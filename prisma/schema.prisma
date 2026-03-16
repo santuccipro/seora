@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  tokens        Int       @default(5)
+  referralCode  String?   @unique
+  referredBy    String?
+  totalReferrals Int      @default(0)
+  isAdmin       Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  cvAnalyses     CVAnalysis[]
+  coverLetters   CoverLetterAnalysis[]
+  jobMatches     JobMatch[]
+  tokenPurchases TokenPurchase[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model CVAnalysis {
+  id              String   @id @default(cuid())
+  userId          String
+  fileName        String
+  fileContent     String
+  score           Int?
+  scoreBreakdown  String?
+  summary         String?
+  strengths       String?
+  weaknesses      String?
+  corrections     String?
+  correctedCV     String?
+  status          String   @default("pending")
+  tokensUsed      Int      @default(0)
+  shareToken      String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobMatches JobMatch[]
+}
+
+model CoverLetterAnalysis {
+  id              String   @id @default(cuid())
+  userId          String
+  fileName        String
+  fileContent     String
+  score           Int?
+  scoreBreakdown  String?
+  summary         String?
+  strengths       String?
+  weaknesses      String?
+  corrections     String?
+  correctedText   String?
+  status          String   @default("pending")
+  tokensUsed      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model JobMatch {
+  id              String   @id @default(cuid())
+  userId          String
+  cvAnalysisId    String
+  jobTitle        String
+  jobDescription  String
+  matchScore      Int?
+  adaptedCV       String?
+  suggestions     String?
+  keywords        String?
+  status          String   @default("pending")
+  tokensUsed      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cvAnalysis CVAnalysis @relation(fields: [cvAnalysisId], references: [id], onDelete: Cascade)
+}
+
+model TokenPurchase {
+  id              String   @id @default(cuid())
+  userId          String
+  amount          Int
+  price           Int
+  stripeSessionId String?  @unique
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
