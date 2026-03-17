@@ -30,30 +30,8 @@ import {
 } from "lucide-react";
 
 
-/* ─── Scroll Reveal Hook ─── */
-function useScrollReveal() {
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("visible");
-          }
-        });
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
-    );
-
-    document.querySelectorAll(".reveal, .reveal-left, .reveal-right, .reveal-scale").forEach((el) => {
-      observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-  }, []);
-}
-
 /* ═══════════════════════════════════════════════ */
-/*          CV MASTER — LANDING PAGE              */
+/*          SEORA — LANDING PAGE                  */
 /* ═══════════════════════════════════════════════ */
 export default function Home() {
   const { data: session } = useSession();
@@ -64,8 +42,6 @@ export default function Home() {
   const [showTools, setShowTools] = useState(false);
   const [activeDemo, setActiveDemo] = useState(0);
   const [activeAudience, setActiveAudience] = useState(0);
-
-  useScrollReveal();
 
   useEffect(() => {
     if (session) {
@@ -99,8 +75,8 @@ export default function Home() {
           <div className="mx-auto max-w-4xl px-4 pt-3">
             <div className="flex h-14 items-center justify-between rounded-2xl glass-strong px-5">
               <div className="flex items-center gap-2.5">
-                <img src="/logos/seora-icon.png" alt="Seora" className="h-9 w-9 rounded-xl" draggable={false} />
-                <span className="text-base font-bold tracking-tight text-gray-900">Seora</span>
+                <img src="/logos/seora-icon.png" alt="Seora" className="h-10 w-10 rounded-xl" draggable={false} />
+                <span className="text-lg font-extrabold tracking-tight text-gray-900">Seora</span>
               </div>
 
               <div className="hidden items-center gap-5 md:flex">
