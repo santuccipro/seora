@@ -80,6 +80,10 @@ export default function Home() {
   const [showTokens, setShowTokens] = useState(false);
   const [activeTab, setActiveTab] = useState<"results" | "corrections" | "cover-letter" | "job-match">("results");
 
+  // Theatrical loading
+  const [theatricalStep, setTheatricalStep] = useState(-1);
+  const [fakeScore, setFakeScore] = useState(0);
+
   // Cover letter form
   const [clCompany, setClCompany] = useState("");
   const [clUrl, setClUrl] = useState("");
@@ -107,12 +111,6 @@ export default function Home() {
     async (file: File) => {
       if (!file) return;
 
-      if (!session) {
-        setShowAuth(true);
-        toast.error("Connectez-vous pour analyser votre CV");
-        return;
-      }
-
       setFileName(file.name);
       setUploading(true);
       setAnalysis(null);
@@ -120,33 +118,68 @@ export default function Home() {
       setCoverLetter(null);
       setJobMatch(null);
       setActiveTab("results");
+      setTheatricalStep(0);
+      setFakeScore(Math.floor(Math.random() * 25) + 48);
 
-      try {
+      const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+      // Theatrical animation (always runs)
+      const animate = async () => {
+        const delays = [2500, 3000, 3500, 2500, 2000];
+        for (let i = 0; i < delays.length; i++) {
+          await sleep(delays[i]);
+          setTheatricalStep(i + 1);
+        }
+      };
+
+      // Real API call (only if authenticated)
+      const callApi = async (): Promise<Analysis | null> => {
+        if (!session) return null;
         const formData = new FormData();
         formData.append("cv", file);
-
         const res = await fetch("/api/analyze", { method: "POST", body: formData });
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erreur lors de l'analyse");
+        return data;
+      };
 
-        if (!res.ok) {
-          toast.error(data.error || "Erreur lors de l'analyse");
-          return;
+      try {
+        const [, apiResult] = await Promise.all([animate(), callApi()]);
+        if (apiResult) {
+          setAnalysis(apiResult);
+          setTokens((t) => (t !== null ? t - 1 : null));
         }
-
-        setAnalysis(data);
-        setTokens((t) => (t !== null ? t - 1 : null));
-
-        setTimeout(() => {
-          resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 200);
-      } catch {
-        toast.error("Erreur réseau");
-      } finally {
-        setUploading(false);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Erreur réseau";
+        toast.error(message);
       }
+
+      setUploading(false);
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 300);
     },
     [session]
   );
+
+  // Auto-process file from landing page sessionStorage
+  const hasAutoProcessed = useRef(false);
+  useEffect(() => {
+    if (hasAutoProcessed.current) return;
+    const dataUrl = sessionStorage.getItem("seora_cv_file");
+    const name = sessionStorage.getItem("seora_cv_filename");
+    if (dataUrl && name) {
+      hasAutoProcessed.current = true;
+      sessionStorage.removeItem("seora_cv_file");
+      sessionStorage.removeItem("seora_cv_filename");
+      fetch(dataUrl)
+        .then((r) => r.blob())
+        .then((blob) => {
+          const file = new File([blob], name, { type: blob.type || "application/pdf" });
+          handleUpload(file);
+        });
+    }
+  }, [handleUpload]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -383,12 +416,141 @@ export default function Home() {
             )}
           </div>
 
-          {!session && !analysis && (
+          {!session && !analysis && !uploading && theatricalStep < 0 && (
             <p className="mt-3 text-center text-xs text-gray-400">
-              Première analyse gratuite • Aucune carte bancaire requise
+              Analyse gratuite • Aucune carte bancaire requise
             </p>
           )}
         </div>
+
+        {/* ═══════ THEATRICAL LOADING ═══════ */}
+        {uploading && theatricalStep >= 0 && (
+          <div className="mx-auto max-w-2xl mt-8">
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-indigo-400/20 animate-ping" />
+                  <div className="relative h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Analyse approfondie en cours</p>
+                  <p className="text-xs text-gray-400">{fileName}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  "Extraction du contenu du CV",
+                  "Analyse de la structure et mise en page",
+                  "Évaluation des compétences clés",
+                  "Vérification de la cohérence globale",
+                  "Calcul du score final",
+                ].map((step, i) => (
+                  <div key={i} className={`flex items-center gap-3 transition-all duration-700 ${theatricalStep > i ? "opacity-100" : theatricalStep === i ? "opacity-70" : "opacity-25"}`}>
+                    {theatricalStep > i ? (
+                      <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      </div>
+                    ) : theatricalStep === i ? (
+                      <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />
+                      </div>
+                    ) : (
+                      <div className="h-6 w-6 rounded-full border-2 border-gray-200 shrink-0" />
+                    )}
+                    <span className={`text-sm ${theatricalStep > i ? "text-gray-900 font-medium" : theatricalStep === i ? "text-gray-600" : "text-gray-300"}`}>{step}</span>
+                    {theatricalStep > i && <span className="text-[10px] text-green-500 font-medium ml-auto">Terminé</span>}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8">
+                <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 transition-all duration-1000 ease-out" style={{ width: `${Math.min(((theatricalStep + 1) / 6) * 100, 100)}%` }} />
+                </div>
+              </div>
+
+              {theatricalStep >= 2 && (
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                  <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium mb-3">Moteur d&apos;analyse</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {["NLP sémantique v3", "Matching ATS multi-format", "Scoring pondéré 47 critères", "Parsing contextuel deep-learning"].map((t) => (
+                      <span key={t} className="inline-flex items-center rounded-full bg-indigo-50/80 border border-indigo-100/60 px-2.5 py-0.5 text-[10px] font-medium text-indigo-500">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {theatricalStep >= 3 && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium mb-3">Vérifié avec</p>
+                  <div className="flex items-center gap-6">
+                    {["GPTZero", "Originality.ai", "LinkedIn", "Indeed"].map((name) => (
+                      <span key={name} className="text-xs font-semibold text-gray-400">{name}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ═══════ GATED RESULTS (non-auth) ═══════ */}
+        {!uploading && theatricalStep >= 5 && !session && !analysis && (
+          <div ref={resultsRef} className="mx-auto max-w-4xl pt-12 pb-20">
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center mb-6">
+              <ScoreRing score={fakeScore} size={180} />
+              <p className="mt-3 text-sm text-gray-500">
+                {fakeScore >= 60 ? "Bon CV, quelques améliorations possibles" : "Des améliorations importantes à faire"}
+              </p>
+            </div>
+
+            <div className="relative rounded-2xl border border-gray-200 bg-white overflow-hidden">
+              <div className="p-8 filter blur-[6px] pointer-events-none select-none" aria-hidden="true">
+                <div className="space-y-3 mb-6">
+                  <div className="h-4 bg-gray-100 rounded-full w-3/4" />
+                  <div className="h-4 bg-gray-100 rounded-full w-full" />
+                  <div className="h-4 bg-gray-100 rounded-full w-5/6" />
+                  <div className="h-4 bg-gray-100 rounded-full w-2/3" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-xl bg-green-50 p-4">
+                    <div className="h-3 bg-green-200 rounded w-1/2 mb-3" />
+                    <div className="space-y-2">
+                      <div className="h-3 bg-green-100 rounded w-full" />
+                      <div className="h-3 bg-green-100 rounded w-4/5" />
+                      <div className="h-3 bg-green-100 rounded w-3/4" />
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-orange-50 p-4">
+                    <div className="h-3 bg-orange-200 rounded w-1/2 mb-3" />
+                    <div className="space-y-2">
+                      <div className="h-3 bg-orange-100 rounded w-full" />
+                      <div className="h-3 bg-orange-100 rounded w-4/5" />
+                      <div className="h-3 bg-orange-100 rounded w-3/4" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-white via-white/95 to-white/60">
+                <div className="text-center px-6">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 mb-4">
+                    <Lock className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Débloquez votre analyse complète</h3>
+                  <p className="text-sm text-gray-500 mt-2 mb-6 max-w-sm mx-auto">Créez votre compte gratuit pour voir les détails, corrections et recommandations.</p>
+                  <button onClick={() => setShowAuth(true)} className="inline-flex items-center gap-2 rounded-xl bg-black px-8 py-3.5 text-sm font-semibold text-white hover:bg-gray-800 shadow-lg transition-all">
+                    <ArrowRight className="h-4 w-4" />
+                    Créer mon compte — c&apos;est gratuit
+                  </button>
+                  <p className="text-xs text-gray-400 mt-3">Sans carte bancaire • 3 tokens offerts</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ═══════ RESULTS ═══════ */}
         {analysis && (
@@ -752,7 +914,7 @@ export default function Home() {
         )}
 
         {/* ─── Pre-analysis: Feature preview ─── */}
-        {!analysis && !uploading && (
+        {!analysis && !uploading && theatricalStep < 5 && (
           <div className="mx-auto max-w-3xl pb-20 pt-16">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 import {
@@ -24,9 +25,7 @@ import {
   TrendingUp,
   Sparkles,
   Bot,
-  RefreshCw,
   Search,
-  Send,
 } from "lucide-react";
 
 
@@ -35,13 +34,129 @@ import {
 /* ═══════════════════════════════════════════════ */
 export default function Home() {
   const { data: session } = useSession();
+  const router = useRouter();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [landingHumanizerText, setLandingHumanizerText] = useState("");
+  const [landingCompany, setLandingCompany] = useState("");
+  const [landingJob, setLandingJob] = useState("");
+  const [landingContractType, setLandingContractType] = useState("");
+  const [landingSector, setLandingSector] = useState("");
+  const [showSectorSuggestions, setShowSectorSuggestions] = useState(false);
+  const [sectorSuggestions, setSectorSuggestions] = useState<string[]>([]);
+  const [humInputMode, setHumInputMode] = useState<"text" | "file">("text");
+  const [humDragOver, setHumDragOver] = useState(false);
+  const [humFileName, setHumFileName] = useState("");
+  const humFileRef = useRef<HTMLInputElement>(null);
+  const [humTone, setHumTone] = useState("");
+  const [letterCvName, setLetterCvName] = useState("");
+  const letterCvRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [tokens, setTokens] = useState<number | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [showTools, setShowTools] = useState(false);
   const [activeDemo, setActiveDemo] = useState(0);
   const [activeAudience, setActiveAudience] = useState(0);
+  const [autoCycleDemo, setAutoCycleDemo] = useState(true);
+  const [activeInteractive, setActiveInteractive] = useState<"cv" | "letter" | "humanizer">("cv");
+  const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
+  const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
+
+  const topCompanies = [
+    "L'Oréal", "LVMH", "TotalEnergies", "Sanofi", "BNP Paribas", "Airbus", "Danone", "Société Générale",
+    "Capgemini", "Schneider Electric", "Michelin", "Saint-Gobain", "Renault", "Pernod Ricard", "Hermès",
+    "Thales", "Dassault Systèmes", "Orange", "Carrefour", "Crédit Agricole", "AXA", "Engie", "Bouygues",
+    "Publicis", "Veolia", "Decathlon", "Ubisoft", "Criteo", "OVHcloud", "Back Market", "Alan", "Doctolib",
+    "Swile", "Qonto", "PayFit", "Ledger", "ManoMano", "Blablacar", "Deezer", "Vestiaire Collective",
+    "Leroy Merlin", "Amazon France", "Google France", "McKinsey", "BCG", "Bain & Company", "Deloitte",
+    "EY", "PwC", "KPMG", "Accenture", "Alstom", "Valeo", "Safran", "Stellantis", "EDF", "SNCF",
+    "La Poste", "Auchan", "Leclerc", "Chanel", "Dior", "Cartier", "Kering", "Nike France", "Apple France",
+  ];
+
+  const handleCompanyInput = (value: string) => {
+    setLandingCompany(value);
+    if (value.length > 0) {
+      const filtered = topCompanies.filter((c) =>
+        c.toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 5);
+      setCompanySuggestions(filtered);
+      setShowCompanySuggestions(filtered.length > 0);
+    } else {
+      setShowCompanySuggestions(false);
+    }
+  };
+
+  const sectors = [
+    "Tech & IT", "Finance & Banque", "Conseil & Audit", "Marketing & Communication",
+    "Industrie & Ingénierie", "Santé & Pharma", "Luxe & Mode", "Grande Distribution",
+    "Énergie & Environnement", "BTP & Immobilier", "Média & Divertissement",
+    "Transport & Logistique", "Droit & Juridique", "Ressources Humaines", "Éducation & Formation",
+    "Agroalimentaire", "Télécoms", "Assurance", "Startup & Innovation", "Fonction publique",
+  ];
+
+  const handleSectorInput = (value: string) => {
+    setLandingSector(value);
+    if (value.length > 0) {
+      const filtered = sectors.filter((s) =>
+        s.toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 5);
+      setSectorSuggestions(filtered);
+      setShowSectorSuggestions(filtered.length > 0);
+    } else {
+      setShowSectorSuggestions(false);
+    }
+  };
+
+  const contractTypes = ["Stage", "Alternance", "CDI", "CDD", "Freelance", "VIE"];
+
+  const humTones = ["Naturel", "Académique", "Professionnel", "Décontracté"];
+
+  const handleHumFile = (file: File) => {
+    const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
+    if (!validTypes.includes(file.type) && !file.name.endsWith(".txt") && !file.name.endsWith(".docx") && !file.name.endsWith(".pdf")) {
+      toast.error("Format accepté : PDF, DOCX ou TXT"); return;
+    }
+    setHumFileName(file.name);
+    const reader = new FileReader();
+    if (file.type === "text/plain" || file.name.endsWith(".txt")) {
+      reader.onload = (e) => { setLandingHumanizerText(e.target?.result as string || ""); setHumInputMode("text"); };
+      reader.readAsText(file);
+    } else {
+      reader.onload = (e) => {
+        sessionStorage.setItem("seora_humanizer_file", e.target?.result as string);
+        sessionStorage.setItem("seora_humanizer_filename", file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLetterCv = (file: File) => {
+    if (!file.type.includes("pdf") && !file.name.endsWith(".pdf") && !file.name.endsWith(".docx")) {
+      toast.error("PDF ou DOCX uniquement"); return;
+    }
+    setLetterCvName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      sessionStorage.setItem("seora_cl_cv_file", e.target?.result as string);
+      sessionStorage.setItem("seora_cl_cv_filename", file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Auto-cycle demo tabs: Analyse CV (12s) → Lettre (14s) → Humanizer (10s)
+  useEffect(() => {
+    if (!autoCycleDemo) return;
+    const durations: Record<number, number> = { 0: 12000, 2: 14000, 3: 10000 };
+    const order = [0, 2, 3];
+    const currentDuration = durations[activeDemo] || 12000;
+    const timer = setTimeout(() => {
+      const currentIndex = order.indexOf(activeDemo);
+      const nextIndex = (currentIndex + 1) % order.length;
+      setActiveDemo(order[nextIndex]);
+    }, currentDuration);
+    return () => clearTimeout(timer);
+  }, [activeDemo, autoCycleDemo]);
 
   useEffect(() => {
     if (session) {
@@ -91,13 +206,9 @@ export default function Home() {
                       <div className="rounded-2xl p-3 shadow-2xl shadow-black/10 border border-white/50 w-[440px] grid grid-cols-2 gap-1 bg-white/90 backdrop-blur-xl">
                         {[
                           { href: "/app", icon: BarChart3, label: "Analyse CV", desc: "Score sur 6 critères", color: "text-indigo-600 bg-indigo-50" },
-                          { href: "/app", icon: Sparkles, label: "Corrections IA", desc: "Réécriture intelligente", color: "text-purple-600 bg-purple-50" },
                           { href: "/cover-letter", icon: PenTool, label: "Lettre de motivation", desc: "Adaptée à l'offre", color: "text-blue-600 bg-blue-50" },
                           { href: "/job-match", icon: Briefcase, label: "Job Matching", desc: "CV sur-mesure", color: "text-emerald-600 bg-emerald-50" },
                           { href: "/humanize", icon: Bot, label: "Humanizer IA", desc: "Texte indétectable", color: "text-orange-600 bg-orange-50" },
-                          { href: "/plagiarism", icon: Search, label: "Détecteur plagiat", desc: "Score d'originalité", color: "text-red-600 bg-red-50" },
-                          { href: "/reformulate", icon: RefreshCw, label: "Reformulateur", desc: "Reformulez en 1 clic", color: "text-cyan-600 bg-cyan-50" },
-                          { href: "/email-pro", icon: Send, label: "Email Pro", desc: "Relances & candidatures", color: "text-pink-600 bg-pink-50" },
                         ].map((tool) => (
                           <Link
                             key={tool.label}
@@ -118,7 +229,6 @@ export default function Home() {
                   )}
                 </div>
 
-                <a href="#pricing" className="text-[13px] font-medium text-gray-500 hover:text-gray-900 transition-colors">Tarifs</a>
                 <a href="#faq" className="text-[13px] font-medium text-gray-500 hover:text-gray-900 transition-colors">FAQ</a>
               </div>
 
@@ -149,7 +259,7 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         {/*  2. HERO — Emotional, direct           */}
         {/* ══════════════════════════════════════ */}
-        <section className="relative pt-20 pb-12 sm:pt-28 sm:pb-16">
+        <section className="relative pt-14 pb-8 sm:pt-20 sm:pb-10">
           <div className="relative mx-auto max-w-2xl px-6 text-center">
             {/* Badge */}
             <div className="animate-fade-up inline-flex items-center gap-2 rounded-full glass-strong px-4 py-1.5 text-xs font-semibold text-indigo-700 mb-6 shadow-sm">
@@ -166,7 +276,7 @@ export default function Home() {
               Score détaillé, corrections IA, lettre de motivation sur-mesure — tout en 30 secondes. <strong className="text-gray-700">Aucun autre outil ne fait ça.</strong>
             </p>
 
-            <div className="animate-fade-up delay-300 mt-8 flex flex-col items-center gap-4" style={{ animationFillMode: "both" }}>
+            <div className="animate-fade-up delay-300 mt-6 flex flex-col items-center gap-3" style={{ animationFillMode: "both" }}>
               <Link
                 href="/app"
                 className="brand-gradient animate-cta-pulse flex items-center gap-2 rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform"
@@ -178,11 +288,42 @@ export default function Home() {
             </div>
 
             {/* Social proof */}
-            <div className="animate-fade-up delay-500 mt-10 flex items-center justify-center gap-2.5" style={{ animationFillMode: "both" }}>
+            <div className="animate-fade-up delay-500 mt-6 flex items-center justify-center gap-2.5" style={{ animationFillMode: "both" }}>
               <img src="/logos/customers.webp" alt="Utilisateurs" className="h-10" draggable={false} />
               <p className="text-sm text-gray-500">
                 <strong className="text-gray-900 font-bold text-base">4.9/5</strong> · utilisé par <strong className="text-gray-800 font-semibold">1 783</strong> étudiants <img src="/logos/blue-badge.svg" alt="Vérifié" className="h-4 w-4 inline-block ml-0.5 -mt-0.5" />
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════ */}
+        {/*  2b. ANTI-IA BANNER — Indétectable      */}
+        {/* ══════════════════════════════════════ */}
+        <section className="py-5 sm:py-6">
+          <div className="mx-auto max-w-4xl px-6">
+            <div className="relative rounded-2xl overflow-hidden border border-white/30 shadow-2xl shadow-indigo-500/10">
+              {/* Background gradient */}
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-indigo-950 to-gray-900" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.15),transparent_50%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(168,85,247,0.1),transparent_50%)]" />
+
+              <div className="relative px-8 py-8 sm:px-14 sm:py-10">
+                {/* Top row: badge + headline inline */}
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Indétectable</span>
+                  </div>
+                </div>
+
+                <h2 className="text-center text-2xl sm:text-3xl md:text-4xl font-black text-white leading-tight mb-2.5">
+                  100% de nos contenus passent <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">sous les radars de l&apos;IA.</span>
+                </h2>
+                <p className="text-center text-gray-400 text-sm max-w-xl mx-auto">
+                  Notre moteur supprime les signatures IA de vos textes — indétectable par GPTZero, Turnitin, Compilatio.
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -229,11 +370,404 @@ export default function Home() {
         </section>
 
         {/* ══════════════════════════════════════ */}
+        {/*  ESSAYE MAINTENANT — INTERACTIVE       */}
+        {/* ══════════════════════════════════════ */}
+        <section className="py-10 sm:py-12">
+          <div className="mx-auto max-w-4xl px-6">
+            <div className="text-center mb-6">
+              <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl mb-3">
+                Essaye maintenant, <span className="brand-gradient-text">c&apos;est gratuit</span>
+              </h2>
+              <p className="text-base text-gray-500 max-w-lg mx-auto">
+                Dépose ton CV, colle ton texte ou génère ta lettre. Résultat en 30 secondes.
+              </p>
+            </div>
+
+            {/* Tabs — pill style */}
+            <div className="flex items-center justify-center mb-8">
+              <div className="inline-flex items-center gap-1 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200/60 p-1.5 shadow-sm">
+                {[
+                  { key: "cv" as const, icon: BarChart3, label: "Analyse CV" },
+                  { key: "letter" as const, icon: PenTool, label: "Lettre de motivation" },
+                  { key: "humanizer" as const, icon: Bot, label: "Humanizer IA" },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveInteractive(tab.key)}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      activeInteractive === tab.key
+                        ? "bg-white text-gray-900 shadow-md"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    <tab.icon className="h-4 w-4" />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Content card */}
+            <div className="rounded-3xl bg-white/80 backdrop-blur-xl border border-gray-200/60 shadow-2xl shadow-gray-900/[0.06] overflow-hidden">
+              {/* CV Tab */}
+              {activeInteractive === "cv" && (
+                <div
+                  className={`p-10 sm:p-14 transition-all duration-300 ${dragOver ? "bg-indigo-50/40" : ""}`}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file && (file.type === "application/pdf" || file.name.endsWith(".pdf") || file.name.endsWith(".docx"))) {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        sessionStorage.setItem("seora_cv_file", reader.result as string);
+                        sessionStorage.setItem("seora_cv_filename", file.name);
+                        router.push("/app");
+                      };
+                      reader.readAsDataURL(file);
+                    } else {
+                      toast.error("Format accepté : PDF ou DOCX");
+                    }
+                  }}
+                >
+                  <input ref={fileInputRef} type="file" accept=".pdf,.docx" className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          sessionStorage.setItem("seora_cv_file", reader.result as string);
+                          sessionStorage.setItem("seora_cv_filename", file.name);
+                          router.push("/app");
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <div
+                    className={`border-2 border-dashed rounded-2xl py-24 sm:py-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${
+                      dragOver ? "border-indigo-500 bg-indigo-50/50 scale-[1.005]" : "border-gray-200 hover:border-indigo-400 hover:bg-gray-50/50"
+                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className={`h-16 w-16 rounded-2xl flex items-center justify-center mb-5 transition-colors ${dragOver ? "bg-indigo-100" : "bg-gray-100"}`}>
+                      <Upload className={`h-7 w-7 ${dragOver ? "text-indigo-600" : "text-gray-400"}`} />
+                    </div>
+                    <p className="text-xl font-bold text-gray-900 mb-1">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
+                    <p className="text-sm text-gray-400 mb-8">PDF ou DOCX • Analyse gratuite et instantanée</p>
+                    <div className="px-8 py-3 rounded-xl brand-gradient text-white text-sm font-semibold shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all">
+                      Parcourir mes fichiers
+                    </div>
+                  </div>
+                  {/* Quick info */}
+                  <div className="flex items-center justify-center gap-8 mt-6 text-xs text-gray-400">
+                    <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Confidentiel</span>
+                    <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-amber-400" /> Résultat en 30s</span>
+                    <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-indigo-400" /> Données supprimées après analyse</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Letter Tab */}
+              {activeInteractive === "letter" && (
+                <div className="p-8 sm:p-12">
+                  <div className="space-y-6">
+                    {/* Row 1: Company + Sector */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {/* Company input with autocomplete */}
+                      <div className="relative">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">🏢 Entreprise visée</label>
+                        <div className="relative">
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={landingCompany}
+                            onChange={(e) => handleCompanyInput(e.target.value)}
+                            onFocus={() => { if (companySuggestions.length > 0) setShowCompanySuggestions(true); }}
+                            onBlur={() => setTimeout(() => setShowCompanySuggestions(false), 200)}
+                            placeholder="Rechercher une entreprise..."
+                            className="w-full rounded-xl border border-gray-200 bg-white px-5 py-3.5 pl-11 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+                          />
+                        </div>
+                        {showCompanySuggestions && companySuggestions.length > 0 && (
+                          <div className="absolute z-20 w-full mt-1 rounded-xl bg-white border border-gray-200 shadow-xl shadow-gray-900/10 overflow-hidden">
+                            {companySuggestions.map((company, i) => (
+                              <button
+                                key={i}
+                                onMouseDown={() => { setLandingCompany(company); setShowCompanySuggestions(false); }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-3 border-b border-gray-100 last:border-0"
+                              >
+                                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-xs font-bold text-indigo-600 shrink-0">
+                                  {company.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="font-medium">{company}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Sector with autocomplete */}
+                      <div className="relative">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">📊 Secteur d&apos;activité</label>
+                        <div className="relative">
+                          <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={landingSector}
+                            onChange={(e) => handleSectorInput(e.target.value)}
+                            onFocus={() => { if (landingSector.length === 0) { setSectorSuggestions(sectors.slice(0, 5)); setShowSectorSuggestions(true); } else if (sectorSuggestions.length > 0) setShowSectorSuggestions(true); }}
+                            onBlur={() => setTimeout(() => setShowSectorSuggestions(false), 200)}
+                            placeholder="Ex: Tech & IT, Finance..."
+                            className="w-full rounded-xl border border-gray-200 bg-white px-5 py-3.5 pl-11 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+                          />
+                        </div>
+                        {showSectorSuggestions && sectorSuggestions.length > 0 && (
+                          <div className="absolute z-20 w-full mt-1 rounded-xl bg-white border border-gray-200 shadow-xl shadow-gray-900/10 overflow-hidden">
+                            {sectorSuggestions.map((sector, i) => (
+                              <button
+                                key={i}
+                                onMouseDown={() => { setLandingSector(sector); setShowSectorSuggestions(false); }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors border-b border-gray-100 last:border-0"
+                              >
+                                <span className="font-medium">{sector}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Row 2: Contract type pills */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">📋 Type de contrat</label>
+                      <div className="flex flex-wrap gap-2.5">
+                        {contractTypes.map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => setLandingContractType(landingContractType === type ? "" : type)}
+                            className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all border ${
+                              landingContractType === type
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50"
+                            }`}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Row 3: CV upload (optional) */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">📎 Ton CV <span className="text-gray-400 font-normal">(optionnel — pour personnaliser la lettre)</span></label>
+                      <div
+                        onClick={() => letterCvRef.current?.click()}
+                        className={`flex items-center gap-4 rounded-xl border border-dashed py-4 px-5 cursor-pointer transition-all ${
+                          letterCvName ? "border-emerald-300 bg-emerald-50" : "border-gray-300 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50/50"
+                        }`}
+                      >
+                        <input
+                          ref={letterCvRef}
+                          type="file"
+                          accept=".pdf,.docx"
+                          className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLetterCv(f); }}
+                        />
+                        {letterCvName ? (
+                          <>
+                            <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-emerald-700 truncate">{letterCvName}</p>
+                              <p className="text-xs text-emerald-500">CV importé • Cliquez pour changer</p>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); setLetterCvName(""); sessionStorage.removeItem("seora_cl_cv_file"); sessionStorage.removeItem("seora_cl_cv_filename"); }} className="text-gray-400 hover:text-red-500 transition-colors">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                              <Upload className="h-5 w-5 text-indigo-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">Ajouter ton CV</p>
+                              <p className="text-xs text-gray-400">PDF ou DOCX • La lettre sera adaptée à ton profil</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Row 4: Job description - larger textarea */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">📝 Description de l&apos;offre</label>
+                      <textarea
+                        value={landingJob}
+                        onChange={(e) => setLandingJob(e.target.value)}
+                        placeholder="Collez l'intitulé ou la description complète de l'offre d'emploi..."
+                        rows={6}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-5 py-4 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none transition-all"
+                      />
+                      <p className="text-xs text-gray-400 mt-1.5 ml-1">Plus l&apos;offre est détaillée, meilleure sera la lettre générée.</p>
+                    </div>
+
+                    {/* Submit */}
+                    <button
+                      onClick={() => {
+                        if (!landingCompany.trim() || !landingJob.trim()) { toast.error("Remplis au moins l'entreprise et l'offre"); return; }
+                        sessionStorage.setItem("seora_cl_company", landingCompany);
+                        sessionStorage.setItem("seora_cl_job", landingJob);
+                        if (landingContractType) sessionStorage.setItem("seora_cl_contract", landingContractType);
+                        if (landingSector) sessionStorage.setItem("seora_cl_sector", landingSector);
+                        router.push("/cover-letter");
+                      }}
+                      className="w-full flex items-center justify-center gap-2.5 rounded-xl brand-gradient px-6 py-4 text-base font-bold text-white shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.005] transition-all"
+                    >
+                      <Sparkles className="h-5 w-5" /> Générer ma lettre — gratuit
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Humanizer Tab */}
+              {activeInteractive === "humanizer" && (
+                <div className="p-8 sm:p-12">
+                  <div className="space-y-6">
+                    {/* Input mode toggle */}
+                    <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1 w-fit">
+                      <button
+                        onClick={() => setHumInputMode("text")}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${humInputMode === "text" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        ✏️ Coller du texte
+                      </button>
+                      <button
+                        onClick={() => setHumInputMode("file")}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${humInputMode === "file" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        📄 Importer un fichier
+                      </button>
+                    </div>
+
+                    {/* Text mode */}
+                    {humInputMode === "text" && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">📝 Texte à humaniser</label>
+                        <textarea
+                          value={landingHumanizerText}
+                          onChange={(e) => setLandingHumanizerText(e.target.value)}
+                          placeholder="Commencez à taper ou collez votre texte IA (ChatGPT, Gemini, Claude...)"
+                          rows={10}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-5 py-4 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 resize-none transition-all"
+                        />
+                        <div className="flex items-center justify-between mt-1.5 px-1">
+                          <p className="text-xs text-gray-400">Minimum 50 caractères requis</p>
+                          <p className={`text-xs font-medium ${landingHumanizerText.length >= 50 ? "text-emerald-500" : "text-gray-400"}`}>
+                            {landingHumanizerText.length} caractère{landingHumanizerText.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* File mode */}
+                    {humInputMode === "file" && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">📎 Importer votre document</label>
+                        <div
+                          onDragOver={(e) => { e.preventDefault(); setHumDragOver(true); }}
+                          onDragLeave={() => setHumDragOver(false)}
+                          onDrop={(e) => { e.preventDefault(); setHumDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleHumFile(f); }}
+                          onClick={() => humFileRef.current?.click()}
+                          className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-16 cursor-pointer transition-all ${
+                            humDragOver ? "border-orange-400 bg-orange-50" : humFileName ? "border-emerald-300 bg-emerald-50" : "border-gray-300 bg-gray-50 hover:border-orange-300 hover:bg-orange-50/50"
+                          }`}
+                        >
+                          <input
+                            ref={humFileRef}
+                            type="file"
+                            accept=".pdf,.docx,.txt"
+                            className="hidden"
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleHumFile(f); }}
+                          />
+                          {humFileName ? (
+                            <>
+                              <div className="h-12 w-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-3">
+                                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                              </div>
+                              <p className="text-sm font-semibold text-emerald-700">{humFileName}</p>
+                              <p className="text-xs text-emerald-500 mt-1">Fichier importé • Cliquez pour changer</p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="h-12 w-12 rounded-xl bg-orange-100 flex items-center justify-center mb-3">
+                                <Upload className="h-6 w-6 text-orange-600" />
+                              </div>
+                              <p className="text-sm font-semibold text-gray-700">Glissez votre fichier ici</p>
+                              <p className="text-xs text-gray-400 mt-1">PDF, DOCX ou TXT • 10 Mo max</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tone selection */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">🎨 Style d&apos;écriture souhaité</label>
+                      <div className="flex flex-wrap gap-2.5">
+                        {humTones.map((tone) => (
+                          <button
+                            key={tone}
+                            onClick={() => setHumTone(humTone === tone ? "" : tone)}
+                            className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all border ${
+                              humTone === tone
+                                ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:bg-orange-50"
+                            }`}
+                          >
+                            {tone}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Submit */}
+                    <button
+                      onClick={() => {
+                        if (humInputMode === "text" && landingHumanizerText.length < 50) { toast.error("Minimum 50 caractères"); return; }
+                        if (humInputMode === "file" && !humFileName) { toast.error("Importe un fichier"); return; }
+                        if (humInputMode === "text") sessionStorage.setItem("seora_humanizer_text", landingHumanizerText);
+                        if (humTone) sessionStorage.setItem("seora_humanizer_tone", humTone);
+                        router.push("/humanize");
+                      }}
+                      className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 text-base font-bold text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.005] transition-all"
+                    >
+                      <Bot className="h-5 w-5" /> Humaniser — gratuit
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom trust badges */}
+            <div className="flex items-center justify-center gap-8 mt-6 text-xs text-gray-400">
+              <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> Données sécurisées</span>
+              <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" /> Résultat en 30s</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> 100% gratuit</span>
+            </div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════ */}
         {/*  4. DEMO — 3 separate animated cards   */}
         {/* ══════════════════════════════════════ */}
-        <section className="py-12 sm:py-16">
+        <section className="py-8 sm:py-10">
           <div className="mx-auto max-w-5xl px-6">
-            <div className="text-center mb-12">
+            <div className="text-center mb-6">
               <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-3">
                 Regarde ce que l&apos;IA fait de ton CV <span className="brand-gradient-text">en 30 secondes</span>
               </h2>
@@ -247,10 +781,11 @@ export default function Home() {
               {[
                 { icon: BarChart3, label: "Analyse CV", idx: 0 },
                 { icon: PenTool, label: "Lettre de motivation", idx: 2 },
+                { icon: Bot, label: "Humanizer IA", idx: 3 },
               ].map((tab) => (
                 <button
                   key={tab.idx}
-                  onClick={() => setActiveDemo(tab.idx)}
+                  onClick={() => { setActiveDemo(tab.idx); setAutoCycleDemo(false); setTimeout(() => setAutoCycleDemo(true), 20000); }}
                   className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all ${
                     activeDemo === tab.idx
                       ? "brand-gradient text-white shadow-lg shadow-indigo-500/20"
@@ -536,6 +1071,98 @@ export default function Home() {
                 </div>
               )}
 
+              {/* ─── Demo 3: Humanizer IA ─── */}
+              {activeDemo === 3 && (
+                <div className="glass-card rounded-3xl overflow-hidden animate-fade-up" style={{ animationDuration: "0.3s" }}>
+                  <div className="flex items-center gap-2.5 px-6 py-4 border-b border-gray-200/60">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-100">
+                      <Bot className="h-4.5 w-4.5 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">Humanizer IA</p>
+                      <p className="text-[11px] text-gray-400">Rendez vos textes indétectables par les outils IA</p>
+                    </div>
+                  </div>
+                  <div className="relative h-[340px] overflow-hidden">
+                    {/* Phase 1: Texte IA détecté */}
+                    <div className="anim-phase anim-h-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="w-full max-w-xs">
+                        <div className="rounded-xl bg-red-50 border border-red-200/60 p-4 mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-semibold text-red-500 uppercase tracking-wider">Détection IA</span>
+                            <span className="text-lg font-extrabold text-red-600">87%</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-red-100 overflow-hidden">
+                            <div className="h-full rounded-full bg-red-500 w-[87%]" />
+                          </div>
+                          <p className="text-[10px] text-red-400 mt-1.5">Texte généré par IA détecté</p>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-1.5">
+                          <div className="h-2.5 bg-gray-100 rounded w-full" />
+                          <div className="h-2.5 bg-gray-100 rounded w-11/12" />
+                          <div className="h-2.5 bg-red-100 rounded w-full" />
+                          <div className="h-2.5 bg-gray-100 rounded w-4/5" />
+                          <div className="h-2.5 bg-red-100 rounded w-full" />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Phase 2: Humanisation en cours */}
+                    <div className="anim-phase anim-h-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="relative">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/30 anim-a-magic-glow">
+                          <Bot className="h-7 w-7 text-white" />
+                        </div>
+                        <div className="absolute -inset-3 rounded-3xl border-2 border-orange-300/40 anim-a-magic-spin" style={{ borderStyle: "dashed" }} />
+                      </div>
+                      <p className="mt-4 text-sm font-bold text-gray-900">Humanisation en cours...</p>
+                      <p className="text-[11px] text-gray-400 mt-1">Reformulation intelligente du texte</p>
+                      <div className="mt-5 w-full max-w-[220px] space-y-2.5">
+                        {[
+                          { t: "Suppression markers SFT", d: 1 },
+                          { t: "Désync. GPT-patterns", d: 2 },
+                          { t: "Randomisation syntaxique", d: 3 },
+                          { t: "Inversion perplexité", d: 4 },
+                        ].map((item) => (
+                          <div key={item.t} className={`flex items-center gap-2 anim-a-magic-line anim-a-magic-line-${item.d}`}>
+                            <CheckCircle2 className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                            <span className="text-[10px] text-gray-600">{item.t}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Phase 3: Résultat */}
+                    <div className="anim-phase anim-h-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="w-full max-w-xs space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-xl bg-red-50 border border-red-100/60 p-3">
+                            <p className="text-[9px] font-semibold text-red-400 uppercase tracking-wider mb-1">Avant</p>
+                            <p className="text-xl font-extrabold text-red-600">87%</p>
+                            <p className="text-[9px] text-red-400">Détecté IA</p>
+                          </div>
+                          <div className="rounded-xl bg-emerald-50 border border-emerald-100/60 p-3">
+                            <p className="text-[9px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">Après</p>
+                            <p className="text-xl font-extrabold text-emerald-600">8%</p>
+                            <p className="text-[9px] text-emerald-400">Score humain</p>
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-1.5">
+                          <div className="h-2.5 bg-emerald-50 rounded w-full" />
+                          <div className="h-2.5 bg-emerald-50 rounded w-11/12" />
+                          <div className="h-2.5 bg-emerald-50 rounded w-full" />
+                          <div className="h-2.5 bg-emerald-50 rounded w-4/5" />
+                          <div className="h-2.5 bg-emerald-50 rounded w-full" />
+                        </div>
+                        <div className="flex items-center justify-center">
+                          <span className="rounded-full bg-emerald-50 border border-emerald-200/60 px-3 py-1 text-[10px] font-semibold text-emerald-600 flex items-center gap-1.5">
+                            <CheckCircle2 className="h-3 w-3" /> 100% indétectable
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* CTA under demos */}
@@ -552,12 +1179,12 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         {/*  SEORA EST FAIT POUR TOI               */}
         {/* ══════════════════════════════════════ */}
-        <section className="py-12 sm:py-16">
+        <section className="py-8 sm:py-10">
           <div className="mx-auto max-w-5xl px-6">
             <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-3 text-center">
               Seora s&apos;adapte à <span className="brand-gradient-text">ton profil</span>
             </h2>
-            <p className="text-sm text-gray-500 text-center mb-10 max-w-md mx-auto">
+            <p className="text-sm text-gray-500 text-center mb-6 max-w-md mx-auto">
               Que tu cherches un stage, un premier emploi ou une reconversion, les outils s&apos;adaptent.
             </p>
 
@@ -644,16 +1271,16 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         {/*  8. TÉMOIGNAGES — Chiffres + quotes    */}
         {/* ══════════════════════════════════════ */}
-        <section className="py-12 sm:py-16">
+        <section className="py-8 sm:py-10">
           <div className="mx-auto max-w-5xl px-6">
-            <div className="text-center mb-12">
+            <div className="text-center mb-6">
               <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-3">
                 Ce qu&apos;en pensent <span className="brand-gradient-text">nos utilisateurs.</span>
               </h2>
             </div>
 
             {/* Stats bar */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-10">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6">
               {[
                 { value: "12 847+", label: "utilisateurs" },
                 { value: "45 000+", label: "CV analysés" },
@@ -712,7 +1339,7 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         {/*  BLOC CTA — Accès complet              */}
         {/* ══════════════════════════════════════ */}
-        <section className="py-16 sm:py-24 relative overflow-hidden">
+        <section className="py-8 sm:py-10 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-indigo-50/50 via-purple-50/30 to-transparent" />
           {/* Floating icons — hidden on mobile */}
           <div className="absolute inset-0 pointer-events-none hidden md:block">
@@ -740,7 +1367,7 @@ export default function Home() {
               Tous les outils. <span className="brand-gradient-text">Un seul accès.</span>
             </h2>
             <p className="text-base text-gray-500 mb-8 max-w-lg mx-auto leading-relaxed">
-              Analyse de CV, lettre de motivation, humanizer IA, détection de plagiat, email pro — tout est inclus avec tes tokens. Pas d&apos;abonnement.
+              Analyse de CV, lettre de motivation, job matching, humanizer IA — 4 outils inclus avec tes tokens. Pas d&apos;abonnement.
             </p>
             <Link href="/app" className="inline-flex items-center gap-2 brand-gradient animate-cta-pulse rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform shadow-lg shadow-indigo-500/25">
               Commencer gratuitement
@@ -755,7 +1382,7 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         <section id="faq" className="py-12 sm:py-16">
           <div className="mx-auto max-w-2xl px-6">
-            <div className="text-center mb-10">
+            <div className="text-center mb-6">
               <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-3">
                 Questions fréquentes
               </h2>
@@ -804,58 +1431,94 @@ export default function Home() {
         </section>
 
         {/* ══════════════════════════════════════ */}
-        {/*  11. CTA FINAL                         */}
+        {/*  FOOTER                                 */}
         {/* ══════════════════════════════════════ */}
-        <section className="py-12 sm:py-16">
-          <div className="mx-auto max-w-3xl px-6">
-            <div className="rounded-3xl brand-gradient p-10 sm:p-14 text-center relative overflow-hidden">
-              {/* Floating glass orbs */}
-              <div className="absolute top-6 left-10 h-32 w-32 rounded-full bg-white/10 blur-2xl animate-float-slow" />
-              <div className="absolute bottom-6 right-10 h-40 w-40 rounded-full bg-white/10 blur-3xl animate-float-reverse" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-60 w-60 rounded-full bg-white/5 blur-3xl animate-pulse-glow" />
-
-              <div className="relative">
-                <h2 className="text-2xl font-extrabold text-white sm:text-3xl">
-                  Ton prochain entretien commence ici.
-                </h2>
-                <p className="mt-3 text-sm text-white/80 max-w-md mx-auto">
-                  Analyse ton CV maintenant, découvre ce que les recruteurs voient vraiment, et corrige tout avant ta prochaine candidature.
+        <footer className="bg-gray-950 mt-8">
+          <div className="mx-auto max-w-6xl px-6 pt-14 pb-8">
+            {/* Top grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-12 gap-10 sm:gap-8">
+              {/* Brand — wider column */}
+              <div className="col-span-2 sm:col-span-4">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <img src="/logos/seora-icon.png" alt="Seora" className="h-8 w-8 rounded-lg" draggable={false} />
+                  <span className="text-lg font-extrabold text-white">Seora</span>
+                </div>
+                <p className="text-[13px] text-gray-400 leading-relaxed max-w-[280px]">
+                  Analyse, corrige et adapte ton CV pour décrocher plus d&apos;entretiens. Conçu pour les étudiants en France.
                 </p>
+                {/* Social icons */}
+                <div className="flex items-center gap-4 mt-6">
+                  <a href="#" className="text-gray-500 hover:text-white transition-colors" aria-label="Twitter">
+                    <svg className="h-[18px] w-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                  </a>
+                  <a href="#" className="text-gray-500 hover:text-white transition-colors" aria-label="LinkedIn">
+                    <svg className="h-[18px] w-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                  </a>
+                  <a href="#" className="text-gray-500 hover:text-white transition-colors" aria-label="Instagram">
+                    <svg className="h-[18px] w-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                  </a>
+                  <a href="#" className="text-gray-500 hover:text-white transition-colors" aria-label="TikTok">
+                    <svg className="h-[18px] w-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+                  </a>
+                </div>
+              </div>
 
-                <Link
-                  href="/app"
-                  className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-sm font-bold text-indigo-700 shadow-xl glow-white hover:scale-[1.03] transition-all"
-                >
-                  Analyser mon CV gratuitement
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+              {/* Outils */}
+              <div className="sm:col-span-2 sm:col-start-6">
+                <h4 className="text-[13px] font-semibold text-white uppercase tracking-wider mb-4">Outils</h4>
+                <ul className="space-y-3">
+                  {[
+                    { label: "Analyse CV", href: "/app" },
+                    { label: "Lettre de motivation", href: "/cover-letter" },
+                    { label: "Humanizer IA", href: "/humanize" },
+                    { label: "Job Matching", href: "/job-match" },
+                  ].map((link) => (
+                    <li key={link.label}>
+                      <Link href={link.href} className="text-[13px] text-gray-400 hover:text-white transition-colors">{link.label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-                <p className="mt-4 flex items-center justify-center gap-3 text-xs text-white/60">
-                  <span className="flex items-center gap-1"><Coins className="h-3 w-3" /> 5 tokens offerts</span>
-                  <span>•</span>
-                  <span>8 outils IA</span>
-                  <span>•</span>
-                  <span>Sans carte bancaire</span>
-                </p>
+              {/* Ressources */}
+              <div className="sm:col-span-2">
+                <h4 className="text-[13px] font-semibold text-white uppercase tracking-wider mb-4">Ressources</h4>
+                <ul className="space-y-3">
+                  {[
+                    { label: "Guide du CV parfait", href: "#" },
+                    { label: "Modèles de lettres", href: "#" },
+                    { label: "Conseils entretien", href: "#" },
+                    { label: "Blog", href: "#" },
+                  ].map((link) => (
+                    <li key={link.label}>
+                      <a href={link.href} className="text-[13px] text-gray-400 hover:text-white transition-colors">{link.label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Légal */}
+              <div className="sm:col-span-2">
+                <h4 className="text-[13px] font-semibold text-white uppercase tracking-wider mb-4">Légal</h4>
+                <ul className="space-y-3">
+                  {[
+                    { label: "Conditions générales", href: "#" },
+                    { label: "Confidentialité", href: "#" },
+                    { label: "Mentions légales", href: "#" },
+                    { label: "Contact", href: "mailto:contact@seora.fr" },
+                  ].map((link) => (
+                    <li key={link.label}>
+                      <a href={link.href} className="text-[13px] text-gray-400 hover:text-white transition-colors">{link.label}</a>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
-          </div>
-        </section>
 
-        {/* ══════════════════════════════════════ */}
-        {/*  12. FOOTER                            */}
-        {/* ══════════════════════════════════════ */}
-        <footer className="border-t border-white/40 py-8">
-          <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-6 sm:flex-row sm:justify-between">
-            <div className="flex items-center gap-2">
-              <img src="/logos/seora-icon.png" alt="Seora" className="h-6 w-6 rounded-md" draggable={false} />
-              <span className="text-sm font-bold text-gray-900">Seora</span>
-              <span className="text-xs text-gray-400">© 2026</span>
-            </div>
-            <div className="flex gap-6">
-              <a href="#" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">CGU</a>
-              <a href="#" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Confidentialité</a>
-              <a href="#" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Contact</a>
+            {/* Bottom bar */}
+            <div className="mt-10 pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-xs text-gray-500">© 2026 Seora. Tous droits réservés.</p>
+              <p className="text-xs text-gray-600">Fait en France 🇫🇷</p>
             </div>
           </div>
         </footer>

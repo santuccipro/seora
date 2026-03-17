@@ -627,3 +627,13 @@ button, a, input, textarea {
 .anim-c-line-6 { animation-delay: 5.5s; }
 .anim-c-line-7 { animation-delay: 6.5s; }
 .anim-c-line-8 { animation-delay: 7.5s; }
+
+/* ─── CARD H: Humanizer IA (3 phases, 10s loop) ─── */
+/* h-p1: detected 0-30% | h-p2: humanizing 30-55% | h-p3: result 55-95% */
+@keyframes h-p1 { 0% { opacity:1;visibility:visible } 28% { opacity:1;visibility:visible } 30% { opacity:0;visibility:hidden } 100% { opacity:0;visibility:hidden } }
+@keyframes h-p2 { 0%,30% { opacity:0;visibility:hidden } 32% { opacity:1;visibility:visible } 53% { opacity:1;visibility:visible } 55% { opacity:0;visibility:hidden } 100% { opacity:0;visibility:hidden } }
+@keyframes h-p3 { 0%,55% { opacity:0;visibility:hidden } 57% { opacity:1;visibility:visible } 93% { opacity:1;visibility:visible } 96% { opacity:0;visibility:hidden } 100% { opacity:0;visibility:hidden } }
+
+.anim-h-phase1 { animation: h-p1 10s infinite; }
+.anim-h-phase2 { animation: h-p2 10s infinite; }
+.anim-h-phase3 { animation: h-p3 10s infinite; }

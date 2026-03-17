@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/dashboard/layout";
+import { signIn } from "next-auth/react";
 import {
   PenTool,
   Loader2,
@@ -17,6 +17,10 @@ import {
   CheckCircle2,
   Upload,
   XCircle,
+  Lock,
+  ArrowRight,
+  X,
+  Check,
 } from "lucide-react";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { useDropzone } from "react-dropzone";
@@ -40,7 +44,6 @@ type ActiveTab = "generate" | "analyze";
 
 export default function CoverLetterPage() {
   const { status } = useSession();
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActiveTab>("generate");
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [selectedCV, setSelectedCV] = useState("");
@@ -56,6 +59,10 @@ export default function CoverLetterPage() {
   const [tips, setTips] = useState<string[]>([]);
   const [companyInsights, setCompanyInsights] = useState<string[]>([]);
 
+  // Theatrical loading
+  const [theatricalStep, setTheatricalStep] = useState(-1);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
   // Analyze state
   const [analyzeFile, setAnalyzeFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -68,13 +75,39 @@ export default function CoverLetterPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (status === "unauthenticated") router.push("/auth/signin");
     if (status === "authenticated") {
       fetch("/api/analyses")
         .then((r) => r.json())
         .then((d) => { if (Array.isArray(d)) setAnalyses(d); });
     }
-  }, [status, router]);
+  }, [status]);
+
+  // Auto-process from landing page sessionStorage
+  const hasAutoProcessed = useRef(false);
+  const [pendingAutoGenerate, setPendingAutoGenerate] = useState(false);
+  useEffect(() => {
+    if (hasAutoProcessed.current) return;
+    const company = sessionStorage.getItem("seora_cl_company");
+    const job = sessionStorage.getItem("seora_cl_job");
+    if (company && job) {
+      hasAutoProcessed.current = true;
+      sessionStorage.removeItem("seora_cl_company");
+      sessionStorage.removeItem("seora_cl_job");
+      setCompanyName(company);
+      setJobDescription(job);
+      setActiveTab("generate");
+      setPendingAutoGenerate(true);
+    }
+  }, []);
+
+  // Auto-trigger generation after state is set
+  useEffect(() => {
+    if (pendingAutoGenerate && companyName && jobDescription && !generating) {
+      setPendingAutoGenerate(false);
+      handleGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoGenerate, companyName, jobDescription]);
 
   // Research company
   async function handleResearch() {
@@ -107,7 +140,20 @@ export default function CoverLetterPage() {
       return;
     }
     setGenerating(true);
-    try {
+    setTheatricalStep(0);
+
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+    const animate = async () => {
+      const delays = [2500, 3500, 4000, 3000, 2000];
+      for (let i = 0; i < delays.length; i++) {
+        await sleep(delays[i]);
+        setTheatricalStep(i + 1);
+      }
+    };
+
+    const callApi = async () => {
+      if (status !== "authenticated") return null;
       const res = await fetch("/api/cover-letter/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -119,21 +165,25 @@ export default function CoverLetterPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error);
-        if (res.status === 403) router.push("/tokens");
-        return;
+      if (!res.ok) throw new Error(data.error || "Erreur");
+      return data;
+    };
+
+    try {
+      const [, apiResult] = await Promise.all([animate(), callApi()]);
+      if (apiResult) {
+        setGeneratedLetter(apiResult.coverLetter);
+        setTips(apiResult.tips || []);
+        setCompanyInsights(apiResult.companyInsights || []);
+        if (apiResult.companyInfo) setCompanyInfo(apiResult.companyInfo);
+        toast.success("Lettre générée !");
       }
-      setGeneratedLetter(data.coverLetter);
-      setTips(data.tips || []);
-      setCompanyInsights(data.companyInsights || []);
-      if (data.companyInfo) setCompanyInfo(data.companyInfo);
-      toast.success("Lettre générée !");
-    } catch {
-      toast.error("Erreur de connexion");
-    } finally {
-      setGenerating(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur de connexion";
+      toast.error(message);
     }
+
+    setGenerating(false);
   }
 
   // Analyze existing cover letter
@@ -313,15 +363,116 @@ export default function CoverLetterPage() {
               {generating ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Recherche entreprise + génération... (45s)
+                  Génération en cours...
                 </>
               ) : (
                 <>
                   <Sparkles className="h-5 w-5" />
-                  Générer la lettre de motivation (3 tokens)
+                  Générer la lettre de motivation
                 </>
               )}
             </button>
+
+            {/* Theatrical Loading */}
+            {generating && theatricalStep >= 0 && (
+              <div className="rounded-2xl bg-white border border-gray-200 p-8 shadow-sm">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-full bg-indigo-400/20 animate-ping" />
+                    <div className="relative h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Génération de votre lettre</p>
+                    <p className="text-xs text-gray-400">Pour {companyName}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {[
+                    "Recherche d'informations sur l'entreprise",
+                    "Analyse du poste et des compétences requises",
+                    "Croisement avec votre profil",
+                    "Rédaction personnalisée",
+                    "Vérification et optimisation finale",
+                  ].map((step, i) => (
+                    <div key={i} className={`flex items-center gap-3 transition-all duration-700 ${theatricalStep > i ? "opacity-100" : theatricalStep === i ? "opacity-70" : "opacity-25"}`}>
+                      {theatricalStep > i ? (
+                        <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                          <Check className="h-4 w-4 text-green-500" />
+                        </div>
+                      ) : theatricalStep === i ? (
+                        <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />
+                        </div>
+                      ) : (
+                        <div className="h-6 w-6 rounded-full border-2 border-gray-200 shrink-0" />
+                      )}
+                      <span className={`text-sm ${theatricalStep > i ? "text-gray-900 font-medium" : theatricalStep === i ? "text-gray-600" : "text-gray-300"}`}>{step}</span>
+                      {theatricalStep > i && <span className="text-[10px] text-green-500 font-medium ml-auto">Terminé</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-8 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 transition-all duration-1000 ease-out" style={{ width: `${Math.min(((theatricalStep + 1) / 6) * 100, 100)}%` }} />
+                </div>
+                {theatricalStep >= 2 && (
+                  <div className="mt-6 pt-4 border-t border-gray-100">
+                    <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium mb-3">Moteur de rédaction</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {["Extraction NER entreprise", "Cross-matching compétences×offre", "Génération fine-tuned GPT-4o", "Anti-détection IA intégrée"].map((t) => (
+                        <span key={t} className="inline-flex items-center rounded-full bg-indigo-50/80 border border-indigo-100/60 px-2.5 py-0.5 text-[10px] font-medium text-indigo-500">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {theatricalStep >= 3 && (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium mb-3">Sources utilisées</p>
+                    <div className="flex items-center gap-5">
+                      {["Site entreprise", "LinkedIn", "Glassdoor", "Welcome to the Jungle"].map((n) => (
+                        <span key={n} className="text-xs font-semibold text-gray-400">{n}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Gated Results (non-auth) */}
+        {activeTab === "generate" && !generating && theatricalStep >= 5 && status !== "authenticated" && !generatedLetter && (
+          <div className="space-y-6">
+            <div className="relative rounded-2xl bg-white border border-gray-200 overflow-hidden shadow-sm">
+              <div className="p-8 filter blur-[6px] pointer-events-none select-none" aria-hidden="true">
+                <div className="space-y-2 mb-4">
+                  <div className="h-4 bg-gray-100 rounded w-2/3" />
+                  <div className="h-4 bg-gray-100 rounded w-full" />
+                  <div className="h-4 bg-gray-100 rounded w-5/6" />
+                  <div className="h-4 bg-gray-100 rounded w-full" />
+                  <div className="h-4 bg-gray-100 rounded w-3/4" />
+                  <div className="h-4 bg-gray-100 rounded w-full" />
+                  <div className="h-4 bg-gray-100 rounded w-4/5" />
+                  <div className="h-4 bg-gray-100 rounded w-full" />
+                  <div className="h-4 bg-gray-100 rounded w-2/3" />
+                </div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-white via-white/95 to-white/60">
+                <div className="text-center px-6">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 mb-4">
+                    <Lock className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Votre lettre est prête !</h3>
+                  <p className="text-sm text-gray-500 mt-2 mb-6 max-w-sm mx-auto">Créez votre compte gratuit pour débloquer votre lettre de motivation personnalisée.</p>
+                  <button onClick={() => setShowAuthModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-black px-8 py-3.5 text-sm font-semibold text-white hover:bg-gray-800 shadow-lg transition-all">
+                    <ArrowRight className="h-4 w-4" />
+                    Créer mon compte — c&apos;est gratuit
+                  </button>
+                  <p className="text-xs text-gray-400 mt-3">Sans carte bancaire • 3 tokens offerts</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -485,6 +636,48 @@ export default function CoverLetterPage() {
           </div>
         )}
       </div>
+
+      {/* Auth Modal */}
+      {showAuthModal && status !== "authenticated" && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAuthModal(false)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <button onClick={() => setShowAuthModal(false)} className="absolute right-3 top-3 rounded-full p-1 text-gray-400 hover:bg-gray-100">
+              <X className="h-4 w-4" />
+            </button>
+            <AuthFormCL onSuccess={() => { setShowAuthModal(false); window.location.reload(); }} />
+          </div>
+        </div>
+      )}
     </DashboardLayout>
+  );
+}
+
+function AuthFormCL({ onSuccess }: { onSuccess: () => void }) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const res = await signIn("credentials", { email, name, redirect: false });
+    if (res?.ok) onSuccess();
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">Débloquez votre lettre</h2>
+      <p className="text-xs text-gray-500 mb-5">3 tokens offerts à l&apos;inscription</p>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Votre prénom" required className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm" />
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm" />
+        <button type="submit" disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+          {loading ? "Connexion..." : "Continuer"}
+        </button>
+      </form>
+    </div>
   );
 }
