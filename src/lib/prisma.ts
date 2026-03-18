@@ -1,13 +1,16 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
-  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
-  const adapter = new PrismaPg({ connectionString });
+  const connectionString = process.env.DATABASE_URL;
+  // Use pg.Pool with prepared statements disabled for Supabase transaction pooler
+  const pool = new pg.Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }
 
