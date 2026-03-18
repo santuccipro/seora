@@ -311,7 +311,7 @@ export default function Home() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-black">
               <FileText className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="text-[15px] font-semibold tracking-tight">CV Master</span>
+            <span className="text-[15px] font-semibold tracking-tight">Seora CV</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1015,10 +1015,10 @@ export default function Home() {
       {/* ═══════ FOOTER ═══════ */}
       <footer className="border-t border-gray-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-          <p className="text-xs text-gray-400">© 2026 CV Master</p>
+          <p className="text-xs text-gray-400">© 2026 Seora CV</p>
           <div className="flex gap-4">
-            <a href="#" className="text-xs text-gray-400 hover:text-gray-600">CGU</a>
-            <a href="#" className="text-xs text-gray-400 hover:text-gray-600">Confidentialité</a>
+            <a href="/cgu" className="text-xs text-gray-400 hover:text-gray-600">CGU</a>
+            <a href="/confidentialite" className="text-xs text-gray-400 hover:text-gray-600">Confidentialité</a>
           </div>
         </div>
       </footer>
@@ -1046,51 +1046,18 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
 }
 
 function AuthForm({ onSuccess }: { onSuccess: () => void }) {
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const res = await signIn("credentials", { email, name, redirect: false });
-    if (res?.ok) {
-      onSuccess();
-      window.location.reload();
-    }
-    setLoading(false);
-  };
-
+  void onSuccess;
   return (
-    <div className="p-6">
+    <div className="p-6 text-center">
       <h2 className="text-lg font-semibold text-gray-900 mb-1">Connexion</h2>
-      <p className="text-xs text-gray-500 mb-5">3 tokens offerts à l&apos;inscription</p>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Votre prénom"
-          required
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          required
-          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-          {loading ? "Connexion..." : "Continuer"}
-        </button>
-      </form>
+      <p className="text-xs text-gray-500 mb-5">5 tokens offerts à l&apos;inscription</p>
+      <a
+        href="/auth/signin"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+      >
+        <ArrowRight className="h-4 w-4" />
+        Se connecter avec email
+      </a>
     </div>
   );
 }

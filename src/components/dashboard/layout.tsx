@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/app", label: "Espace de travail", icon: LayoutDashboard },
   { href: "/job-match", label: "Matcher une offre", icon: Target },
   { href: "/cover-letter", label: "Lettre de motivation", icon: PenTool },
   { href: "/referral", label: "Parrainage", icon: Gift },
@@ -45,7 +45,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <FileText className="h-4 w-4 text-white" />
               </div>
               <span className="text-lg font-bold text-gray-900">
-                CV <span className="gradient-text">Master</span>
+                Seora <span className="gradient-text">CV</span>
               </span>
             </Link>
           </div>
@@ -119,11 +119,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
         <div className="flex h-14 items-center justify-between px-4">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/app" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500">
               <FileText className="h-4 w-4 text-white" />
             </div>
-            <span className="font-bold text-gray-900">CV Master</span>
+            <span className="font-bold text-gray-900">Seora <span className="gradient-text">CV</span></span>
           </Link>
           <div className="flex items-center gap-1">
             {navItems.slice(0, 4).map((item) => (

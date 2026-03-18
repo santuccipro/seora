@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 // In-memory store for verification codes (in production, use Redis or DB)
 // We use the VerificationToken model in prisma
@@ -9,6 +10,14 @@ export async function POST(req: NextRequest) {
 
     if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "Email invalide" }, { status: 400 });
+    }
+
+    const { success } = rateLimit(`send-code:${email}`, 5, 600_000);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Trop de tentatives. Réessayez dans 10 minutes." },
+        { status: 429 }
+      );
     }
 
     // Generate 6-digit code
@@ -29,9 +38,26 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // In production: send email via Resend/SendGrid/etc.
-    // For now, log it (and also return it in dev for testing)
-    console.log(`[VERIFICATION] Code for ${email}: ${code}`);
+    // Send email via Resend
+    if (process.env.RESEND_API_KEY) {
+      const { Resend } = await import("resend");
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: "Seora CV <noreply@seora-cv.com>",
+        to: email,
+        subject: "Votre code de connexion Seora CV",
+        html: `
+          <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #4F46E5;">Seora CV</h2>
+            <p>Votre code de vérification :</p>
+            <div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; padding: 20px; background: #F3F4F6; border-radius: 12px; margin: 16px 0;">${code}</div>
+            <p style="color: #6B7280; font-size: 14px;">Ce code est valable 10 minutes.</p>
+          </div>
+        `,
+      });
+    } else {
+      console.log(`[VERIFICATION] Code for ${email}: ${code}`);
+    }
 
     return NextResponse.json({
       success: true,

@@ -149,7 +149,7 @@ export default function HumanizePage() {
                 <div className="brand-gradient flex h-8 w-8 items-center justify-center rounded-xl shadow-lg shadow-indigo-500/20">
                   <FileText className="h-4 w-4 text-white" />
                 </div>
-                <span className="text-base font-bold tracking-tight text-gray-900">CV Master</span>
+                <span className="text-base font-bold tracking-tight text-gray-900">Seora CV</span>
               </Link>
 
               <div className="flex items-center gap-3">

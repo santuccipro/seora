@@ -1,8 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 export interface CompanyInfo {
   name: string;
@@ -85,21 +83,16 @@ export async function researchCompany(
     }
   }
 
-  // Use Claude to analyze what we found + its knowledge
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1500,
-    messages: [
-      {
-        role: "user",
-        content: `Fais une recherche sur l'entreprise "${companyName}".
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: `Fais une recherche sur l'entreprise "${companyName}".
 ${
   webContent
     ? `\nVoici du contenu de leur site web:\n${webContent.slice(0, 3000)}`
     : "\nJe n'ai pas pu accéder à leur site web."
 }
 
-Réponds UNIQUEMENT avec un JSON valide au format:
+Réponds avec un JSON au format:
 {
   "name": "${companyName}",
   "description": "<description de l'entreprise en 2-3 phrases>",
@@ -112,11 +105,12 @@ Réponds UNIQUEMENT avec un JSON valide au format:
 }
 
 Utilise tes connaissances sur cette entreprise si elle est connue. Si tu ne la connais pas et que le contenu web est insuffisant, fais de ton mieux avec ce que tu as et indique clairement les incertitudes.`,
-      },
-    ],
+    config: {
+      maxOutputTokens: 1500,
+      responseMimeType: "application/json",
+    },
   });
 
-  const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
+  const text = response.text ?? "";
   return JSON.parse(text);
 }

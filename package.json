@@ -10,10 +10,9 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
     "@auth/prisma-adapter": "^2.11.1",
-    "@libsql/client": "^0.17.0",
-    "@prisma/adapter-libsql": "^7.5.0",
+    "@google/genai": "^1.46.0",
+    "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -22,10 +21,12 @@
     "next": "16.1.6",
     "next-auth": "^4.24.13",
     "pdf-parse": "^2.4.5",
+    "pg": "^8.20.0",
     "prisma": "^7.5.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-dropzone": "^15.0.0",
+    "resend": "^6.9.4",
     "sonner": "^2.0.7",
     "stripe": "^20.4.1",
     "tailwind-merge": "^3.5.0"

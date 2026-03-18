@@ -18,7 +18,7 @@ export function Navbar() {
               <FileText className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold text-gray-900">
-              CV <span className="gradient-text">Master</span>
+              Seora <span className="gradient-text">CV</span>
             </span>
           </Link>
 
@@ -40,10 +40,10 @@ export function Navbar() {
           <div className="hidden items-center gap-3 md:flex">
             {session ? (
               <Link
-                href="/dashboard"
+                href="/app"
                 className="rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all"
               >
-                Mon Dashboard
+                Mon espace
               </Link>
             ) : (
               <>

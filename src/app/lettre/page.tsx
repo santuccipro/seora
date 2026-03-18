@@ -178,7 +178,7 @@ export default function LettrePage() {
             <div className="brand-gradient flex h-9 w-9 items-center justify-center rounded-xl">
               <FileText className="h-4 w-4 text-white" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-gray-900">CV Master</span>
+            <span className="text-lg font-bold tracking-tight text-gray-900">Seora CV</span>
           </Link>
 
           <div className="flex items-center gap-3">

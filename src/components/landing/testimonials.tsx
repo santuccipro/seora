@@ -6,7 +6,7 @@ const testimonials = [
   {
     name: "Léa M.",
     role: "Étudiante en marketing",
-    content: "J'avais envoyé mon CV partout sans réponse. Après les corrections de CV Master, j'ai décroché 3 entretiens en une semaine !",
+    content: "J'avais envoyé mon CV partout sans réponse. Après les corrections de Seora CV, j'ai décroché 3 entretiens en une semaine !",
     rating: 5,
     avatar: "L",
     color: "bg-pink-500",
@@ -46,7 +46,7 @@ const testimonials = [
   {
     name: "Karim B.",
     role: "Commercial",
-    content: "J'ai utilisé les tokens pour corriger mon CV et ma lettre de motivation. Les deux sont maintenant au top. Merci CV Master !",
+    content: "J'ai utilisé les tokens pour corriger mon CV et ma lettre de motivation. Les deux sont maintenant au top. Merci Seora CV !",
     rating: 5,
     avatar: "K",
     color: "bg-orange-500",

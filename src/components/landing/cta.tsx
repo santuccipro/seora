@@ -15,7 +15,7 @@ export function CTA() {
               Prêt à booster votre CV ?
             </h2>
             <p className="mt-4 text-lg text-indigo-100">
-              Rejoignez des milliers de candidats qui ont amélioré leur CV avec CV Master
+              Rejoignez des milliers de candidats qui ont amélioré leur CV avec Seora CV
             </p>
             <button
               onClick={() => signIn()}

@@ -13,7 +13,7 @@ export function Footer() {
               <FileText className="h-4 w-4 text-white" />
             </div>
             <span className="text-lg font-bold text-gray-900">
-              CV <span className="gradient-text">Master</span>
+              Seora <span className="gradient-text">CV</span>
             </span>
           </div>
 
@@ -24,13 +24,13 @@ export function Footer() {
             <Link href="/confidentialite" className="hover:text-indigo-600 transition-colors">
               Confidentialité
             </Link>
-            <Link href="/cgv" className="hover:text-indigo-600 transition-colors">
-              CGV
+            <Link href="/cgu" className="hover:text-indigo-600 transition-colors">
+              CGU
             </Link>
           </div>
 
           <p className="text-sm text-gray-400">
-            &copy; {new Date().getFullYear()} CV Master. Tous droits réservés.
+            &copy; {new Date().getFullYear()} Seora CV. Tous droits réservés.
           </p>
         </div>
       </div>

@@ -54,7 +54,7 @@ export default function SharePage() {
         <div className="text-center">
           <p className="text-gray-600">Cette analyse n&apos;existe pas ou n&apos;est plus partagée.</p>
           <Link href="/" className="mt-4 inline-block text-indigo-600 font-medium hover:underline">
-            Retour à CV Master
+            Retour à Seora CV
           </Link>
         </div>
       </div>

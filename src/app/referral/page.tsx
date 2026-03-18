@@ -55,7 +55,7 @@ export default function ReferralPage() {
 
   function shareOnSocial(platform: string) {
     const text = encodeURIComponent(
-      `Analysez et améliorez votre CV gratuitement avec CV Master ! Utilisez mon code ${referralCode} pour 2 tokens offerts.`
+      `Analysez et améliorez votre CV gratuitement avec Seora CV ! Utilisez mon code ${referralCode} pour 2 tokens offerts.`
     );
     const url = encodeURIComponent(referralLink);
 

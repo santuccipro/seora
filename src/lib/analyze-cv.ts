@@ -1,8 +1,18 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+async function generateJSON(prompt: string, maxTokens: number = 4000): Promise<string> {
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: prompt,
+    config: {
+      maxOutputTokens: maxTokens,
+      responseMimeType: "application/json",
+    },
+  });
+  return response.text ?? "";
+}
 
 export interface ScoreBreakdown {
   structure: number;
@@ -66,18 +76,12 @@ export interface JobMatchResult {
 // ===== CV ANALYSIS =====
 
 export async function analyzeCV(cvText: string): Promise<CVAnalysisResult> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2500,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un expert RH français avec 15 ans d'expérience. Analyse ce CV en profondeur.
+  const text = await generateJSON(`Tu es un expert RH français avec 15 ans d'expérience. Analyse ce CV en profondeur.
 
 CV:
 ${cvText}
 
-Réponds UNIQUEMENT avec un JSON valide (pas de markdown, pas de \`\`\`) au format:
+Réponds avec un JSON au format:
 {
   "score": <0-100>,
   "scoreBreakdown": {
@@ -94,30 +98,20 @@ Réponds UNIQUEMENT avec un JSON valide (pas de markdown, pas de \`\`\`) au form
 }
 
 Barème: structure=mise en page/lisibilité, contenu=pertinence/clarté, experiences=détails/résultats chiffrés, competences=hard+soft skills, orthographe=grammaire/syntaxe, impact=mots-clés ATS/accroche.
-Minimum 3 points forts et 3 axes d'amélioration. Sois spécifique avec des exemples du CV.`,
-      },
-    ],
-  });
+Minimum 3 points forts et 3 axes d'amélioration. Sois spécifique avec des exemples du CV.`, 2500);
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(text);
 }
 
 // ===== CV CORRECTIONS =====
 
 export async function generateCorrections(cvText: string): Promise<CVCorrectionsResult> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un expert RH français. Génère des corrections détaillées et réécris ce CV.
+  const text = await generateJSON(`Tu es un expert RH français. Génère des corrections détaillées et réécris ce CV.
 
 CV:
 ${cvText}
 
-Réponds UNIQUEMENT avec un JSON valide (pas de markdown) au format:
+Réponds avec un JSON au format:
 {
   "corrections": [
     {
@@ -132,30 +126,20 @@ Réponds UNIQUEMENT avec un JSON valide (pas de markdown) au format:
   "tips": ["<conseil actionnable 1>", ...]
 }
 
-Focus: verbes d'action, quantification résultats, optimisation ATS, suppression superflu, erreurs FR. Minimum 5 corrections et 5 conseils.`,
-      },
-    ],
-  });
+Focus: verbes d'action, quantification résultats, optimisation ATS, suppression superflu, erreurs FR. Minimum 5 corrections et 5 conseils.`);
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(text);
 }
 
 // ===== COVER LETTER ANALYSIS =====
 
 export async function analyzeCoverLetter(letterText: string): Promise<CoverLetterAnalysisResult> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2500,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un expert RH français spécialisé dans les lettres de motivation. Analyse cette lettre.
+  const text = await generateJSON(`Tu es un expert RH français spécialisé dans les lettres de motivation. Analyse cette lettre.
 
 Lettre de motivation:
 ${letterText}
 
-Réponds UNIQUEMENT avec un JSON valide au format:
+Réponds avec un JSON au format:
 {
   "score": <0-100>,
   "scoreBreakdown": {
@@ -171,12 +155,8 @@ Réponds UNIQUEMENT avec un JSON valide au format:
   "weaknesses": ["<axe amélioration 1>", ...]
 }
 
-Minimum 3 forces et 3 faiblesses. Sois spécifique.`,
-      },
-    ],
-  });
+Minimum 3 forces et 3 faiblesses. Sois spécifique.`, 2500);
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(text);
 }
 
@@ -188,13 +168,7 @@ export async function generateCoverLetter(
   companyName: string,
   companyInfo: string
 ): Promise<CoverLetterGenerationResult> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un expert RH français spécialisé dans la rédaction de lettres de motivation percutantes.
+  const text = await generateJSON(`Tu es un expert RH français spécialisé dans la rédaction de lettres de motivation percutantes.
 
 Génère une lettre de motivation personnalisée en utilisant ces informations:
 
@@ -208,7 +182,7 @@ ENTREPRISE: ${companyName}
 INFORMATIONS SUR L'ENTREPRISE:
 ${companyInfo}
 
-Réponds UNIQUEMENT avec un JSON valide au format:
+Réponds avec un JSON au format:
 {
   "coverLetter": "<lettre de motivation complète, professionnelle, en français. Utilise les informations de l'entreprise pour personnaliser. Format avec paragraphes. Environ 300-400 mots.>",
   "tips": ["<conseil pour personnaliser encore plus>", ...],
@@ -221,12 +195,8 @@ La lettre doit:
 - Avoir une accroche qui capte l'attention (pas "Par la présente...")
 - Être structurée: accroche, motivation, adéquation, conclusion avec call-to-action
 - Sonner authentique, pas robotique
-- Utiliser un ton professionnel mais pas trop formel`,
-      },
-    ],
-  });
+- Utiliser un ton professionnel mais pas trop formel`);
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(text);
 }
 
@@ -257,13 +227,7 @@ export async function humanizeText(
     decontracte: "Ton décontracté mais crédible — comme quelqu'un qui écrit naturellement bien."
   };
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un expert en rédaction française. Ta mission : réécrire ce texte pour qu'il soit INDÉTECTABLE par les outils de détection d'IA (GPTZero, Originality.ai, etc.).
+  const responseText = await generateJSON(`Tu es un expert en rédaction française. Ta mission : réécrire ce texte pour qu'il soit INDÉTECTABLE par les outils de détection d'IA (GPTZero, Originality.ai, etc.).
 
 TEXTE ORIGINAL:
 ${text}
@@ -284,7 +248,7 @@ RÈGLES ANTI-DÉTECTION CRITIQUES:
 - GARDE des "imperfections naturelles" : une virgule avant "et" parfois, une phrase qui commence par "Et" ou "Mais"
 - Le sens, les informations et le niveau de qualité doivent rester IDENTIQUES
 
-Réponds UNIQUEMENT avec un JSON valide (pas de markdown) au format:
+Réponds avec un JSON au format:
 {
   "humanizedText": "<texte complet réécrit>",
   "changes": ["<description du changement 1>", "<changement 2>", ...],
@@ -292,12 +256,8 @@ Réponds UNIQUEMENT avec un JSON valide (pas de markdown) au format:
   "aiScoreAfter": <estimation 0-100 du score IA après humanisation>
 }
 
-Minimum 5 changements listés. Le aiScoreAfter doit être réaliste (pas toujours 0).`
-      },
-    ],
-  });
+Minimum 5 changements listés. Le aiScoreAfter doit être réaliste (pas toujours 0).`);
 
-  const responseText = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(responseText);
 }
 
@@ -317,13 +277,7 @@ export interface PlagiarismResult {
 }
 
 export async function detectPlagiarism(text: string): Promise<PlagiarismResult> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un expert en détection de plagiat universitaire français avec 20 ans d'expérience (comme Compilatio/Turnitin). Analyse ce texte en profondeur pour détecter tout plagiat, paraphrase trop proche, ou contenu non-original.
+  const responseText = await generateJSON(`Tu es un expert en détection de plagiat universitaire français avec 20 ans d'expérience (comme Compilatio/Turnitin). Analyse ce texte en profondeur pour détecter tout plagiat, paraphrase trop proche, ou contenu non-original.
 
 TEXTE À ANALYSER:
 ${text}
@@ -336,7 +290,7 @@ ANALYSE REQUISE:
 5. Repère les passages qui ressemblent à du contenu généré par IA (structures trop régulières, vocabulaire trop soutenu)
 6. Vérifie la cohérence du niveau de langue à travers le texte
 
-Réponds UNIQUEMENT avec un JSON valide (pas de markdown) au format:
+Réponds avec un JSON au format:
 {
   "originalityScore": <0-100, où 100 = totalement original>,
   "flaggedSections": [
@@ -352,12 +306,8 @@ Réponds UNIQUEMENT avec un JSON valide (pas de markdown) au format:
   "tips": ["<conseil pour améliorer l'originalité 1>", "<conseil 2>", ...]
 }
 
-Sois rigoureux mais juste. Ne flag pas les expressions courantes ou le vocabulaire technique normal. Minimum 3 tips. Si le texte est original, dis-le clairement avec un score élevé.`
-      },
-    ],
-  });
+Sois rigoureux mais juste. Ne flag pas les expressions courantes ou le vocabulaire technique normal. Minimum 3 tips. Si le texte est original, dis-le clairement avec un score élevé.`);
 
-  const responseText = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(responseText);
 }
 
@@ -379,13 +329,7 @@ export async function reformulateText(
     soutenu: "Style littéraire soutenu : élégant, riche en vocabulaire, avec des figures de style subtiles. Registre de langue élevé.",
   };
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un expert en rédaction française. Reformule ce texte dans un style différent en gardant EXACTEMENT le même sens et les mêmes informations.
+  const responseText = await generateJSON(`Tu es un expert en rédaction française. Reformule ce texte dans un style différent en gardant EXACTEMENT le même sens et les mêmes informations.
 
 TEXTE ORIGINAL:
 ${text}
@@ -399,18 +343,14 @@ RÈGLES:
 - Le résultat doit être naturel et fluide
 - Pas de perte de contenu
 
-Réponds UNIQUEMENT avec un JSON valide (pas de markdown) au format:
+Réponds avec un JSON au format:
 {
   "reformulatedText": "<texte complet reformulé>",
   "changes": ["<description du type de changement 1>", "<changement 2>", ...]
 }
 
-Minimum 5 changements listés.`
-      },
-    ],
-  });
+Minimum 5 changements listés.`);
 
-  const responseText = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(responseText);
 }
 
@@ -435,13 +375,7 @@ export async function generateProEmail(
     demande_info: "Mail de demande d'information professionnelle",
   };
 
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2500,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un coach en communication professionnelle français. Rédige un email professionnel.
+  const responseText = await generateJSON(`Tu es un coach en communication professionnelle français. Rédige un email professionnel.
 
 TYPE: ${typeLabels[type]}
 CONTEXTE: ${context}
@@ -450,7 +384,7 @@ ${details.companyName ? `ENTREPRISE: ${details.companyName}` : ""}
 ${details.position ? `POSTE: ${details.position}` : ""}
 TON: ${details.tone || "professionnel mais naturel"}
 
-Réponds UNIQUEMENT avec un JSON valide (pas de markdown) au format:
+Réponds avec un JSON au format:
 {
   "email": "<corps complet du mail, avec formule de politesse adaptée>",
   "subject": "<objet du mail, court et percutant>",
@@ -464,12 +398,8 @@ RÈGLES:
 - Accroche qui donne envie de lire la suite
 - Call-to-action clair en fin de mail
 - Formule de politesse moderne (pas "Veuillez agréer l'expression de mes sentiments distingués")
-- Le mail doit sonner humain, pas écrit par une IA`
-      },
-    ],
-  });
+- Le mail doit sonner humain, pas écrit par une IA`, 2500);
 
-  const responseText = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(responseText);
 }
 
@@ -479,13 +409,7 @@ export async function matchCVToJob(
   cvText: string,
   jobDescription: string
 ): Promise<JobMatchResult> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
-    messages: [
-      {
-        role: "user",
-        content: `Tu es un expert RH français. Compare ce CV avec cette offre et adapte le CV.
+  const text = await generateJSON(`Tu es un expert RH français. Compare ce CV avec cette offre et adapte le CV.
 
 CV ACTUEL:
 ${cvText}
@@ -493,7 +417,7 @@ ${cvText}
 OFFRE D'EMPLOI:
 ${jobDescription}
 
-Réponds UNIQUEMENT avec un JSON valide au format:
+Réponds avec un JSON au format:
 {
   "matchScore": <0-100>,
   "adaptedCV": "<CV complet réécrit et optimisé pour cette offre spécifique>",
@@ -503,11 +427,7 @@ Réponds UNIQUEMENT avec un JSON valide au format:
   "globalAdvice": "<conseil global en 2-3 phrases>"
 }
 
-Le CV adapté doit reprendre les mots-clés de l'offre naturellement, réorganiser les expériences, optimiser pour les ATS.`,
-      },
-    ],
-  });
+Le CV adapté doit reprendre les mots-clés de l'offre naturellement, réorganiser les expériences, optimiser pour les ATS.`);
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "";
   return JSON.parse(text);
 }

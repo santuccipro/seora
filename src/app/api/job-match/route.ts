@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { matchCVToJob } from "@/lib/analyze-cv";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,22 @@ export async function POST(req: NextRequest) {
       where: { email: session.user.email },
     });
 
-    if (!user || user.tokens < 2) {
+    if (!user) {
+      return NextResponse.json(
+        { error: "Utilisateur introuvable" },
+        { status: 404 }
+      );
+    }
+
+    const { success } = rateLimit(user.id);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Trop de requêtes. Réessayez dans une minute." },
+        { status: 429 }
+      );
+    }
+
+    if (user.tokens < 2) {
       return NextResponse.json(
         { error: "Pas assez de tokens (2 requis)" },
         { status: 403 }

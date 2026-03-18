@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useAuthModal } from "@/components/auth/auth-context";
+import { ResultPreviewPopup } from "@/components/landing/result-preview-popup";
+import { InlinePricing } from "@/components/landing/inline-pricing";
+import { TrustBadges } from "@/components/landing/trust-badges";
 import {
   Upload,
   Loader2,
@@ -35,8 +39,7 @@ import {
 export default function Home() {
   const { data: session } = useSession();
   const router = useRouter();
-
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { openAuthModal } = useAuthModal();
   const [dragOver, setDragOver] = useState(false);
   const [landingHumanizerText, setLandingHumanizerText] = useState("");
   const [landingCompany, setLandingCompany] = useState("");
@@ -58,6 +61,9 @@ export default function Home() {
   const [showTools, setShowTools] = useState(false);
   const [activeDemo, setActiveDemo] = useState(0);
   const [activeAudience, setActiveAudience] = useState(0);
+  const [showResultPreview, setShowResultPreview] = useState(false);
+  const [resultPreviewType, setResultPreviewType] = useState<"cv" | "letter" | "humanizer">("cv");
+  const [showInlinePricing, setShowInlinePricing] = useState(false);
   const [autoCycleDemo, setAutoCycleDemo] = useState(true);
   const [activeInteractive, setActiveInteractive] = useState<"cv" | "letter" | "humanizer">("cv");
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
@@ -203,12 +209,16 @@ export default function Home() {
                   </button>
                   {showTools && (
                     <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 z-50">
-                      <div className="rounded-2xl p-3 shadow-2xl shadow-black/10 border border-white/50 w-[440px] grid grid-cols-2 gap-1 bg-white/90 backdrop-blur-xl">
+                      <div className="rounded-2xl p-3 shadow-2xl shadow-black/10 border border-white/50 w-[520px] grid grid-cols-2 gap-1 bg-white/90 backdrop-blur-xl">
                         {[
                           { href: "/app", icon: BarChart3, label: "Analyse CV", desc: "Score sur 6 critères", color: "text-indigo-600 bg-indigo-50" },
                           { href: "/cover-letter", icon: PenTool, label: "Lettre de motivation", desc: "Adaptée à l'offre", color: "text-blue-600 bg-blue-50" },
                           { href: "/job-match", icon: Briefcase, label: "Job Matching", desc: "CV sur-mesure", color: "text-emerald-600 bg-emerald-50" },
                           { href: "/humanize", icon: Bot, label: "Humanizer IA", desc: "Texte indétectable", color: "text-orange-600 bg-orange-50" },
+                          { href: "/plagiarism", icon: Search, label: "Détection plagiat", desc: "Vérifier l'originalité", color: "text-violet-600 bg-violet-50" },
+                          { href: "/reformulate", icon: FileText, label: "Reformulation", desc: "Réécriture intelligente", color: "text-cyan-600 bg-cyan-50" },
+                          { href: "/email-pro", icon: Mail, label: "Email pro", desc: "Emails professionnels", color: "text-rose-600 bg-rose-50" },
+                          { href: "/compteur-mots", icon: Zap, label: "Compteur de mots", desc: "Outil gratuit", color: "text-amber-600 bg-amber-50", badge: "Gratuit" },
                         ].map((tool) => (
                           <Link
                             key={tool.label}
@@ -218,8 +228,11 @@ export default function Home() {
                             <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tool.color} shrink-0`}>
                               <tool.icon className="h-3.5 w-3.5" />
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-[12px] font-semibold text-gray-900 truncate">{tool.label}</p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-[12px] font-semibold text-gray-900 truncate">{tool.label}</p>
+                                {"badge" in tool && tool.badge && <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700">{tool.badge}</span>}
+                              </div>
                               <p className="text-[10px] text-gray-400 truncate">{tool.desc}</p>
                             </div>
                           </Link>
@@ -245,7 +258,7 @@ export default function Home() {
                   </>
                 ) : (
                   <button
-                    onClick={() => setShowAuthModal(true)}
+                    onClick={() => openAuthModal()}
                     className="brand-gradient flex items-center gap-1.5 rounded-xl px-4 py-2 text-[13px] font-semibold text-white shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
                   >
                     Essayer gratuitement
@@ -424,7 +437,7 @@ export default function Home() {
                       reader.onload = () => {
                         sessionStorage.setItem("seora_cv_file", reader.result as string);
                         sessionStorage.setItem("seora_cv_filename", file.name);
-                        router.push("/app");
+                        if (session) { router.push("/app"); } else { setResultPreviewType("cv"); setShowResultPreview(true); }
                       };
                       reader.readAsDataURL(file);
                     } else {
@@ -440,7 +453,7 @@ export default function Home() {
                         reader.onload = () => {
                           sessionStorage.setItem("seora_cv_file", reader.result as string);
                           sessionStorage.setItem("seora_cv_filename", file.name);
-                          router.push("/app");
+                          if (session) { router.push("/app"); } else { setResultPreviewType("cv"); setShowResultPreview(true); }
                         };
                         reader.readAsDataURL(file);
                       }
@@ -624,7 +637,7 @@ export default function Home() {
                         sessionStorage.setItem("seora_cl_job", landingJob);
                         if (landingContractType) sessionStorage.setItem("seora_cl_contract", landingContractType);
                         if (landingSector) sessionStorage.setItem("seora_cl_sector", landingSector);
-                        router.push("/cover-letter");
+                        if (session) { router.push("/cover-letter"); } else { setResultPreviewType("letter"); setShowResultPreview(true); }
                       }}
                       className="w-full flex items-center justify-center gap-2.5 rounded-xl brand-gradient px-6 py-4 text-base font-bold text-white shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.005] transition-all"
                     >
@@ -742,7 +755,7 @@ export default function Home() {
                         if (humInputMode === "file" && !humFileName) { toast.error("Importe un fichier"); return; }
                         if (humInputMode === "text") sessionStorage.setItem("seora_humanizer_text", landingHumanizerText);
                         if (humTone) sessionStorage.setItem("seora_humanizer_tone", humTone);
-                        router.push("/humanize");
+                        if (session) { router.push("/humanize"); } else { setResultPreviewType("humanizer"); setShowResultPreview(true); }
                       }}
                       className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 text-base font-bold text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.005] transition-all"
                     >
@@ -761,6 +774,9 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Trust Badges */}
+        <TrustBadges />
 
         {/* ══════════════════════════════════════ */}
         {/*  4. DEMO — 3 separate animated cards   */}
@@ -1525,126 +1541,31 @@ export default function Home() {
 
       </div>{/* end z-10 wrapper */}
 
-      {/* ══════════════════════════════════════ */}
-      {/*  AUTH MODAL (OTP)                      */}
-      {/* ══════════════════════════════════════ */}
-      {showAuthModal && !session && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-md" onClick={() => setShowAuthModal(false)} />
-          <div className="relative w-full max-w-md animate-scale-in glass-strong rounded-3xl p-8 shadow-2xl">
-            <button onClick={() => setShowAuthModal(false)} className="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 hover:bg-gray-100/50 transition-colors">
-              <X className="h-4 w-4" />
-            </button>
-            <OTPAuthForm onSuccess={() => { setShowAuthModal(false); window.location.reload(); }} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+      {/* Result Preview Popup */}
+      <ResultPreviewPopup
+        isOpen={showResultPreview}
+        onClose={() => setShowResultPreview(false)}
+        type={resultPreviewType}
+        onUnlock={() => {
+          setShowResultPreview(false);
+          if (session) {
+            const routes = { cv: "/app", letter: "/cover-letter", humanizer: "/humanize" };
+            router.push(routes[resultPreviewType]);
+          } else {
+            setShowInlinePricing(true);
+            openAuthModal(() => {
+              const routes = { cv: "/app", letter: "/cover-letter", humanizer: "/humanize" };
+              window.location.href = routes[resultPreviewType];
+            });
+          }
+        }}
+      />
 
-/* ═══════ OTP AUTH FORM ═══════ */
-function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
-  const [step, setStep] = useState<"email" | "code">("email");
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const [loading, setLoading] = useState(false);
-  const [devCode, setDevCode] = useState("");
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  const handleSendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/send-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.error); return; }
-      if (data.code) setDevCode(data.code);
-      setStep("code");
-      toast.success("Code envoyé à " + email);
-      setTimeout(() => inputRefs.current[0]?.focus(), 100);
-    } catch { toast.error("Erreur réseau"); } finally { setLoading(false); }
-  };
-
-  const handleCodeChange = (index: number, value: string) => {
-    if (value.length > 1) value = value.slice(-1);
-    if (!/^\d*$/.test(value)) return;
-    const newCode = [...code];
-    newCode[index] = value;
-    setCode(newCode);
-    if (value && index < 5) inputRefs.current[index + 1]?.focus();
-    if (value && index === 5 && newCode.every(c => c)) verifyCode(newCode.join(""));
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !code[index] && index > 0) inputRefs.current[index - 1]?.focus();
-  };
-
-  const verifyCode = async (fullCode: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/verify-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, code: fullCode }) });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.error || "Code invalide"); setCode(["", "", "", "", "", ""]); inputRefs.current[0]?.focus(); return; }
-      const signInRes = await signIn("credentials", { email, name: data.user?.name || email.split("@")[0], redirect: false });
-      if (signInRes?.ok) { toast.success("Bienvenue ! 5 tokens offerts"); onSuccess(); } else { toast.error("Erreur"); }
-    } catch { toast.error("Erreur réseau"); } finally { setLoading(false); }
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (pasted.length === 6) { e.preventDefault(); setCode(pasted.split("")); inputRefs.current[5]?.focus(); verifyCode(pasted); }
-  };
-
-  return (
-    <div>
-      {step === "email" ? (
-        <>
-          <div className="text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50">
-              <Mail className="h-6 w-6 text-indigo-600" />
-            </div>
-            <h3 className="mt-4 text-lg font-bold text-gray-900">Recevez votre code</h3>
-            <p className="mt-2 text-sm text-gray-500">Entrez votre email pour recevoir un code de vérification.</p>
-          </div>
-          <form onSubmit={handleSendCode} className="mt-5 space-y-3">
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="votre@email.com" required autoFocus className="w-full rounded-xl border border-gray-200/60 bg-white/60 px-4 py-3 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 backdrop-blur-sm" />
-            <button type="submit" disabled={loading || !email} className="flex w-full items-center justify-center gap-2 rounded-xl brand-gradient px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 shadow-lg shadow-indigo-500/25">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-              {loading ? "Envoi..." : "Recevoir mon code"}
-            </button>
-          </form>
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <div className="flex items-center gap-1 text-[11px] text-gray-400"><Coins className="h-3 w-3" /> 5 tokens offerts</div>
-            <span className="text-gray-300">•</span>
-            <span className="text-[11px] text-gray-400">Sans carte bancaire</span>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
-              <Shield className="h-6 w-6 text-emerald-600" />
-            </div>
-            <h3 className="mt-4 text-lg font-bold text-gray-900">Vérification</h3>
-            <p className="mt-2 text-sm text-gray-500">Code envoyé à <strong>{email}</strong></p>
-            {devCode && <p className="mt-1 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-700 inline-block">Dev: <strong>{devCode}</strong></p>}
-          </div>
-          <div className="mt-6 flex justify-center gap-2" onPaste={handlePaste}>
-            {code.map((digit, i) => (
-              <input key={i} ref={el => { inputRefs.current[i] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleCodeChange(i, e.target.value)} onKeyDown={(e) => handleKeyDown(i, e)}
-                className={`h-12 w-12 rounded-xl border text-center text-lg font-bold outline-none transition-all backdrop-blur-sm ${digit ? "border-indigo-300 bg-indigo-50/80 text-indigo-700" : "border-gray-200/60 bg-white/60"} focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100`}
-              />
-            ))}
-          </div>
-          {loading && <div className="mt-4 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-indigo-600" /></div>}
-          <div className="mt-5 flex items-center justify-between">
-            <button onClick={() => { setStep("email"); setCode(["", "", "", "", "", ""]); }} className="text-xs text-gray-500 hover:text-gray-700">← Changer d&apos;email</button>
-            <button onClick={() => handleSendCode({ preventDefault: () => {} } as React.FormEvent)} className="text-xs text-indigo-600 font-medium hover:underline">Renvoyer le code</button>
-          </div>
-        </>
-      )}
+      {/* Inline Pricing */}
+      <InlinePricing
+        isOpen={showInlinePricing}
+        onClose={() => setShowInlinePricing(false)}
+      />
     </div>
   );
 }

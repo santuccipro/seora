@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: "eur",
             product_data: {
-              name: `${pack.name} - ${pack.tokens} tokens CV Master`,
+              name: `${pack.name} - ${pack.tokens} tokens Seora CV`,
               description: pack.description,
             },
             unit_amount: pack.price,

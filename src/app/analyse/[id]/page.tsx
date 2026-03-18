@@ -76,7 +76,7 @@ export default function AnalysisPage() {
   async function fetchAnalysis() {
     try {
       const res = await fetch(`/api/analyses/${id}`);
-      if (!res.ok) { router.push("/dashboard"); return; }
+      if (!res.ok) { router.push("/app"); return; }
       setAnalysis(await res.json());
     } catch { toast.error("Erreur"); }
     finally { setLoading(false); }
@@ -134,7 +134,7 @@ export default function AnalysisPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors">
+            <Link href="/app" className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors">
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </Link>
             <div>

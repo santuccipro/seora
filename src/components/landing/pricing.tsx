@@ -7,7 +7,7 @@ const plans = [
   {
     name: "Gratuit",
     price: "0 €",
-    description: "Pour découvrir CV Master",
+    description: "Pour découvrir Seora CV",
     tokens: "3 tokens offerts",
     features: [
       "1 analyse complète de CV",

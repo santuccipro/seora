@@ -22,7 +22,7 @@ const faqs = [
   },
   {
     question: "Quelle est la différence avec un conseiller en emploi ?",
-    answer: "CV Master vous donne un feedback instantané, disponible 24/7, à une fraction du prix d'un consultant. L'analyse est objective et basée sur des données, pas sur une opinion subjective. C'est un excellent complément à un accompagnement humain.",
+    answer: "Seora CV vous donne un feedback instantané, disponible 24/7, à une fraction du prix d'un consultant. L'analyse est objective et basée sur des données, pas sur une opinion subjective. C'est un excellent complément à un accompagnement humain.",
   },
   {
     question: "Quels formats de CV sont acceptés ?",
