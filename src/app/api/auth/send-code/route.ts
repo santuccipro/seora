@@ -65,8 +65,13 @@ export async function POST(req: NextRequest) {
       // Remove this in production - only for dev/testing
       ...(process.env.NODE_ENV === "development" ? { code } : {}),
     });
-  } catch (error) {
-    console.error("Send code error:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : "";
+    console.error("Send code error:", errMsg, errStack);
+    return NextResponse.json(
+      { error: "Erreur serveur", debug: process.env.NODE_ENV === "development" ? errMsg : undefined },
+      { status: 500 }
+    );
   }
 }
