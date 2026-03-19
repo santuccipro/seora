@@ -25,15 +25,30 @@ export async function POST(req: NextRequest) {
     const { purchaseId, userId, tokens } = session.metadata || {};
 
     if (purchaseId && userId && tokens) {
-      await prisma.tokenPurchase.update({
+      // Idempotency check: skip if already completed
+      const existingPurchase = await prisma.tokenPurchase.findUnique({
         where: { id: purchaseId },
-        data: { status: "completed" },
       });
 
-      await prisma.user.update({
-        where: { id: userId },
-        data: { tokens: { increment: parseInt(tokens) } },
-      });
+      if (existingPurchase?.status === "completed") {
+        return NextResponse.json({ received: true });
+      }
+
+      try {
+        await prisma.$transaction([
+          prisma.tokenPurchase.update({
+            where: { id: purchaseId },
+            data: { status: "completed" },
+          }),
+          prisma.user.update({
+            where: { id: userId },
+            data: { tokens: { increment: parseInt(tokens) } },
+          }),
+        ]);
+      } catch (dbError) {
+        console.error("Webhook DB error:", dbError);
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
+      }
     }
   }
 

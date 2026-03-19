@@ -29,13 +29,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (user.tokens < 3) {
-      return NextResponse.json(
-        { error: "Pas assez de tokens (3 requis pour la génération de lettre)" },
-        { status: 403 }
-      );
-    }
-
     const { cvAnalysisId, jobDescription, companyName, companyUrl } = await req.json();
 
     if (!jobDescription || !companyName) {
@@ -45,20 +38,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get CV content
-    let cvText = "";
-    if (cvAnalysisId) {
-      const analysis = await prisma.cVAnalysis.findUnique({
-        where: { id: cvAnalysisId },
-      });
-      if (analysis && analysis.userId === user.id) {
-        cvText = analysis.fileContent;
-      }
+    // Atomic token deduction
+    const deductResult = await prisma.user.updateMany({
+      where: { id: user.id, tokens: { gte: 3 } },
+      data: { tokens: { decrement: 3 } },
+    });
+
+    if (deductResult.count === 0) {
+      return NextResponse.json(
+        { error: "Pas assez de tokens (3 requis pour la génération de lettre)" },
+        { status: 403 }
+      );
     }
 
-    // Research company (scrape + AI)
-    const companyInfo = await researchCompany(companyName, companyUrl);
-    const companyInfoText = `
+    try {
+      // Get CV content
+      let cvText = "";
+      if (cvAnalysisId) {
+        const analysis = await prisma.cVAnalysis.findUnique({
+          where: { id: cvAnalysisId },
+        });
+        if (analysis && analysis.userId === user.id) {
+          cvText = analysis.fileContent;
+        }
+      }
+
+      // Research company (scrape + AI)
+      const companyInfo = await researchCompany(companyName, companyUrl);
+      const companyInfoText = `
 Entreprise: ${companyInfo.name}
 Description: ${companyInfo.description}
 Secteur: ${companyInfo.sector}
@@ -66,45 +73,51 @@ Valeurs: ${companyInfo.values.join(", ")}
 Produits/Services: ${companyInfo.products.join(", ")}
 Culture: ${companyInfo.culture}
 Taille: ${companyInfo.size}
-    `.trim();
+      `.trim();
 
-    // Generate cover letter
-    const result = await generateCoverLetter(
-      cvText,
-      jobDescription,
-      companyName,
-      companyInfoText
-    );
+      // Generate cover letter
+      const result = await generateCoverLetter(
+        cvText,
+        jobDescription,
+        companyName,
+        companyInfoText
+      );
 
-    // Save to DB
-    const coverLetter = await prisma.coverLetterAnalysis.create({
-      data: {
-        userId: user.id,
-        fileName: `Lettre - ${companyName}`,
-        fileContent: jobDescription,
-        score: 85, // Generated letters start with a high score
-        summary: `Lettre de motivation générée pour ${companyName}`,
-        strengths: JSON.stringify(result.companyInsights),
-        weaknesses: JSON.stringify(result.tips),
-        correctedText: result.coverLetter,
-        status: "generated",
-        tokensUsed: 3,
-      },
-    });
+      // Save to DB
+      const coverLetter = await prisma.coverLetterAnalysis.create({
+        data: {
+          userId: user.id,
+          fileName: `Lettre - ${companyName}`,
+          fileContent: jobDescription,
+          score: 85, // Generated letters start with a high score
+          summary: `Lettre de motivation générée pour ${companyName}`,
+          strengths: JSON.stringify(result.companyInsights),
+          weaknesses: JSON.stringify(result.tips),
+          correctedText: result.coverLetter,
+          status: "generated",
+          tokensUsed: 3,
+        },
+      });
 
-    // Deduct tokens
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { tokens: { decrement: 3 } },
-    });
-
-    return NextResponse.json({
-      id: coverLetter.id,
-      coverLetter: result.coverLetter,
-      tips: result.tips,
-      companyInsights: result.companyInsights,
-      companyInfo,
-    });
+      return NextResponse.json({
+        id: coverLetter.id,
+        coverLetter: result.coverLetter,
+        tips: result.tips,
+        companyInsights: result.companyInsights,
+        companyInfo,
+      });
+    } catch (error) {
+      // Refund tokens on failure
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tokens: { increment: 3 } },
+      });
+      console.error("Cover letter generation error:", error);
+      return NextResponse.json(
+        { error: "Erreur lors de la génération" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Cover letter generation error:", error);
     return NextResponse.json(

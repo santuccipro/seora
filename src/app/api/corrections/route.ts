@@ -31,13 +31,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (user.tokens <= 0) {
-      return NextResponse.json(
-        { error: "Pas assez de tokens" },
-        { status: 403 }
-      );
-    }
-
     const { analysisId } = await req.json();
 
     const analysis = await prisma.cVAnalysis.findUnique({
@@ -58,28 +51,49 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const result = await generateCorrections(analysis.fileContent);
-
-    await prisma.cVAnalysis.update({
-      where: { id: analysisId },
-      data: {
-        corrections: JSON.stringify(result.corrections),
-        correctedCV: result.correctedCV,
-        status: "corrected",
-        tokensUsed: { increment: 2 },
-      },
-    });
-
-    await prisma.user.update({
-      where: { id: user.id },
+    // Atomic token deduction
+    const deductResult = await prisma.user.updateMany({
+      where: { id: user.id, tokens: { gte: 2 } },
       data: { tokens: { decrement: 2 } },
     });
 
-    return NextResponse.json({
-      corrections: result.corrections,
-      correctedCV: result.correctedCV,
-      tips: result.tips,
-    });
+    if (deductResult.count === 0) {
+      return NextResponse.json(
+        { error: "Pas assez de tokens" },
+        { status: 403 }
+      );
+    }
+
+    try {
+      const result = await generateCorrections(analysis.fileContent);
+
+      await prisma.cVAnalysis.update({
+        where: { id: analysisId },
+        data: {
+          corrections: JSON.stringify(result.corrections),
+          correctedCV: result.correctedCV,
+          status: "corrected",
+          tokensUsed: { increment: 2 },
+        },
+      });
+
+      return NextResponse.json({
+        corrections: result.corrections,
+        correctedCV: result.correctedCV,
+        tips: result.tips,
+      });
+    } catch (error) {
+      // Refund tokens on failure
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tokens: { increment: 2 } },
+      });
+      console.error("Corrections error:", error);
+      return NextResponse.json(
+        { error: "Erreur lors de la génération des corrections" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Corrections error:", error);
     return NextResponse.json(

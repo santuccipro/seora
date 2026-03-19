@@ -31,13 +31,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (user.tokens < 2) {
-      return NextResponse.json(
-        { error: "Pas assez de tokens (2 requis)" },
-        { status: 403 }
-      );
-    }
-
     const { cvAnalysisId, jobTitle, jobDescription } = await req.json();
 
     if (!cvAnalysisId || !jobDescription) {
@@ -55,40 +48,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "CV introuvable" }, { status: 404 });
     }
 
-    const result = await matchCVToJob(cvAnalysis.fileContent, jobDescription);
-
-    const jobMatch = await prisma.jobMatch.create({
-      data: {
-        userId: user.id,
-        cvAnalysisId,
-        jobTitle: jobTitle || "Poste",
-        jobDescription,
-        matchScore: result.matchScore,
-        adaptedCV: result.adaptedCV,
-        suggestions: JSON.stringify(result.suggestions),
-        keywords: JSON.stringify({
-          missing: result.missingKeywords,
-          present: result.presentKeywords,
-        }),
-        status: "completed",
-        tokensUsed: 2,
-      },
-    });
-
-    await prisma.user.update({
-      where: { id: user.id },
+    // Atomic token deduction
+    const deductResult = await prisma.user.updateMany({
+      where: { id: user.id, tokens: { gte: 2 } },
       data: { tokens: { decrement: 2 } },
     });
 
-    return NextResponse.json({
-      id: jobMatch.id,
-      matchScore: result.matchScore,
-      adaptedCV: result.adaptedCV,
-      suggestions: result.suggestions,
-      missingKeywords: result.missingKeywords,
-      presentKeywords: result.presentKeywords,
-      globalAdvice: result.globalAdvice,
-    });
+    if (deductResult.count === 0) {
+      return NextResponse.json(
+        { error: "Pas assez de tokens (2 requis)" },
+        { status: 403 }
+      );
+    }
+
+    try {
+      const result = await matchCVToJob(cvAnalysis.fileContent, jobDescription);
+
+      const jobMatch = await prisma.jobMatch.create({
+        data: {
+          userId: user.id,
+          cvAnalysisId,
+          jobTitle: jobTitle || "Poste",
+          jobDescription,
+          matchScore: result.matchScore,
+          adaptedCV: result.adaptedCV,
+          suggestions: JSON.stringify(result.suggestions),
+          keywords: JSON.stringify({
+            missing: result.missingKeywords,
+            present: result.presentKeywords,
+          }),
+          status: "completed",
+          tokensUsed: 2,
+        },
+      });
+
+      return NextResponse.json({
+        id: jobMatch.id,
+        matchScore: result.matchScore,
+        adaptedCV: result.adaptedCV,
+        suggestions: result.suggestions,
+        missingKeywords: result.missingKeywords,
+        presentKeywords: result.presentKeywords,
+        globalAdvice: result.globalAdvice,
+      });
+    } catch (error) {
+      // Refund tokens on failure
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tokens: { increment: 2 } },
+      });
+      console.error("Job match error:", error);
+      return NextResponse.json(
+        { error: "Erreur lors du matching" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Job match error:", error);
     return NextResponse.json(

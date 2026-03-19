@@ -28,13 +28,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (user.tokens < 1) {
-      return NextResponse.json(
-        { error: "Pas assez de tokens. La reformulation coûte 1 token." },
-        { status: 403 }
-      );
-    }
-
     const body = await req.json();
     const { text, style } = body;
 
@@ -52,20 +45,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validStyles = ["academique", "simplifie", "professionnel", "soutenu"];
-    const safeStyle = validStyles.includes(style) ? style : "academique";
-
-    const result = await reformulateText(text, safeStyle);
-
-    await prisma.user.update({
-      where: { id: user.id },
+    // Atomic token deduction
+    const deductResult = await prisma.user.updateMany({
+      where: { id: user.id, tokens: { gte: 1 } },
       data: { tokens: { decrement: 1 } },
     });
 
-    return NextResponse.json({
-      ...result,
-      tokensUsed: 1,
-    });
+    if (deductResult.count === 0) {
+      return NextResponse.json(
+        { error: "Pas assez de tokens. La reformulation coûte 1 token." },
+        { status: 403 }
+      );
+    }
+
+    try {
+      const validStyles = ["academique", "simplifie", "professionnel", "soutenu"];
+      const safeStyle = validStyles.includes(style) ? style : "academique";
+
+      const result = await reformulateText(text, safeStyle);
+
+      return NextResponse.json({
+        ...result,
+        tokensUsed: 1,
+      });
+    } catch (error) {
+      // Refund token on failure
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tokens: { increment: 1 } },
+      });
+      console.error("Erreur reformulation:", error);
+      return NextResponse.json(
+        { error: "Erreur lors de la reformulation." },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Erreur reformulation:", error);
     return NextResponse.json(

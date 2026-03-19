@@ -28,13 +28,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (user.tokens < 1) {
-      return NextResponse.json(
-        { error: "Pas assez de tokens. La génération d'email coûte 1 token." },
-        { status: 403 }
-      );
-    }
-
     const body = await req.json();
     const { context, type, recipientName, companyName, position, tone } = body;
 
@@ -45,25 +38,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validTypes = ["candidature", "relance", "stage", "remerciement", "demande_info"];
-    const safeType = validTypes.includes(type) ? type : "candidature";
-
-    const result = await generateProEmail(context, safeType, {
-      recipientName,
-      companyName,
-      position,
-      tone,
-    });
-
-    await prisma.user.update({
-      where: { id: user.id },
+    // Atomic token deduction
+    const deductResult = await prisma.user.updateMany({
+      where: { id: user.id, tokens: { gte: 1 } },
       data: { tokens: { decrement: 1 } },
     });
 
-    return NextResponse.json({
-      ...result,
-      tokensUsed: 1,
-    });
+    if (deductResult.count === 0) {
+      return NextResponse.json(
+        { error: "Pas assez de tokens. La génération d'email coûte 1 token." },
+        { status: 403 }
+      );
+    }
+
+    try {
+      const validTypes = ["candidature", "relance", "stage", "remerciement", "demande_info"];
+      const safeType = validTypes.includes(type) ? type : "candidature";
+
+      const result = await generateProEmail(context, safeType, {
+        recipientName,
+        companyName,
+        position,
+        tone,
+      });
+
+      return NextResponse.json({
+        ...result,
+        tokensUsed: 1,
+      });
+    } catch (error) {
+      // Refund token on failure
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tokens: { increment: 1 } },
+      });
+      console.error("Erreur génération email:", error);
+      return NextResponse.json(
+        { error: "Erreur lors de la génération de l'email." },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Erreur génération email:", error);
     return NextResponse.json(

@@ -28,13 +28,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (user.tokens < 1) {
-      return NextResponse.json(
-        { error: "Pas assez de tokens. L'humanisation coûte 1 token." },
-        { status: 403 }
-      );
-    }
-
     const body = await req.json();
     const { text, intensity, tone } = body;
 
@@ -52,28 +45,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validIntensities = ["light", "balanced", "aggressive"];
-    const validTones = ["standard", "professionnel", "academique", "decontracte"];
-
-    const safeIntensity = validIntensities.includes(intensity) ? intensity : "balanced";
-    const safeTone = validTones.includes(tone) ? tone : "standard";
-
-    // Call Claude to humanize
-    const result = await humanizeText(text, safeIntensity, safeTone);
-
-    // Deduct 1 token
-    await prisma.user.update({
-      where: { id: user.id },
+    // Atomic token deduction
+    const deductResult = await prisma.user.updateMany({
+      where: { id: user.id, tokens: { gte: 1 } },
       data: { tokens: { decrement: 1 } },
     });
 
-    return NextResponse.json({
-      humanizedText: result.humanizedText,
-      changes: result.changes,
-      aiScoreBefore: result.aiScoreBefore,
-      aiScoreAfter: result.aiScoreAfter,
-      tokensUsed: 1,
-    });
+    if (deductResult.count === 0) {
+      return NextResponse.json(
+        { error: "Pas assez de tokens. L'humanisation coûte 1 token." },
+        { status: 403 }
+      );
+    }
+
+    try {
+      const validIntensities = ["light", "balanced", "aggressive"];
+      const validTones = ["standard", "professionnel", "academique", "decontracte"];
+
+      const safeIntensity = validIntensities.includes(intensity) ? intensity : "balanced";
+      const safeTone = validTones.includes(tone) ? tone : "standard";
+
+      // Call Claude to humanize
+      const result = await humanizeText(text, safeIntensity, safeTone);
+
+      return NextResponse.json({
+        humanizedText: result.humanizedText,
+        changes: result.changes,
+        aiScoreBefore: result.aiScoreBefore,
+        aiScoreAfter: result.aiScoreAfter,
+        tokensUsed: 1,
+      });
+    } catch (error) {
+      // Refund token on failure
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tokens: { increment: 1 } },
+      });
+      console.error("Erreur humanisation:", error);
+      return NextResponse.json(
+        { error: "Erreur lors de l'humanisation." },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Erreur humanisation:", error);
     return NextResponse.json(
