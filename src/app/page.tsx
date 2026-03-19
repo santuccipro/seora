@@ -1230,7 +1230,7 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         {/*  SEORA EST FAIT POUR TOI               */}
         {/* ══════════════════════════════════════ */}
-        <section className="py-8 sm:py-10 bg-white/80 backdrop-blur-sm border-y border-gray-100">
+        <section className="py-8 sm:py-10">
           <div className="mx-auto max-w-5xl px-4 sm:px-6">
             <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-3 text-center">
               Seora s&apos;adapte à <span className="brand-gradient-text">ton profil</span>
