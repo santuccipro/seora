@@ -68,6 +68,7 @@ export default function Home() {
   const [activeInteractive, setActiveInteractive] = useState<"cv" | "letter" | "humanizer">("cv");
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
+  const [liveCount, setLiveCount] = useState(847);
 
   const topCompanies = [
     "L'Oréal", "LVMH", "TotalEnergies", "Sanofi", "BNP Paribas", "Airbus", "Danone", "Société Générale",
@@ -170,6 +171,13 @@ export default function Home() {
     }
   }, [session]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveCount(prev => prev + 1);
+    }, Math.random() * 4000 + 4000);
+    return () => clearInterval(interval);
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-mesh overflow-hidden">
@@ -255,7 +263,7 @@ export default function Home() {
                   </>
                 ) : (
                   <button
-                    onClick={() => openAuthModal()}
+                    onClick={() => document.getElementById('hero-upload')?.scrollIntoView({ behavior: 'smooth' })}
                     className="brand-gradient flex items-center gap-1.5 rounded-xl px-4 py-2 text-[13px] font-semibold text-white shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
                   >
                     Commencer
@@ -267,14 +275,17 @@ export default function Home() {
         </nav>
 
         {/* ══════════════════════════════════════ */}
-        {/*  2. HERO — Emotional, direct           */}
+        {/*  2. HERO — with upload zone merged     */}
         {/* ══════════════════════════════════════ */}
         <section className="relative pt-10 pb-6 sm:pt-20 sm:pb-10">
           <div className="relative mx-auto max-w-2xl px-5 sm:px-6 text-center">
-            {/* Badge */}
+            {/* Badge — live counter */}
             <div className="animate-fade-up inline-flex items-center gap-2 rounded-full glass-strong px-4 py-1.5 text-xs font-semibold text-indigo-700 mb-6 shadow-sm">
-              <Sparkles className="h-3.5 w-3.5" />
-              Déjà utilisé par +12 000 étudiants en France
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-emerald-600 font-bold">{liveCount.toLocaleString()}</span> CV analysés aujourd&apos;hui
             </div>
 
             <h1 className="animate-fade-up delay-100 text-[1.7rem] font-extrabold tracking-tight text-gray-900 sm:text-5xl md:text-6xl leading-[1.12] sm:leading-[1.08]" style={{ animationFillMode: "both" }}>
@@ -283,17 +294,17 @@ export default function Home() {
             </h1>
 
             <p className="animate-fade-up delay-200 mx-auto mt-4 max-w-lg text-[0.9rem] text-gray-500 leading-relaxed sm:text-lg px-1 sm:px-0" style={{ animationFillMode: "both" }}>
-              Score détaillé, corrections IA, lettre de motivation sur-mesure — tout en 30 secondes. <strong className="text-gray-700">Aucun autre outil ne fait ça.</strong>
+              Les étudiants qui utilisent Seora décrochent <strong className="text-gray-700">3× plus d&apos;entretiens.</strong>
             </p>
 
             <div className="animate-fade-up delay-300 mt-6 flex flex-col items-center gap-3" style={{ animationFillMode: "both" }}>
-              <Link
-                href="/app"
+              <button
+                onClick={() => document.getElementById('hero-upload')?.scrollIntoView({ behavior: 'smooth' })}
                 className="brand-gradient animate-cta-pulse flex items-center gap-2 rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform"
               >
                 Analyse ton CV maintenant
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </button>
               <p className="text-xs text-gray-400">Résultat en 30 secondes.</p>
             </div>
 
@@ -305,96 +316,11 @@ export default function Home() {
               </p>
             </div>
           </div>
-        </section>
 
-        {/* ══════════════════════════════════════ */}
-        {/*  2b. ANTI-IA BANNER — Indétectable      */}
-        {/* ══════════════════════════════════════ */}
-        <section className="py-5 sm:py-6">
-          <div className="mx-auto max-w-4xl px-4 sm:px-6">
-            <div className="relative rounded-2xl overflow-hidden border border-white/30 shadow-2xl shadow-indigo-500/10">
-              {/* Background gradient */}
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-indigo-950 to-gray-900" />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.15),transparent_50%)]" />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(168,85,247,0.1),transparent_50%)]" />
-
-              <div className="relative px-5 py-6 sm:px-14 sm:py-10">
-                {/* Top row: badge + headline inline */}
-                <div className="flex items-center justify-center gap-3 mb-3">
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1">
-                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Indétectable</span>
-                  </div>
-                </div>
-
-                <h2 className="text-center text-xl sm:text-3xl md:text-4xl font-black text-white leading-tight mb-2.5">
-                  100% de nos contenus passent <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">sous les radars de l&apos;IA.</span>
-                </h2>
-                <p className="text-center text-gray-400 text-xs sm:text-sm max-w-xl mx-auto">
-                  Notre moteur supprime les signatures IA de vos textes — indétectable par GPTZero, Turnitin, Compilatio.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ══════════════════════════════════════ */}
-        {/*  3. TRUST BAR — Stats + écoles         */}
-        {/* ══════════════════════════════════════ */}
-        <section className="py-6 border-y border-white/30 overflow-hidden">
-          <div className="mx-auto max-w-5xl px-6">
-            <p className="text-center text-[11px] font-medium uppercase tracking-widest text-gray-400 mb-5">
-              Utilisé par des étudiants et diplômés de
-            </p>
-            <div className="relative">
-              {/* Fade edges */}
-              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 z-10" style={{background:"linear-gradient(to right, rgb(237,233,254), transparent)"}} />
-              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 z-10" style={{background:"linear-gradient(to left, rgb(237,233,254), transparent)"}} />
-              {/* Scrolling logos */}
-              <div className="flex animate-scroll-logos items-center gap-16 w-max">
-                {[...Array(2)].map((_, setIdx) => (
-                  <div key={setIdx} className="flex items-center gap-16 shrink-0">
-                    {[
-                      { src: "/logos/hec.png", alt: "HEC Paris", h: "h-8" },
-                      { src: "/logos/essec.png", alt: "ESSEC", h: "h-7" },
-                      { src: "/logos/sciencespo.png", alt: "Sciences Po", h: "h-7" },
-                      { src: "/logos/dauphine.png", alt: "Dauphine PSL", h: "h-7" },
-                      { src: "/logos/polytechnique.png", alt: "Polytechnique", h: "h-9" },
-                      { src: "/logos/epitech.png", alt: "EPITECH", h: "h-6" },
-                      { src: "/logos/edhec.png", alt: "EDHEC", h: "h-7" },
-                      { src: "/logos/emlyon.png", alt: "EM Lyon", h: "h-8" },
-                    ].map((logo) => (
-                      <img
-                        key={logo.alt}
-                        src={logo.src}
-                        alt={logo.alt}
-                        className={`${logo.h} w-auto object-contain opacity-40 grayscale hover:opacity-70 hover:grayscale-0 transition-all duration-300`}
-                        draggable={false}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ══════════════════════════════════════ */}
-        {/*  ESSAYE MAINTENANT — INTERACTIVE       */}
-        {/* ══════════════════════════════════════ */}
-        <section className="py-10 sm:py-12">
-          <div className="mx-auto max-w-4xl px-4 sm:px-6">
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-extrabold text-gray-900 sm:text-4xl mb-2 sm:mb-3">
-                Essaye <span className="brand-gradient-text">maintenant</span>
-              </h2>
-              <p className="text-sm sm:text-base text-gray-500 max-w-lg mx-auto px-2 sm:px-0">
-                Dépose ton CV, colle ton texte ou génère ta lettre. Résultat en 30 secondes.
-              </p>
-            </div>
-
+          {/* ═══ INTERACTIVE TABS — merged into hero ═══ */}
+          <div className="mx-auto max-w-4xl px-4 sm:px-6 mt-10 sm:mt-14">
             {/* Tabs — pill style */}
-            <div className="flex items-center justify-center mb-6 sm:mb-8">
+            <div id="hero-upload" className="flex items-center justify-center mb-6 sm:mb-8">
               <div className="relative inline-flex items-center gap-0.5 sm:gap-1 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200/60 p-1 sm:p-1.5 shadow-sm w-full sm:w-auto">
                 {/* Floating glow aura */}
                 <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-indigo-400/20 via-purple-400/20 to-pink-400/20 blur-xl animate-pulse pointer-events-none" />
@@ -477,150 +403,54 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Letter Tab */}
+              {/* Letter Tab — simplified */}
               {activeInteractive === "letter" && (
                 <div className="p-4 sm:p-8 md:p-12">
                   <div className="space-y-6">
-                    {/* Row 1: Company + Sector */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      {/* Company input with autocomplete */}
-                      <div className="relative">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">🏢 Entreprise visée</label>
-                        <div className="relative">
-                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={landingCompany}
-                            onChange={(e) => handleCompanyInput(e.target.value)}
-                            onFocus={() => { if (companySuggestions.length > 0) setShowCompanySuggestions(true); }}
-                            onBlur={() => setTimeout(() => setShowCompanySuggestions(false), 200)}
-                            placeholder="Rechercher une entreprise..."
-                            className="w-full rounded-xl border border-gray-200 bg-white px-5 py-3.5 pl-11 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
-                          />
-                        </div>
-                        {showCompanySuggestions && companySuggestions.length > 0 && (
-                          <div className="absolute z-20 w-full mt-1 rounded-xl bg-white border border-gray-200 shadow-xl shadow-gray-900/10 overflow-hidden">
-                            {companySuggestions.map((company, i) => (
-                              <button
-                                key={i}
-                                onMouseDown={() => { setLandingCompany(company); setShowCompanySuggestions(false); }}
-                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-3 border-b border-gray-100 last:border-0"
-                              >
-                                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-xs font-bold text-indigo-600 shrink-0">
-                                  {company.charAt(0).toUpperCase()}
-                                </div>
-                                <span className="font-medium">{company}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Sector with autocomplete */}
-                      <div className="relative">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">📊 Secteur d&apos;activité</label>
-                        <div className="relative">
-                          <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={landingSector}
-                            onChange={(e) => handleSectorInput(e.target.value)}
-                            onFocus={() => { if (landingSector.length === 0) { setSectorSuggestions(sectors.slice(0, 5)); setShowSectorSuggestions(true); } else if (sectorSuggestions.length > 0) setShowSectorSuggestions(true); }}
-                            onBlur={() => setTimeout(() => setShowSectorSuggestions(false), 200)}
-                            placeholder="Ex: Tech & IT, Finance..."
-                            className="w-full rounded-xl border border-gray-200 bg-white px-5 py-3.5 pl-11 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
-                          />
-                        </div>
-                        {showSectorSuggestions && sectorSuggestions.length > 0 && (
-                          <div className="absolute z-20 w-full mt-1 rounded-xl bg-white border border-gray-200 shadow-xl shadow-gray-900/10 overflow-hidden">
-                            {sectorSuggestions.map((sector, i) => (
-                              <button
-                                key={i}
-                                onMouseDown={() => { setLandingSector(sector); setShowSectorSuggestions(false); }}
-                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors border-b border-gray-100 last:border-0"
-                              >
-                                <span className="font-medium">{sector}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Row 2: Contract type pills */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-3">📋 Type de contrat</label>
-                      <div className="flex flex-wrap gap-2.5">
-                        {contractTypes.map((type) => (
-                          <button
-                            key={type}
-                            onClick={() => setLandingContractType(landingContractType === type ? "" : type)}
-                            className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all border ${
-                              landingContractType === type
-                                ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20"
-                                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50"
-                            }`}
-                          >
-                            {type}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Row 3: CV upload (optional) */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">📎 Ton CV <span className="text-gray-400 font-normal">(optionnel — pour personnaliser la lettre)</span></label>
-                      <div
-                        onClick={() => letterCvRef.current?.click()}
-                        className={`flex items-center gap-4 rounded-xl border border-dashed py-4 px-5 cursor-pointer transition-all ${
-                          letterCvName ? "border-emerald-300 bg-emerald-50" : "border-gray-300 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50/50"
-                        }`}
-                      >
-                        <input
-                          ref={letterCvRef}
-                          type="file"
-                          accept=".pdf,.docx"
-                          className="hidden"
-                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLetterCv(f); }}
-                        />
-                        {letterCvName ? (
-                          <>
-                            <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-emerald-700 truncate">{letterCvName}</p>
-                              <p className="text-xs text-emerald-500">CV importé • Cliquez pour changer</p>
-                            </div>
-                            <button onClick={(e) => { e.stopPropagation(); setLetterCvName(""); sessionStorage.removeItem("seora_cl_cv_file"); sessionStorage.removeItem("seora_cl_cv_filename"); }} className="text-gray-400 hover:text-red-500 transition-colors">
-                              <X className="h-4 w-4" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                              <Upload className="h-5 w-5 text-indigo-600" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-700">Ajouter ton CV</p>
-                              <p className="text-xs text-gray-400">PDF ou DOCX • La lettre sera adaptée à ton profil</p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Row 4: Job description - larger textarea */}
+                    {/* Job description textarea */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">📝 Description de l&apos;offre</label>
                       <textarea
                         value={landingJob}
                         onChange={(e) => setLandingJob(e.target.value)}
-                        placeholder="Collez l'intitulé ou la description complète de l'offre d'emploi..."
+                        placeholder="Collez l'offre d'emploi ou décrivez le poste visé..."
                         rows={6}
                         className="w-full rounded-xl border border-gray-200 bg-white px-5 py-4 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none transition-all"
                       />
                       <p className="text-xs text-gray-400 mt-1.5 ml-1">Plus l&apos;offre est détaillée, meilleure sera la lettre générée.</p>
+                    </div>
+
+                    {/* Company name input */}
+                    <div className="relative">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">🏢 Entreprise visée</label>
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={landingCompany}
+                          onChange={(e) => handleCompanyInput(e.target.value)}
+                          onFocus={() => { if (companySuggestions.length > 0) setShowCompanySuggestions(true); }}
+                          onBlur={() => setTimeout(() => setShowCompanySuggestions(false), 200)}
+                          placeholder="Rechercher une entreprise..."
+                          className="w-full rounded-xl border border-gray-200 bg-white px-5 py-3.5 pl-11 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+                        />
+                      </div>
+                      {showCompanySuggestions && companySuggestions.length > 0 && (
+                        <div className="absolute z-20 w-full mt-1 rounded-xl bg-white border border-gray-200 shadow-xl shadow-gray-900/10 overflow-hidden">
+                          {companySuggestions.map((company, i) => (
+                            <button
+                              key={i}
+                              onMouseDown={() => { setLandingCompany(company); setShowCompanySuggestions(false); }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-3 border-b border-gray-100 last:border-0"
+                            >
+                              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-xs font-bold text-indigo-600 shrink-0">
+                                {company.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium">{company}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Submit */}
@@ -635,7 +465,7 @@ export default function Home() {
                       }}
                       className="w-full flex items-center justify-center gap-2.5 rounded-xl brand-gradient px-6 py-4 text-base font-bold text-white shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.005] transition-all"
                     >
-                      <Sparkles className="h-5 w-5" /> Générer ma lettre
+                      <Sparkles className="h-5 w-5" /> Générer ma lettre <ArrowRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -760,6 +590,42 @@ export default function Home() {
               )}
             </div>
 
+            {/* School logos — moved here from trust bar */}
+            <div className="mt-8 sm:mt-10 overflow-hidden">
+              <p className="text-center text-[11px] font-medium uppercase tracking-widest text-gray-400 mb-5">
+                Utilisé par des étudiants et diplômés de
+              </p>
+              <div className="relative">
+                {/* Fade edges */}
+                <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 z-10" style={{background:"linear-gradient(to right, rgb(237,233,254), transparent)"}} />
+                <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 z-10" style={{background:"linear-gradient(to left, rgb(237,233,254), transparent)"}} />
+                {/* Scrolling logos */}
+                <div className="flex animate-scroll-logos items-center gap-16 w-max">
+                  {[...Array(2)].map((_, setIdx) => (
+                    <div key={setIdx} className="flex items-center gap-16 shrink-0">
+                      {[
+                        { src: "/logos/hec.png", alt: "HEC Paris", h: "h-8" },
+                        { src: "/logos/essec.png", alt: "ESSEC", h: "h-7" },
+                        { src: "/logos/sciencespo.png", alt: "Sciences Po", h: "h-7" },
+                        { src: "/logos/dauphine.png", alt: "Dauphine PSL", h: "h-7" },
+                        { src: "/logos/polytechnique.png", alt: "Polytechnique", h: "h-9" },
+                        { src: "/logos/epitech.png", alt: "EPITECH", h: "h-6" },
+                        { src: "/logos/edhec.png", alt: "EDHEC", h: "h-7" },
+                        { src: "/logos/emlyon.png", alt: "EM Lyon", h: "h-8" },
+                      ].map((logo) => (
+                        <img
+                          key={logo.alt}
+                          src={logo.src}
+                          alt={logo.alt}
+                          className={`${logo.h} w-auto object-contain opacity-40 grayscale hover:opacity-70 hover:grayscale-0 transition-all duration-300`}
+                          draggable={false}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1226,11 +1092,63 @@ export default function Home() {
 
             {/* CTA under demos */}
             <div className="mt-10 text-center">
-              <Link href="/app" className="inline-flex items-center gap-2 brand-gradient animate-cta-pulse rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform">
+              <button
+                onClick={() => document.getElementById('hero-upload')?.scrollIntoView({ behavior: 'smooth' })}
+                className="inline-flex items-center gap-2 brand-gradient animate-cta-pulse rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform"
+              >
                 Analyser mon CV
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <p className="mt-3 text-xs text-gray-400">Résultat en 30 secondes</p>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════ */}
+        {/*  COMPARISON TABLE — Seora vs ChatGPT   */}
+        {/* ══════════════════════════════════════ */}
+        <section className="py-10 sm:py-14">
+          <div className="mx-auto max-w-4xl px-4 sm:px-6">
+            <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-2 text-center">
+              Pourquoi Seora et pas <span className="brand-gradient-text">ChatGPT ?</span>
+            </h2>
+            <p className="text-sm text-gray-400 text-center mb-8">La vraie différence, en un coup d&apos;œil.</p>
+
+            <div className="glass-card rounded-3xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200/60">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider"></th>
+                    <th className="px-3 sm:px-6 py-4 text-center">
+                      <div className="inline-flex items-center gap-1.5 rounded-full brand-gradient px-3 py-1 text-xs font-bold text-white">Seora</div>
+                    </th>
+                    <th className="px-3 sm:px-6 py-4 text-center text-xs font-semibold text-gray-500">ChatGPT</th>
+                    <th className="px-3 sm:px-6 py-4 text-center text-xs font-semibold text-gray-500 hidden sm:table-cell">Faire seul</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {[
+                    { feature: "Score ATS détaillé", seora: true, gpt: false, solo: false },
+                    { feature: "Adapté à chaque offre", seora: true, gpt: "~", solo: false },
+                    { feature: "Anti-plagiat intégré", seora: true, gpt: false, solo: false },
+                    { feature: "Indétectable par l'IA", seora: true, gpt: false, solo: true },
+                    { feature: "Lettre personnalisée", seora: true, gpt: "~", solo: false },
+                    { feature: "Temps moyen", seora: "30s", gpt: "10min", solo: "2h+" },
+                  ].map((row, i) => (
+                    <tr key={i} className={i % 2 === 0 ? "bg-white/30" : ""}>
+                      <td className="px-4 sm:px-6 py-3.5 text-sm font-medium text-gray-700">{row.feature}</td>
+                      <td className="px-3 sm:px-6 py-3.5 text-center">
+                        {row.seora === true ? <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto" /> : <span className="text-sm font-bold text-emerald-600">{row.seora}</span>}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3.5 text-center">
+                        {row.gpt === true ? <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto" /> : row.gpt === false ? <XCircle className="h-5 w-5 text-gray-300 mx-auto" /> : <span className="text-xs text-gray-400">{row.gpt}</span>}
+                      </td>
+                      <td className="px-3 sm:px-6 py-3.5 text-center hidden sm:table-cell">
+                        {row.solo === true ? <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto" /> : row.solo === false ? <XCircle className="h-5 w-5 text-gray-300 mx-auto" /> : <span className="text-xs text-gray-400">{row.solo}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -1430,16 +1348,18 @@ export default function Home() {
           </div>
           <div className="relative mx-auto max-w-2xl px-6 text-center">
             <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl mb-4">
-              Tous les outils. <span className="brand-gradient-text">Un seul accès.</span>
+              Prêt à décrocher ton <span className="brand-gradient-text">prochain entretien ?</span>
             </h2>
             <p className="text-base text-gray-500 mb-8 max-w-lg mx-auto leading-relaxed">
-              Analyse de CV, lettre de motivation, job matching, humanizer IA — 4 outils inclus avec tes tokens. Pas d&apos;abonnement.
+              Analyse ton CV en 30 secondes. Rejoins les 12 000+ étudiants qui ont déjà boosté leur candidature.
             </p>
-            <Link href="/app" className="inline-flex items-center gap-2 brand-gradient animate-cta-pulse rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform shadow-lg shadow-indigo-500/25">
+            <button
+              onClick={() => document.getElementById('hero-upload')?.scrollIntoView({ behavior: 'smooth' })}
+              className="inline-flex items-center gap-2 brand-gradient animate-cta-pulse rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform shadow-lg shadow-indigo-500/25"
+            >
               Commencer maintenant
               <ArrowRight className="h-4 w-4" />
-            </Link>
-            <p className="mt-4 text-xs text-gray-400">Résultat en 30 secondes</p>
+            </button>
           </div>
         </section>
 
@@ -1457,12 +1377,20 @@ export default function Home() {
             <div className="space-y-3">
               {[
                 {
+                  q: "Pourquoi utiliser Seora plutôt que ChatGPT ?",
+                  a: "ChatGPT génère du texte générique. Seora analyse ton CV sur 6 critères ATS précis, adapte chaque lettre à l'entreprise visée, et garantit que tes textes passent les détecteurs d'IA. C'est un outil spécialisé, pas un chatbot.",
+                },
+                {
                   q: "Comment fonctionne le système de tokens ?",
-                  a: "1 token = 1 utilisation d'un outil. Analyser un CV, générer une lettre de motivation, ou humaniser un texte coûte chacun 1 token. Les packs démarrent à 4,99€.",
+                  a: "1 token = 1 utilisation d'un outil. Analyser un CV, générer une lettre ou humaniser un texte coûte chacun 1 token. Les packs démarrent à 4,99€.",
                 },
                 {
                   q: "Les textes générés sont détectables comme IA ?",
-                  a: "On a un outil dédié pour ça : l'Humanizer. Il reformule le texte pour qu'il passe les détecteurs d'IA. Tu peux aussi vérifier le score d'originalité avec le détecteur de plagiat intégré.",
+                  a: "Non. Notre Humanizer reformule le texte pour qu'il passe GPTZero, Turnitin et Compilatio. Tu peux vérifier avec notre détecteur de plagiat intégré.",
+                },
+                {
+                  q: "Est-ce que je peux me faire rembourser ?",
+                  a: "Oui, si tu n'es pas satisfait dans les 7 jours suivant ton achat, on te rembourse intégralement. Aucune question posée.",
                 },
                 {
                   q: "Mes données sont en sécurité ?",
@@ -1470,7 +1398,7 @@ export default function Home() {
                 },
                 {
                   q: "C'est vraiment utile pour un étudiant ?",
-                  a: "Seora a été conçu spécifiquement pour les étudiants et jeunes diplômés. Stage, alternance, premier emploi — la plateforme t'accompagne du premier brouillon de CV jusqu'à l'email de relance après l'entretien.",
+                  a: "Seora a été conçu spécifiquement pour les étudiants et jeunes diplômés. Stage, alternance, premier emploi — du premier CV jusqu'à l'email de relance après l'entretien.",
                 },
               ].map((item, i) => (
                 <div key={i} className="glass-card rounded-2xl overflow-hidden" style={{ transitionDelay: `${i * 0.05}s` }}>
@@ -1495,7 +1423,7 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         {/*  FOOTER                                 */}
         {/* ══════════════════════════════════════ */}
-        <footer className="bg-gray-950 mt-8">
+        <footer className="bg-gray-950 mt-8 pb-20 md:pb-0">
           <div className="mx-auto max-w-6xl px-6 pt-14 pb-8">
             {/* Top grid */}
             <div className="grid grid-cols-2 sm:grid-cols-12 gap-10 sm:gap-8">
@@ -1584,6 +1512,17 @@ export default function Home() {
             </div>
           </div>
         </footer>
+
+        {/* Sticky Mobile CTA */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-3 bg-white/80 backdrop-blur-xl border-t border-gray-200/60 md:hidden">
+          <button
+            onClick={() => document.getElementById('hero-upload')?.scrollIntoView({ behavior: 'smooth' })}
+            className="w-full flex items-center justify-center gap-2 brand-gradient rounded-2xl px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Analyse ton CV maintenant
+          </button>
+        </div>
 
       </div>{/* end z-10 wrapper */}
 
