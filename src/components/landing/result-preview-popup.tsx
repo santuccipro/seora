@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   X,
   Lock,
@@ -12,7 +12,6 @@ import {
   Loader2,
   ArrowRight,
   TrendingUp,
-  XCircle,
 } from "lucide-react";
 
 type PreviewType = "cv" | "letter" | "humanizer";
@@ -24,7 +23,65 @@ interface ResultPreviewPopupProps {
   onUnlock: () => void;
 }
 
-function AnalyzingAnimation({ type, onDone }: { type: PreviewType; onDone: () => void }) {
+/* ─── Generate random but coherent CV scores ─── */
+function generateScores() {
+  const rand = (min: number, max: number) =>
+    Math.floor(Math.random() * (max - min + 1)) + min;
+
+  const structure = rand(30, 70);
+  const experience = rand(45, 85);
+  const competences = rand(25, 65);
+  const ats = rand(10, 45);
+  const miseEnPage = rand(40, 80);
+  const impact = rand(20, 55);
+
+  const values = [structure, experience, competences, ats, miseEnPage, impact];
+  const globalScore = Math.round(
+    values.reduce((a, b) => a + b, 0) / values.length
+  );
+
+  return {
+    global: globalScore,
+    bars: [
+      { label: "Structure", value: structure },
+      { label: "Expérience", value: experience },
+      { label: "Compétences", value: competences },
+      { label: "Mots-clés ATS", value: ats },
+      { label: "Mise en page", value: miseEnPage },
+      { label: "Impact", value: impact },
+    ],
+  };
+}
+
+function getBarStyle(value: number) {
+  if (value >= 70) return { color: "bg-emerald-400", text: "text-emerald-600" };
+  if (value >= 50) return { color: "bg-yellow-400", text: "text-yellow-600" };
+  if (value >= 35) return { color: "bg-orange-400", text: "text-orange-500" };
+  return { color: "bg-red-400", text: "text-red-500" };
+}
+
+function getScoreColor(score: number) {
+  if (score >= 70) return { stroke: "#10B981", text: "text-emerald-500" };
+  if (score >= 50) return { stroke: "#F59E0B", text: "text-amber-500" };
+  return { stroke: "#EF4444", text: "text-red-500" };
+}
+
+function getScoreMessage(score: number) {
+  if (score >= 70)
+    return "Ton CV est bon, mais Seora peut le rendre excellent";
+  if (score >= 50)
+    return "Ton CV a du potentiel, mais il peut aller beaucoup plus loin";
+  return "Ton CV a besoin d'améliorations pour passer les filtres ATS";
+}
+
+/* ─── Analyzing Animation ─── */
+function AnalyzingAnimation({
+  type,
+  onDone,
+}: {
+  type: PreviewType;
+  onDone: () => void;
+}) {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -68,37 +125,41 @@ function AnalyzingAnimation({ type, onDone }: { type: PreviewType; onDone: () =>
   };
 
   const currentSteps = steps[type];
+  const TOTAL_MS = 40000; // exactly 40 seconds
+
+  const stableOnDone = useCallback(onDone, [onDone]);
 
   useEffect(() => {
-    const totalDuration = 40000;
     const numSteps = currentSteps.length;
-    const stepDuration = totalDuration / numSteps;
-    let progressFrame: ReturnType<typeof setTimeout>;
+    const startTime = Date.now();
 
-    // Smooth progress that pauses slightly between steps
-    const tick = () => {
-      setProgress((p) => {
-        if (p >= 100) return 100;
-        return p + 1;
-      });
-      progressFrame = setTimeout(tick, totalDuration / 100);
-    };
-    progressFrame = setTimeout(tick, totalDuration / 100);
+    // Single interval drives both progress and steps
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min(Math.floor((elapsed / TOTAL_MS) * 100), 100);
+      const step = Math.min(
+        Math.floor((elapsed / TOTAL_MS) * numSteps),
+        numSteps - 1
+      );
 
-    // Steps advance evenly across the total duration
-    const stepTimers = Array.from({ length: numSteps - 1 }, (_, i) =>
-      setTimeout(() => setCurrentStep(i + 1), stepDuration * (i + 1))
-    );
+      setProgress(pct);
+      setCurrentStep(step);
 
-    // Done exactly at totalDuration
-    const doneTimer = setTimeout(onDone, totalDuration);
+      if (elapsed >= TOTAL_MS) {
+        clearInterval(interval);
+        setProgress(100);
+        setCurrentStep(numSteps - 1);
+      }
+    }, 200);
+
+    // Fire onDone at exactly 40s
+    const doneTimer = setTimeout(stableOnDone, TOTAL_MS);
 
     return () => {
-      clearTimeout(progressFrame);
-      stepTimers.forEach(clearTimeout);
+      clearInterval(interval);
       clearTimeout(doneTimer);
     };
-  }, [currentSteps.length, onDone]);
+  }, [currentSteps.length, stableOnDone]);
 
   const icons: Record<PreviewType, typeof BarChart3> = {
     cv: BarChart3,
@@ -114,38 +175,41 @@ function AnalyzingAnimation({ type, onDone }: { type: PreviewType; onDone: () =>
 
   return (
     <div className="p-8 flex flex-col items-center justify-center min-h-[350px]">
-      {/* Spinning icon */}
       <div className="relative mb-6">
-        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${colors[type]} flex items-center justify-center shadow-lg`}>
+        <div
+          className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${colors[type]} flex items-center justify-center shadow-lg`}
+        >
           <Icon className="h-9 w-9 text-white" />
         </div>
-        <div className="absolute -inset-3 rounded-3xl border-2 border-indigo-300/40 animate-spin" style={{ borderStyle: "dashed", animationDuration: "3s" }} />
+        <div
+          className="absolute -inset-3 rounded-3xl border-2 border-indigo-300/40 animate-spin"
+          style={{ borderStyle: "dashed", animationDuration: "3s" }}
+        />
       </div>
 
-      {/* Current step */}
       <div className="flex items-center gap-2 mb-4">
         <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
-        <p className="text-sm font-semibold text-gray-700">{currentSteps[currentStep]}</p>
+        <p className="text-sm font-semibold text-gray-700">
+          {currentSteps[currentStep]}
+        </p>
       </div>
 
-      {/* Progress bar */}
       <div className="w-full max-w-xs">
         <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-100"
+            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-200"
             style={{ width: `${progress}%` }}
           />
         </div>
         <p className="text-xs text-gray-400 mt-2 text-center">{progress}%</p>
       </div>
 
-      {/* Completed steps */}
-      <div className="mt-5 w-full max-w-xs space-y-2">
+      <div className="mt-5 w-full max-w-xs space-y-1.5">
         {currentSteps.map((step, i) => (
           <div
             key={step}
             className={`flex items-center gap-2 transition-all duration-300 ${
-              i <= currentStep ? "opacity-100" : "opacity-0"
+              i <= currentStep ? "opacity-100" : "opacity-0 h-0 overflow-hidden"
             }`}
           >
             {i < currentStep ? (
@@ -155,7 +219,15 @@ function AnalyzingAnimation({ type, onDone }: { type: PreviewType; onDone: () =>
             ) : (
               <div className="h-3.5 w-3.5 rounded-full border border-gray-300 shrink-0" />
             )}
-            <span className={`text-[11px] ${i < currentStep ? "text-emerald-600" : i === currentStep ? "text-indigo-600 font-medium" : "text-gray-400"}`}>
+            <span
+              className={`text-[11px] ${
+                i < currentStep
+                  ? "text-emerald-600"
+                  : i === currentStep
+                  ? "text-indigo-600 font-medium"
+                  : "text-gray-400"
+              }`}
+            >
               {step}
             </span>
           </div>
@@ -165,6 +237,7 @@ function AnalyzingAnimation({ type, onDone }: { type: PreviewType; onDone: () =>
   );
 }
 
+/* ─── Main Popup ─── */
 export function ResultPreviewPopup({
   isOpen,
   onClose,
@@ -173,14 +246,21 @@ export function ResultPreviewPopup({
 }: ResultPreviewPopupProps) {
   const [phase, setPhase] = useState<"analyzing" | "result">("analyzing");
 
-  // Reset phase when popup opens
+  // Generate scores once per popup open — different each time
+  const scores = useMemo(() => {
+    if (isOpen) return generateScores();
+    return generateScores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   useEffect(() => {
-    if (isOpen) {
-      setPhase("analyzing");
-    }
+    if (isOpen) setPhase("analyzing");
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const scoreColor = getScoreColor(scores.global);
+  const scoreMsg = getScoreMessage(scores.global);
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
@@ -188,7 +268,7 @@ export function ResultPreviewPopup({
         className="fixed inset-0 bg-black/30 backdrop-blur-md"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md animate-scale-in glass-strong rounded-3xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-md animate-scale-in glass-strong rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 z-10 rounded-full p-1.5 text-gray-400 hover:bg-gray-100/50 transition-colors"
@@ -197,7 +277,10 @@ export function ResultPreviewPopup({
         </button>
 
         {phase === "analyzing" ? (
-          <AnalyzingAnimation type={type} onDone={() => setPhase("result")} />
+          <AnalyzingAnimation
+            type={type}
+            onDone={() => setPhase("result")}
+          />
         ) : (
           <>
             {/* ── CV Result ── */}
@@ -207,60 +290,86 @@ export function ResultPreviewPopup({
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50">
                     <BarChart3 className="h-6 w-6 text-amber-500" />
                   </div>
-                  <h3 className="mt-3 text-lg font-bold text-gray-900">Analyse terminée !</h3>
-                  <p className="mt-1 text-sm text-gray-500">Ton CV a du potentiel, mais il peut aller <strong className="text-gray-700">beaucoup plus loin</strong></p>
+                  <h3 className="mt-3 text-lg font-bold text-gray-900">
+                    Analyse terminée !
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {scoreMsg}
+                  </p>
                 </div>
 
-                {/* Score — VISIBLE, not blurred */}
+                {/* Score ring — dynamic */}
                 <div className="flex justify-center mb-4">
                   <div className="relative">
                     <svg className="h-28 w-28 -rotate-90" viewBox="0 0 36 36">
-                      <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-                      <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#F59E0B" strokeWidth="3" strokeDasharray="42, 100" />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#e5e7eb"
+                        strokeWidth="3"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke={scoreColor.stroke}
+                        strokeWidth="3"
+                        strokeDasharray={`${scores.global}, 100`}
+                      />
                     </svg>
                     <span className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-3xl font-extrabold text-amber-500">42</span>
+                      <span
+                        className={`text-3xl font-extrabold ${scoreColor.text}`}
+                      >
+                        {scores.global}
+                      </span>
                       <span className="text-[10px] text-gray-400">/100</span>
                     </span>
                   </div>
                 </div>
 
-                {/* Bars — VISIBLE */}
+                {/* Bars — dynamic */}
                 <div className="space-y-2 mb-4">
-                  {[
-                    { label: "Structure", value: 40, color: "bg-orange-400", textColor: "text-orange-500" },
-                    { label: "Expérience", value: 72, color: "bg-emerald-400", textColor: "text-emerald-600" },
-                    { label: "Compétences", value: 35, color: "bg-red-400", textColor: "text-red-500" },
-                    { label: "Mots-clés ATS", value: 18, color: "bg-red-500", textColor: "text-red-500" },
-                    { label: "Mise en page", value: 65, color: "bg-yellow-400", textColor: "text-yellow-600" },
-                    { label: "Impact", value: 28, color: "bg-red-400", textColor: "text-red-500" },
-                  ].map((item) => (
-                    <div key={item.label}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-600">{item.label}</span>
-                        <span className={`font-bold ${item.textColor}`}>{item.value}%</span>
+                  {scores.bars.map((item) => {
+                    const style = getBarStyle(item.value);
+                    return (
+                      <div key={item.label}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-600">{item.label}</span>
+                          <span className={`font-bold ${style.text}`}>
+                            {item.value}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-gray-100">
+                          <div
+                            className={`h-1.5 rounded-full ${style.color}`}
+                            style={{ width: `${item.value}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-gray-100">
-                        <div className={`h-1.5 rounded-full ${item.color}`} style={{ width: `${item.value}%` }} />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                {/* Locked corrections preview */}
+                {/* Locked corrections */}
                 <div className="relative rounded-xl border border-gray-200 bg-gray-50/50 p-3 mb-4">
                   <div className="filter blur-[5px] pointer-events-none select-none space-y-2">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                      <span className="text-xs text-gray-600">Ajouter des mots-clés ATS ciblés</span>
+                      <span className="text-xs text-gray-600">
+                        Ajouter des mots-clés ATS ciblés
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                      <span className="text-xs text-gray-600">Restructurer la section expérience</span>
+                      <span className="text-xs text-gray-600">
+                        Restructurer la section expérience
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                      <span className="text-xs text-gray-600">Quantifier les résultats obtenus</span>
+                      <span className="text-xs text-gray-600">
+                        Quantifier les résultats obtenus
+                      </span>
                     </div>
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px] rounded-xl">
@@ -271,16 +380,14 @@ export function ResultPreviewPopup({
                   </div>
                 </div>
 
-                {/* CTA */}
                 <button
                   onClick={onUnlock}
                   className="flex w-full items-center justify-center gap-2 rounded-xl brand-gradient px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 hover:opacity-90 transition-opacity"
                 >
                   <TrendingUp className="h-4 w-4" />
-                  Voir les corrections et passer à 90+/100
+                  Voir les corrections et passer à 90+
                   <ArrowRight className="h-4 w-4" />
                 </button>
-
                 <p className="mt-2 text-center text-[10px] text-gray-400">
                   Seora corrige et réécrit ton CV automatiquement
                 </p>
@@ -294,20 +401,30 @@ export function ResultPreviewPopup({
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50">
                     <CheckCircle2 className="h-6 w-6 text-emerald-600" />
                   </div>
-                  <h3 className="mt-3 text-lg font-bold text-gray-900">Ta lettre est prête !</h3>
-                  <p className="mt-1 text-sm text-gray-500">Personnalisée pour l&apos;entreprise visée</p>
+                  <h3 className="mt-3 text-lg font-bold text-gray-900">
+                    Ta lettre est prête !
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Personnalisée pour l&apos;entreprise visée
+                  </p>
                 </div>
 
-                {/* Letter preview — first lines visible, rest blurred */}
                 <div className="rounded-xl border border-gray-200 bg-white p-4 mb-4 space-y-2">
                   <p className="text-sm text-gray-700">Madame, Monsieur,</p>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Passionné(e) par votre secteur d&apos;activité, je me permets de vous soumettre ma candidature...
+                    Passionné(e) par votre secteur d&apos;activité, je me
+                    permets de vous soumettre ma candidature...
                   </p>
                   <div className="relative">
                     <div className="filter blur-[5px] pointer-events-none select-none space-y-2">
-                      <p className="text-sm text-gray-600">Mon expérience en stratégie digitale m&apos;a permis de développer...</p>
-                      <p className="text-sm text-gray-600">Je serais ravi(e) d&apos;échanger avec vous lors d&apos;un entretien...</p>
+                      <p className="text-sm text-gray-600">
+                        Mon expérience en stratégie digitale m&apos;a permis de
+                        développer...
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Je serais ravi(e) d&apos;échanger avec vous lors
+                        d&apos;un entretien...
+                      </p>
                       <p className="text-sm text-gray-600">Cordialement,</p>
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px]">
@@ -327,7 +444,6 @@ export function ResultPreviewPopup({
                   Débloquer ma lettre complète
                   <ArrowRight className="h-4 w-4" />
                 </button>
-
                 <p className="mt-2 text-center text-[10px] text-gray-400">
                   Prête à copier-coller et envoyer
                 </p>
@@ -341,16 +457,23 @@ export function ResultPreviewPopup({
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50">
                     <CheckCircle2 className="h-6 w-6 text-emerald-600" />
                   </div>
-                  <h3 className="mt-3 text-lg font-bold text-gray-900">Texte humanisé !</h3>
-                  <p className="mt-1 text-sm text-gray-500">Ton texte est maintenant indétectable</p>
+                  <h3 className="mt-3 text-lg font-bold text-gray-900">
+                    Texte humanisé !
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Ton texte est maintenant indétectable
+                  </p>
                 </div>
 
-                {/* Before/After score — VISIBLE */}
                 <div className="flex items-center justify-center gap-6 mb-4">
                   <div className="text-center">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">Avant</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">
+                      Avant
+                    </p>
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50 border-2 border-red-200">
-                      <span className="text-lg font-extrabold text-red-600">87%</span>
+                      <span className="text-lg font-extrabold text-red-600">
+                        87%
+                      </span>
                     </div>
                     <p className="mt-1 text-[10px] text-red-500">IA détecté</p>
                   </div>
@@ -359,19 +482,23 @@ export function ResultPreviewPopup({
                     <ArrowRight className="h-4 w-4 text-gray-300 mt-1" />
                   </div>
                   <div className="text-center">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">Après</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">
+                      Après
+                    </p>
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 border-2 border-emerald-200">
-                      <span className="text-lg font-extrabold text-emerald-600">4%</span>
+                      <span className="text-lg font-extrabold text-emerald-600">
+                        4%
+                      </span>
                     </div>
                     <p className="mt-1 text-[10px] text-emerald-500">Humain</p>
                   </div>
                 </div>
 
-                {/* Blurred text */}
                 <div className="relative rounded-xl border border-gray-200 bg-gray-50/50 p-3 mb-4">
                   <div className="filter blur-[5px] pointer-events-none select-none">
                     <p className="text-sm text-gray-600 leading-relaxed">
-                      Le texte reformulé conserve le sens original tout en adoptant un style plus naturel et personnel...
+                      Le texte reformulé conserve le sens original tout en
+                      adoptant un style plus naturel et personnel...
                     </p>
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px] rounded-xl">
@@ -390,7 +517,6 @@ export function ResultPreviewPopup({
                   Récupérer mon texte humanisé
                   <ArrowRight className="h-4 w-4" />
                 </button>
-
                 <p className="mt-2 text-center text-[10px] text-gray-400">
                   Indétectable par GPTZero, Turnitin et Compilatio
                 </p>
