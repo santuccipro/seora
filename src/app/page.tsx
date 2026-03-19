@@ -804,47 +804,6 @@ export default function Home() {
             {/* Single card at a time */}
             <div className="mx-auto max-w-lg">
 
-              {/* Timeline steps */}
-              {activeDemo === 0 && (
-                <div className="flex items-center justify-center gap-0 mb-6 animate-fade-up" style={{ animationDuration: "0.3s" }}>
-                  {["Dépose ton CV", "Analyse IA", "Score initial", "Optimisation", "CV prêt"].map((step, i) => (
-                    <div key={step} className="flex items-center">
-                      <div className="flex flex-col items-center">
-                        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-indigo-100 text-[10px] sm:text-[11px] font-bold text-indigo-600">{i + 1}</div>
-                        <span className="mt-1 text-[8px] sm:text-[9px] text-gray-400 font-medium text-center w-12 sm:w-14 leading-tight">{step}</span>
-                      </div>
-                      {i < 4 && <div className="h-px w-4 sm:w-6 bg-indigo-200 mt-[-10px]" />}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {activeDemo === 2 && (
-                <div className="flex items-center justify-center gap-0 mb-6 animate-fade-up" style={{ animationDuration: "0.3s" }}>
-                  {["Choisis le secteur", "Infos entreprise", "Génération IA", "Lettre prête"].map((step, i) => (
-                    <div key={step} className="flex items-center">
-                      <div className="flex flex-col items-center">
-                        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-blue-100 text-[10px] sm:text-[11px] font-bold text-blue-600">{i + 1}</div>
-                        <span className="mt-1 text-[8px] sm:text-[9px] text-gray-400 font-medium text-center w-14 sm:w-16 leading-tight">{step}</span>
-                      </div>
-                      {i < 3 && <div className="h-px w-5 sm:w-8 bg-blue-200 mt-[-10px]" />}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {activeDemo === 3 && (
-                <div className="flex items-center justify-center gap-0 mb-6 animate-fade-up" style={{ animationDuration: "0.3s" }}>
-                  {["Texte détecté IA", "Humanisation", "Résultat 100%"].map((step, i) => (
-                    <div key={step} className="flex items-center">
-                      <div className="flex flex-col items-center">
-                        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-orange-100 text-[10px] sm:text-[11px] font-bold text-orange-600">{i + 1}</div>
-                        <span className="mt-1 text-[8px] sm:text-[9px] text-gray-400 font-medium text-center w-16 sm:w-20 leading-tight">{step}</span>
-                      </div>
-                      {i < 2 && <div className="h-px w-8 sm:w-12 bg-orange-200 mt-[-10px]" />}
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* ─── Demo 1: Analyse CV ─── */}
               {activeDemo === 0 && (
                 <div className="glass-card rounded-3xl overflow-hidden animate-fade-up" style={{ animationDuration: "0.3s" }}>
@@ -860,6 +819,10 @@ export default function Home() {
                   <div className="relative h-[340px] overflow-hidden">
                     {/* Phase 1: Upload */}
                     <div className="anim-phase anim-a-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white">1</span>
+                        <span className="text-[10px] font-semibold text-indigo-600">Dépose ton CV</span>
+                      </div>
                       <div className="anim-a-file w-24 h-32 rounded-xl bg-white border-2 border-dashed border-indigo-300 flex flex-col items-center justify-center shadow-lg shadow-indigo-100/50">
                         <FileText className="h-8 w-8 text-indigo-400 mb-2" />
                         <span className="text-[9px] font-bold text-indigo-500">mon-cv.pdf</span>
@@ -872,6 +835,10 @@ export default function Home() {
                     </div>
                     {/* Phase 2: Scanning */}
                     <div className="anim-phase anim-a-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white">2</span>
+                        <span className="text-[10px] font-semibold text-indigo-600">Analyse IA</span>
+                      </div>
                       <div className="w-full max-w-xs">
                         <div className="rounded-xl bg-white border border-gray-200/80 p-5 shadow-sm space-y-3 relative overflow-hidden">
                           <div className="anim-a-scanline absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
@@ -900,6 +867,10 @@ export default function Home() {
                     </div>
                     {/* Phase 3: Bad Score (red) */}
                     <div className="anim-phase anim-a-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-red-50 border border-red-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">3</span>
+                        <span className="text-[10px] font-semibold text-red-600">Score initial</span>
+                      </div>
                       <div className="anim-a-score-pop">
                         <svg width="120" height="120" viewBox="0 0 120 120">
                           <circle cx="60" cy="60" r="50" fill="none" stroke="#E5E7EB" strokeWidth="8" />
@@ -935,6 +906,10 @@ export default function Home() {
                     </div>
                     {/* Phase 4: Magic Seora fix */}
                     <div className="anim-phase anim-a-phase4 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-purple-500 text-[9px] font-bold text-white">4</span>
+                        <span className="text-[10px] font-semibold text-purple-600">Optimisation</span>
+                      </div>
                       <div className="relative">
                         <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 anim-a-magic-glow">
                           <Sparkles className="h-8 w-8 text-white" />
@@ -959,6 +934,10 @@ export default function Home() {
                     </div>
                     {/* Phase 5: Good Score (green) */}
                     <div className="anim-phase anim-a-phase5 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">5</span>
+                        <span className="text-[10px] font-semibold text-emerald-600">CV prêt</span>
+                      </div>
                       <div className="anim-a-score-pop">
                         <svg width="120" height="120" viewBox="0 0 120 120">
                           <circle cx="60" cy="60" r="50" fill="none" stroke="#E5E7EB" strokeWidth="8" />
@@ -1012,6 +991,10 @@ export default function Home() {
                   <div className="relative h-[380px] overflow-hidden">
                     {/* Phase 1: Choix du secteur */}
                     <div className="anim-phase anim-c-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">1</span>
+                        <span className="text-[10px] font-semibold text-blue-600">Choisis le secteur</span>
+                      </div>
                       <p className="text-[10px] font-semibold text-gray-600 mb-3">Choisis ton secteur</p>
                       <div className="w-full max-w-xs space-y-2">
                         {[
@@ -1031,6 +1014,10 @@ export default function Home() {
                     </div>
                     {/* Phase 2: Saisie entreprise */}
                     <div className="anim-phase anim-c-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">2</span>
+                        <span className="text-[10px] font-semibold text-blue-600">Infos entreprise</span>
+                      </div>
                       <div className="w-full max-w-xs space-y-4">
                         <div>
                           <p className="text-[10px] font-semibold text-gray-500 mb-1.5">Secteur</p>
@@ -1057,6 +1044,10 @@ export default function Home() {
                     </div>
                     {/* Phase 3: Génération */}
                     <div className="anim-phase anim-c-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">3</span>
+                        <span className="text-[10px] font-semibold text-blue-600">Génération IA</span>
+                      </div>
                       <div className="relative">
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 anim-a-magic-glow">
                           <PenTool className="h-7 w-7 text-white" />
@@ -1080,7 +1071,11 @@ export default function Home() {
                       </div>
                     </div>
                     {/* Phase 4: Lettre générée */}
-                    <div className="anim-phase anim-c-phase4 absolute inset-0 flex flex-col p-5 overflow-hidden">
+                    <div className="anim-phase anim-c-phase4 absolute inset-0 flex flex-col p-5 pt-9 overflow-hidden">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">4</span>
+                        <span className="text-[10px] font-semibold text-emerald-600">Lettre prête</span>
+                      </div>
                       <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 mb-3 flex items-center justify-between">
                         <div>
                           <p className="text-[9px] text-blue-500 font-semibold">L&apos;Oréal Paris — Marketing Digital</p>
@@ -1130,6 +1125,10 @@ export default function Home() {
                   <div className="relative h-[340px] overflow-hidden">
                     {/* Phase 1: Texte IA détecté */}
                     <div className="anim-phase anim-h-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-red-50 border border-red-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">1</span>
+                        <span className="text-[10px] font-semibold text-red-600">Texte détecté IA</span>
+                      </div>
                       <div className="w-full max-w-xs">
                         <div className="rounded-xl bg-red-50 border border-red-200/60 p-4 mb-4">
                           <div className="flex items-center justify-between mb-2">
@@ -1152,6 +1151,10 @@ export default function Home() {
                     </div>
                     {/* Phase 2: Humanisation en cours */}
                     <div className="anim-phase anim-h-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white">2</span>
+                        <span className="text-[10px] font-semibold text-orange-600">Humanisation</span>
+                      </div>
                       <div className="relative">
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/30 anim-a-magic-glow">
                           <Bot className="h-7 w-7 text-white" />
@@ -1176,6 +1179,10 @@ export default function Home() {
                     </div>
                     {/* Phase 3: Résultat */}
                     <div className="anim-phase anim-h-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1">
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">3</span>
+                        <span className="text-[10px] font-semibold text-emerald-600">Résultat</span>
+                      </div>
                       <div className="w-full max-w-xs space-y-3">
                         <div className="grid grid-cols-2 gap-2">
                           <div className="rounded-xl bg-red-50 border border-red-100/60 p-3">
