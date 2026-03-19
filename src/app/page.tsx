@@ -194,7 +194,7 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         <nav className="sticky top-0 z-50">
           <div className="mx-auto max-w-4xl px-4 pt-3">
-            <div className="flex h-14 items-center justify-between rounded-2xl glass-strong px-5">
+            <div className="flex h-14 items-center justify-between rounded-2xl glass-strong px-3 sm:px-5">
               <div className="flex items-center gap-2.5">
                 <img src="/logos/seora-icon.png" alt="Seora" className="h-10 w-10 rounded-xl" draggable={false} />
                 <span className="text-lg font-extrabold tracking-tight text-gray-900">Seora</span>
@@ -272,20 +272,20 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         {/*  2. HERO — Emotional, direct           */}
         {/* ══════════════════════════════════════ */}
-        <section className="relative pt-14 pb-8 sm:pt-20 sm:pb-10">
-          <div className="relative mx-auto max-w-2xl px-6 text-center">
+        <section className="relative pt-10 pb-6 sm:pt-20 sm:pb-10">
+          <div className="relative mx-auto max-w-2xl px-5 sm:px-6 text-center">
             {/* Badge */}
             <div className="animate-fade-up inline-flex items-center gap-2 rounded-full glass-strong px-4 py-1.5 text-xs font-semibold text-indigo-700 mb-6 shadow-sm">
               <Sparkles className="h-3.5 w-3.5" />
               Déjà utilisé par +12 000 étudiants en France
             </div>
 
-            <h1 className="animate-fade-up delay-100 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl md:text-6xl leading-[1.08]" style={{ animationFillMode: "both" }}>
-              Le seul outil qui analyse, réécrit<br />
+            <h1 className="animate-fade-up delay-100 text-[1.7rem] font-extrabold tracking-tight text-gray-900 sm:text-5xl md:text-6xl leading-[1.12] sm:leading-[1.08]" style={{ animationFillMode: "both" }}>
+              Le seul outil qui analyse, réécrit{" "}
               <span className="brand-gradient-text">et adapte ton CV à chaque offre.</span>
             </h1>
 
-            <p className="animate-fade-up delay-200 mx-auto mt-5 max-w-lg text-base text-gray-500 leading-relaxed sm:text-lg" style={{ animationFillMode: "both" }}>
+            <p className="animate-fade-up delay-200 mx-auto mt-4 max-w-lg text-[0.9rem] text-gray-500 leading-relaxed sm:text-lg px-1 sm:px-0" style={{ animationFillMode: "both" }}>
               Score détaillé, corrections IA, lettre de motivation sur-mesure — tout en 30 secondes. <strong className="text-gray-700">Aucun autre outil ne fait ça.</strong>
             </p>
 
@@ -301,10 +301,10 @@ export default function Home() {
             </div>
 
             {/* Social proof */}
-            <div className="animate-fade-up delay-500 mt-6 flex items-center justify-center gap-2.5" style={{ animationFillMode: "both" }}>
-              <img src="/logos/customers.webp" alt="Utilisateurs" className="h-10" draggable={false} />
-              <p className="text-sm text-gray-500">
-                <strong className="text-gray-900 font-bold text-base">4.9/5</strong> · utilisé par <strong className="text-gray-800 font-semibold">1 783</strong> étudiants <img src="/logos/blue-badge.svg" alt="Vérifié" className="h-4 w-4 inline-block ml-0.5 -mt-0.5" />
+            <div className="animate-fade-up delay-500 mt-6 flex items-center justify-center gap-2" style={{ animationFillMode: "both" }}>
+              <img src="/logos/customers.webp" alt="Utilisateurs" className="h-8 sm:h-10" draggable={false} />
+              <p className="text-xs sm:text-sm text-gray-500">
+                <strong className="text-gray-900 font-bold text-sm sm:text-base">4.9/5</strong> · utilisé par <strong className="text-gray-800 font-semibold">1 783</strong> étudiants <img src="/logos/blue-badge.svg" alt="Vérifié" className="h-4 w-4 inline-block ml-0.5 -mt-0.5" />
               </p>
             </div>
           </div>
@@ -314,14 +314,14 @@ export default function Home() {
         {/*  2b. ANTI-IA BANNER — Indétectable      */}
         {/* ══════════════════════════════════════ */}
         <section className="py-5 sm:py-6">
-          <div className="mx-auto max-w-4xl px-6">
+          <div className="mx-auto max-w-4xl px-4 sm:px-6">
             <div className="relative rounded-2xl overflow-hidden border border-white/30 shadow-2xl shadow-indigo-500/10">
               {/* Background gradient */}
               <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-indigo-950 to-gray-900" />
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.15),transparent_50%)]" />
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(168,85,247,0.1),transparent_50%)]" />
 
-              <div className="relative px-8 py-8 sm:px-14 sm:py-10">
+              <div className="relative px-5 py-6 sm:px-14 sm:py-10">
                 {/* Top row: badge + headline inline */}
                 <div className="flex items-center justify-center gap-3 mb-3">
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1">
@@ -330,10 +330,10 @@ export default function Home() {
                   </div>
                 </div>
 
-                <h2 className="text-center text-2xl sm:text-3xl md:text-4xl font-black text-white leading-tight mb-2.5">
+                <h2 className="text-center text-xl sm:text-3xl md:text-4xl font-black text-white leading-tight mb-2.5">
                   100% de nos contenus passent <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">sous les radars de l&apos;IA.</span>
                 </h2>
-                <p className="text-center text-gray-400 text-sm max-w-xl mx-auto">
+                <p className="text-center text-gray-400 text-xs sm:text-sm max-w-xl mx-auto">
                   Notre moteur supprime les signatures IA de vos textes — indétectable par GPTZero, Turnitin, Compilatio.
                 </p>
               </div>
@@ -386,19 +386,19 @@ export default function Home() {
         {/*  ESSAYE MAINTENANT — INTERACTIVE       */}
         {/* ══════════════════════════════════════ */}
         <section className="py-10 sm:py-12">
-          <div className="mx-auto max-w-4xl px-6">
+          <div className="mx-auto max-w-4xl px-4 sm:px-6">
             <div className="text-center mb-6">
-              <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl mb-3">
+              <h2 className="text-2xl font-extrabold text-gray-900 sm:text-4xl mb-2 sm:mb-3">
                 Essaye maintenant, <span className="brand-gradient-text">c&apos;est gratuit</span>
               </h2>
-              <p className="text-base text-gray-500 max-w-lg mx-auto">
+              <p className="text-sm sm:text-base text-gray-500 max-w-lg mx-auto px-2 sm:px-0">
                 Dépose ton CV, colle ton texte ou génère ta lettre. Résultat en 30 secondes.
               </p>
             </div>
 
             {/* Tabs — pill style */}
-            <div className="flex items-center justify-center mb-8">
-              <div className="inline-flex items-center gap-1 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200/60 p-1.5 shadow-sm">
+            <div className="flex items-center justify-center mb-6 sm:mb-8">
+              <div className="inline-flex items-center gap-0.5 sm:gap-1 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200/60 p-1 sm:p-1.5 shadow-sm w-full sm:w-auto">
                 {[
                   { key: "cv" as const, icon: BarChart3, label: "Analyse CV" },
                   { key: "letter" as const, icon: PenTool, label: "Lettre de motivation" },
@@ -407,14 +407,14 @@ export default function Home() {
                   <button
                     key={tab.key}
                     onClick={() => setActiveInteractive(tab.key)}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                    className={`flex flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-semibold transition-all duration-200 ${
                       activeInteractive === tab.key
                         ? "bg-white text-gray-900 shadow-md"
                         : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    <tab.icon className="h-4 w-4" />
-                    {tab.label}
+                    <tab.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                    <span className="truncate">{tab.label}</span>
                   </button>
                 ))}
               </div>
@@ -425,7 +425,7 @@ export default function Home() {
               {/* CV Tab */}
               {activeInteractive === "cv" && (
                 <div
-                  className={`p-10 sm:p-14 transition-all duration-300 ${dragOver ? "bg-indigo-50/40" : ""}`}
+                  className={`p-3 sm:p-10 md:p-14 transition-all duration-300 ${dragOver ? "bg-indigo-50/40" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
                   onDrop={(e) => {
@@ -460,32 +460,32 @@ export default function Home() {
                     }}
                   />
                   <div
-                    className={`border-2 border-dashed rounded-2xl py-24 sm:py-32 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${
+                    className={`border-2 border-dashed rounded-2xl py-10 sm:py-24 md:py-32 px-4 sm:px-6 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${
                       dragOver ? "border-indigo-500 bg-indigo-50/50 scale-[1.005]" : "border-gray-200 hover:border-indigo-400 hover:bg-gray-50/50"
                     }`}
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <div className={`h-16 w-16 rounded-2xl flex items-center justify-center mb-5 transition-colors ${dragOver ? "bg-indigo-100" : "bg-gray-100"}`}>
-                      <Upload className={`h-7 w-7 ${dragOver ? "text-indigo-600" : "text-gray-400"}`} />
+                    <div className={`h-12 w-12 sm:h-16 sm:w-16 rounded-2xl flex items-center justify-center mb-4 sm:mb-5 transition-colors ${dragOver ? "bg-indigo-100" : "bg-gray-100"}`}>
+                      <Upload className={`h-6 w-6 sm:h-7 sm:w-7 ${dragOver ? "text-indigo-600" : "text-gray-400"}`} />
                     </div>
-                    <p className="text-xl font-bold text-gray-900 mb-1">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
-                    <p className="text-sm text-gray-400 mb-8">PDF ou DOCX • Analyse gratuite et instantanée</p>
-                    <div className="px-8 py-3 rounded-xl brand-gradient text-white text-sm font-semibold shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all">
+                    <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
+                    <p className="text-xs sm:text-sm text-gray-400 mb-5 sm:mb-8">PDF ou DOCX • Analyse gratuite et instantanée</p>
+                    <div className="px-6 sm:px-8 py-3 rounded-xl brand-gradient text-white text-sm font-semibold shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all">
                       Parcourir mes fichiers
                     </div>
                   </div>
                   {/* Quick info */}
-                  <div className="flex items-center justify-center gap-8 mt-6 text-xs text-gray-400">
-                    <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Confidentiel</span>
-                    <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-amber-400" /> Résultat en 30s</span>
-                    <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-indigo-400" /> Données supprimées après analyse</span>
+                  <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 sm:gap-x-8 sm:gap-y-2 mt-4 sm:mt-6 text-[10px] sm:text-xs text-gray-400 px-2 sm:px-0">
+                    <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-400 shrink-0" /> Confidentiel</span>
+                    <span className="flex items-center gap-1.5"><Zap className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-400 shrink-0" /> Résultat en 30s</span>
+                    <span className="flex items-center gap-1.5"><Shield className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-indigo-400 shrink-0" /> Données supprimées</span>
                   </div>
                 </div>
               )}
 
               {/* Letter Tab */}
               {activeInteractive === "letter" && (
-                <div className="p-8 sm:p-12">
+                <div className="p-4 sm:p-8 md:p-12">
                   <div className="space-y-6">
                     {/* Row 1: Company + Sector */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -649,7 +649,7 @@ export default function Home() {
 
               {/* Humanizer Tab */}
               {activeInteractive === "humanizer" && (
-                <div className="p-8 sm:p-12">
+                <div className="p-4 sm:p-8 md:p-12">
                   <div className="space-y-6">
                     {/* Input mode toggle */}
                     <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1 w-fit">
@@ -767,10 +767,10 @@ export default function Home() {
             </div>
 
             {/* Bottom trust badges */}
-            <div className="flex items-center justify-center gap-8 mt-6 text-xs text-gray-400">
-              <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> Données sécurisées</span>
-              <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" /> Résultat en 30s</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> 100% gratuit</span>
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:gap-8 mt-6 text-[11px] sm:text-xs text-gray-400">
+              <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 shrink-0" /> Données sécurisées</span>
+              <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 shrink-0" /> Résultat en 30s</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> 100% gratuit</span>
             </div>
           </div>
         </section>
