@@ -70,7 +70,7 @@ function AnalyzingAnimation({ type, onDone }: { type: PreviewType; onDone: () =>
   const currentSteps = steps[type];
 
   useEffect(() => {
-    const totalDuration = 12000;
+    const totalDuration = 30000;
     const stepDuration = totalDuration / currentSteps.length;
     const progressInterval = setInterval(() => {
       setProgress((p) => {
