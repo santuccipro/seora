@@ -778,7 +778,7 @@ export default function Home() {
                 <div className="absolute inset-0 rounded-full bg-indigo-500/20 animate-ping" style={{ animationDuration: "2s" }} />
                 <div className="absolute -inset-3 rounded-full bg-indigo-400/10 blur-md animate-pulse" />
                 <div className="relative flex h-14 w-14 items-center justify-center rounded-full brand-gradient shadow-lg shadow-indigo-500/30">
-                  <svg className="h-6 w-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  <ChevronDown className="h-6 w-6 text-white" />
                 </div>
               </div>
               <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-2">
