@@ -385,7 +385,7 @@ export default function Home() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.doc,.docx,.txt"
+              accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.heic,.webp"
               onChange={onFileChange}
               className="hidden"
             />
@@ -410,7 +410,7 @@ export default function Home() {
                   <p className="text-sm font-medium text-gray-900">
                     Glissez votre CV ici ou <span className="text-indigo-600">parcourez</span>
                   </p>
-                  <p className="mt-1 text-xs text-gray-400">PDF, DOC, DOCX ou TXT • 10 MB max</p>
+                  <p className="mt-1 text-xs text-gray-400">PDF, DOC, DOCX, TXT ou Photo • 10 MB max</p>
                 </div>
               </div>
             )}

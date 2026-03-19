@@ -120,9 +120,9 @@ export default function Home() {
   const humTones = ["Naturel", "Académique", "Professionnel", "Décontracté"];
 
   const handleHumFile = (file: File) => {
-    const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
-    if (!validTypes.includes(file.type) && !file.name.endsWith(".txt") && !file.name.endsWith(".docx") && !file.name.endsWith(".pdf")) {
-      toast.error("Format accepté : PDF, DOCX ou TXT"); return;
+    const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "image/jpeg", "image/png", "image/heic", "image/webp"];
+    if (!validTypes.includes(file.type) && !file.type.startsWith("image/") && !file.name.endsWith(".txt") && !file.name.endsWith(".docx") && !file.name.endsWith(".pdf") && !file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".heic") && !file.name.endsWith(".webp")) {
+      toast.error("Format accepté : PDF, DOCX, TXT ou Photo"); return;
     }
     setHumFileName(file.name);
     const reader = new FileReader();
@@ -139,8 +139,8 @@ export default function Home() {
   };
 
   const handleLetterCv = (file: File) => {
-    if (!file.type.includes("pdf") && !file.name.endsWith(".pdf") && !file.name.endsWith(".docx")) {
-      toast.error("PDF ou DOCX uniquement"); return;
+    if (!file.type.includes("pdf") && !file.type.startsWith("image/") && !file.name.endsWith(".pdf") && !file.name.endsWith(".docx") && !file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".heic") && !file.name.endsWith(".webp")) {
+      toast.error("PDF, DOCX ou Photo uniquement"); return;
     }
     setLetterCvName(file.name);
     const reader = new FileReader();
@@ -358,7 +358,7 @@ export default function Home() {
                     e.preventDefault();
                     setDragOver(false);
                     const file = e.dataTransfer.files[0];
-                    if (file && (file.type === "application/pdf" || file.name.endsWith(".pdf") || file.name.endsWith(".docx"))) {
+                    if (file && (file.type === "application/pdf" || file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/heic" || file.type === "image/webp" || file.name.endsWith(".pdf") || file.name.endsWith(".docx") || file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") || file.name.endsWith(".png") || file.name.endsWith(".heic") || file.name.endsWith(".webp"))) {
                       const reader = new FileReader();
                       reader.onload = () => {
                         sessionStorage.setItem("seora_cv_file", reader.result as string);
@@ -367,11 +367,11 @@ export default function Home() {
                       };
                       reader.readAsDataURL(file);
                     } else {
-                      toast.error("Format accepté : PDF ou DOCX");
+                      toast.error("Format accepté : PDF, DOCX ou Photo");
                     }
                   }}
                 >
-                  <input ref={fileInputRef} type="file" accept=".pdf,.docx" className="hidden"
+                  <input ref={fileInputRef} type="file" accept=".pdf,.docx,.jpg,.jpeg,.png,.heic,.webp" className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
@@ -395,7 +395,7 @@ export default function Home() {
                       <Upload className={`h-6 w-6 sm:h-7 sm:w-7 ${dragOver ? "text-indigo-600" : "text-gray-400"}`} />
                     </div>
                     <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
-                    <p className="text-xs sm:text-sm text-gray-400 mb-5 sm:mb-8">PDF ou DOCX • Analyse instantanée</p>
+                    <p className="text-xs sm:text-sm text-gray-400 mb-5 sm:mb-8">PDF, DOCX ou Photo • Analyse instantanée</p>
                     <div className="px-6 sm:px-8 py-3 rounded-xl brand-gradient text-white text-sm font-semibold shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all">
                       Parcourir mes fichiers
                     </div>
@@ -527,7 +527,7 @@ export default function Home() {
                           <input
                             ref={humFileRef}
                             type="file"
-                            accept=".pdf,.docx,.txt"
+                            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.heic,.webp"
                             className="hidden"
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleHumFile(f); }}
                           />
@@ -545,7 +545,7 @@ export default function Home() {
                                 <Upload className="h-6 w-6 text-orange-600" />
                               </div>
                               <p className="text-sm font-semibold text-gray-700">Glissez votre fichier ici</p>
-                              <p className="text-xs text-gray-400 mt-1">PDF, DOCX ou TXT • 10 Mo max</p>
+                              <p className="text-xs text-gray-400 mt-1">PDF, DOCX, TXT ou Photo • 10 Mo max</p>
                             </>
                           )}
                         </div>

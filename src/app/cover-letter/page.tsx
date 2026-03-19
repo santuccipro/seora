@@ -193,7 +193,7 @@ export default function CoverLetterPage() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { "application/pdf": [".pdf"], "text/plain": [".txt"] },
+    accept: { "application/pdf": [".pdf"], "text/plain": [".txt"], "image/jpeg": [".jpg", ".jpeg"], "image/png": [".png"], "image/heic": [".heic"], "image/webp": [".webp"] },
     maxFiles: 1,
   });
 
@@ -562,7 +562,7 @@ export default function CoverLetterPage() {
                   <div className="flex flex-col items-center gap-2">
                     <Upload className="h-10 w-10 text-gray-300" />
                     <p className="text-gray-700 font-medium">Glissez votre lettre de motivation</p>
-                    <p className="text-sm text-gray-500">PDF ou TXT</p>
+                    <p className="text-sm text-gray-500">PDF, TXT ou Photo</p>
                   </div>
                 )}
               </div>
