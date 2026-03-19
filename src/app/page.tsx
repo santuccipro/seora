@@ -773,13 +773,18 @@ export default function Home() {
         <section className="py-10 sm:py-14">
           <div className="mx-auto max-w-5xl px-4 sm:px-6">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 border border-indigo-100 px-4 py-1.5 text-[11px] font-semibold text-indigo-600 mb-4">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100"><Zap className="h-3 w-3" /></span>
-                Démo en direct
+              {/* Play icon visual */}
+              <div className="relative inline-flex items-center justify-center mb-5">
+                <div className="absolute inset-0 rounded-full bg-indigo-500/20 animate-ping" style={{ animationDuration: "2s" }} />
+                <div className="absolute -inset-3 rounded-full bg-indigo-400/10 blur-md animate-pulse" />
+                <div className="relative flex h-14 w-14 items-center justify-center rounded-full brand-gradient shadow-lg shadow-indigo-500/30">
+                  <svg className="h-6 w-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                </div>
               </div>
-              <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl">
+              <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-2">
                 Comment ça marche ?
               </h2>
+              <p className="text-sm text-gray-400">Regarde la démo en direct — aucune inscription requise</p>
             </div>
 
             {/* Tab selector */}
