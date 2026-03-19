@@ -30,32 +30,47 @@ function AnalyzingAnimation({ type, onDone }: { type: PreviewType; onDone: () =>
 
   const steps: Record<PreviewType, string[]> = {
     cv: [
-      "Lecture du document...",
-      "Analyse de la structure...",
-      "Vérification des mots-clés ATS...",
-      "Évaluation de l'impact...",
+      "Extraction du contenu...",
+      "Analyse de la mise en page...",
+      "Détection des sections clés...",
+      "Vérification de la structure...",
+      "Analyse des mots-clés ATS...",
+      "Comparaison avec les standards du marché...",
+      "Évaluation de l'impact des expériences...",
+      "Analyse des compétences techniques...",
+      "Vérification orthographique...",
       "Calcul du score final...",
     ],
     letter: [
-      "Analyse de l'offre...",
-      "Personnalisation du contenu...",
-      "Adaptation du ton...",
-      "Rédaction en cours...",
+      "Analyse de l'offre d'emploi...",
+      "Identification des mots-clés...",
+      "Recherche sur l'entreprise...",
+      "Structuration du contenu...",
+      "Personnalisation du ton...",
+      "Adaptation au secteur...",
+      "Rédaction du corps...",
+      "Optimisation de l'accroche...",
+      "Vérification de la cohérence...",
       "Finalisation...",
     ],
     humanizer: [
-      "Détection des patterns IA...",
-      "Analyse du style d'écriture...",
-      "Reformulation intelligente...",
-      "Vérification anti-détection...",
-      "Finalisation...",
+      "Scan des patterns GPT détectés...",
+      "Analyse de la perplexité du texte...",
+      "Détection des structures SFT...",
+      "Cartographie des répétitions syntaxiques...",
+      "Reformulation phrase par phrase...",
+      "Diversification du vocabulaire...",
+      "Injection de variations naturelles...",
+      "Randomisation des connecteurs...",
+      "Test anti-détection GPTZero...",
+      "Vérification finale...",
     ],
   };
 
   const currentSteps = steps[type];
 
   useEffect(() => {
-    const totalDuration = 3500;
+    const totalDuration = 12000;
     const stepDuration = totalDuration / currentSteps.length;
     const progressInterval = setInterval(() => {
       setProgress((p) => {
