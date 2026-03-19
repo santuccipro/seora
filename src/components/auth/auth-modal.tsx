@@ -54,7 +54,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
 const benefits = [
   { icon: FileText, text: "Corrections détaillées de ton CV" },
   { icon: Sparkles, text: "CV réécrit et optimisé par l'IA" },
-  { icon: Bot, text: "Score de 34 → 90+ en 30 secondes" },
+  { icon: Bot, text: "Score de 42 → 90+ en 30 secondes" },
   { icon: CheckCircle2, text: "Passe les filtres ATS des recruteurs" },
 ];
 

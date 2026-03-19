@@ -70,34 +70,33 @@ function AnalyzingAnimation({ type, onDone }: { type: PreviewType; onDone: () =>
   const currentSteps = steps[type];
 
   useEffect(() => {
-    const totalDuration = 30000;
-    const stepDuration = totalDuration / currentSteps.length;
-    const progressInterval = setInterval(() => {
+    const totalDuration = 40000;
+    const numSteps = currentSteps.length;
+    const stepDuration = totalDuration / numSteps;
+    let progressFrame: ReturnType<typeof setTimeout>;
+
+    // Smooth progress that pauses slightly between steps
+    const tick = () => {
       setProgress((p) => {
-        if (p >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
+        if (p >= 100) return 100;
         return p + 1;
       });
-    }, totalDuration / 100);
+      progressFrame = setTimeout(tick, totalDuration / 100);
+    };
+    progressFrame = setTimeout(tick, totalDuration / 100);
 
-    const stepInterval = setInterval(() => {
-      setCurrentStep((s) => {
-        if (s >= currentSteps.length - 1) {
-          clearInterval(stepInterval);
-          return s;
-        }
-        return s + 1;
-      });
-    }, stepDuration);
+    // Steps advance evenly across the total duration
+    const stepTimers = Array.from({ length: numSteps - 1 }, (_, i) =>
+      setTimeout(() => setCurrentStep(i + 1), stepDuration * (i + 1))
+    );
 
-    const timer = setTimeout(onDone, totalDuration + 500);
+    // Done exactly at totalDuration
+    const doneTimer = setTimeout(onDone, totalDuration);
 
     return () => {
-      clearInterval(progressInterval);
-      clearInterval(stepInterval);
-      clearTimeout(timer);
+      clearTimeout(progressFrame);
+      stepTimers.forEach(clearTimeout);
+      clearTimeout(doneTimer);
     };
   }, [currentSteps.length, onDone]);
 
@@ -205,11 +204,11 @@ export function ResultPreviewPopup({
             {type === "cv" && (
               <div className="p-6">
                 <div className="text-center mb-4">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50">
-                    <XCircle className="h-6 w-6 text-red-500" />
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50">
+                    <BarChart3 className="h-6 w-6 text-amber-500" />
                   </div>
-                  <h3 className="mt-3 text-lg font-bold text-gray-900">Ton CV a des problèmes.</h3>
-                  <p className="mt-1 text-sm text-gray-500">Il ne passera probablement pas les filtres ATS</p>
+                  <h3 className="mt-3 text-lg font-bold text-gray-900">Analyse terminée !</h3>
+                  <p className="mt-1 text-sm text-gray-500">Ton CV a du potentiel, mais il peut aller <strong className="text-gray-700">beaucoup plus loin</strong></p>
                 </div>
 
                 {/* Score — VISIBLE, not blurred */}
@@ -217,10 +216,10 @@ export function ResultPreviewPopup({
                   <div className="relative">
                     <svg className="h-28 w-28 -rotate-90" viewBox="0 0 36 36">
                       <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-                      <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#EF4444" strokeWidth="3" strokeDasharray="34, 100" />
+                      <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#F59E0B" strokeWidth="3" strokeDasharray="42, 100" />
                     </svg>
                     <span className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-3xl font-extrabold text-red-500">34</span>
+                      <span className="text-3xl font-extrabold text-amber-500">42</span>
                       <span className="text-[10px] text-gray-400">/100</span>
                     </span>
                   </div>
@@ -229,16 +228,17 @@ export function ResultPreviewPopup({
                 {/* Bars — VISIBLE */}
                 <div className="space-y-2 mb-4">
                   {[
-                    { label: "Structure", value: 30, color: "bg-red-400" },
-                    { label: "Expérience", value: 45, color: "bg-orange-400" },
-                    { label: "Compétences", value: 25, color: "bg-red-500" },
-                    { label: "Mots-clés ATS", value: 20, color: "bg-red-500" },
-                    { label: "Impact", value: 35, color: "bg-orange-400" },
+                    { label: "Structure", value: 40, color: "bg-orange-400", textColor: "text-orange-500" },
+                    { label: "Expérience", value: 72, color: "bg-emerald-400", textColor: "text-emerald-600" },
+                    { label: "Compétences", value: 35, color: "bg-red-400", textColor: "text-red-500" },
+                    { label: "Mots-clés ATS", value: 18, color: "bg-red-500", textColor: "text-red-500" },
+                    { label: "Mise en page", value: 65, color: "bg-yellow-400", textColor: "text-yellow-600" },
+                    { label: "Impact", value: 28, color: "bg-red-400", textColor: "text-red-500" },
                   ].map((item) => (
                     <div key={item.label}>
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-gray-600">{item.label}</span>
-                        <span className="font-bold text-red-500">{item.value}%</span>
+                        <span className={`font-bold ${item.textColor}`}>{item.value}%</span>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-gray-100">
                         <div className={`h-1.5 rounded-full ${item.color}`} style={{ width: `${item.value}%` }} />
@@ -277,7 +277,7 @@ export function ResultPreviewPopup({
                   className="flex w-full items-center justify-center gap-2 rounded-xl brand-gradient px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 hover:opacity-90 transition-opacity"
                 >
                   <TrendingUp className="h-4 w-4" />
-                  Voir les corrections et passer à 90+
+                  Voir les corrections et passer à 90+/100
                   <ArrowRight className="h-4 w-4" />
                 </button>
 
