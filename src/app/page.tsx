@@ -218,7 +218,7 @@ export default function Home() {
                           { href: "/plagiarism", icon: Search, label: "Détection plagiat", desc: "Vérifier l'originalité", color: "text-violet-600 bg-violet-50" },
                           { href: "/reformulate", icon: FileText, label: "Reformulation", desc: "Réécriture intelligente", color: "text-cyan-600 bg-cyan-50" },
                           { href: "/email-pro", icon: Mail, label: "Email pro", desc: "Emails professionnels", color: "text-rose-600 bg-rose-50" },
-                          { href: "/compteur-mots", icon: Zap, label: "Compteur de mots", desc: "Outil gratuit", color: "text-amber-600 bg-amber-50", badge: "Gratuit" },
+                          { href: "/compteur-mots", icon: Zap, label: "Compteur de mots", desc: "Outil rapide", color: "text-amber-600 bg-amber-50" },
                         ].map((tool) => (
                           <Link
                             key={tool.label}
@@ -261,7 +261,7 @@ export default function Home() {
                     onClick={() => openAuthModal()}
                     className="brand-gradient flex items-center gap-1.5 rounded-xl px-4 py-2 text-[13px] font-semibold text-white shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
                   >
-                    Essayer gratuitement
+                    Commencer
                   </button>
                 )}
               </div>
@@ -294,10 +294,10 @@ export default function Home() {
                 href="/app"
                 className="brand-gradient animate-cta-pulse flex items-center gap-2 rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform"
               >
-                Analyse ton CV gratuitement
+                Analyse ton CV maintenant
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <p className="text-xs text-gray-400">Gratuit, sans carte bancaire. Résultat en 30 secondes.</p>
+              <p className="text-xs text-gray-400">Résultat en 30 secondes.</p>
             </div>
 
             {/* Social proof */}
@@ -389,7 +389,7 @@ export default function Home() {
           <div className="mx-auto max-w-4xl px-4 sm:px-6">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-extrabold text-gray-900 sm:text-4xl mb-2 sm:mb-3">
-                Essaye maintenant, <span className="brand-gradient-text">c&apos;est gratuit</span>
+                Essaye <span className="brand-gradient-text">maintenant</span>
               </h2>
               <p className="text-sm sm:text-base text-gray-500 max-w-lg mx-auto px-2 sm:px-0">
                 Dépose ton CV, colle ton texte ou génère ta lettre. Résultat en 30 secondes.
@@ -472,7 +472,7 @@ export default function Home() {
                       <Upload className={`h-6 w-6 sm:h-7 sm:w-7 ${dragOver ? "text-indigo-600" : "text-gray-400"}`} />
                     </div>
                     <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
-                    <p className="text-xs sm:text-sm text-gray-400 mb-5 sm:mb-8">PDF ou DOCX • Analyse gratuite et instantanée</p>
+                    <p className="text-xs sm:text-sm text-gray-400 mb-5 sm:mb-8">PDF ou DOCX • Analyse instantanée</p>
                     <div className="px-6 sm:px-8 py-3 rounded-xl brand-gradient text-white text-sm font-semibold shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all">
                       Parcourir mes fichiers
                     </div>
@@ -638,7 +638,7 @@ export default function Home() {
                       }}
                       className="w-full flex items-center justify-center gap-2.5 rounded-xl brand-gradient px-6 py-4 text-base font-bold text-white shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.005] transition-all"
                     >
-                      <Sparkles className="h-5 w-5" /> Générer ma lettre — gratuit
+                      <Sparkles className="h-5 w-5" /> Générer ma lettre
                     </button>
                   </div>
                 </div>
@@ -756,7 +756,7 @@ export default function Home() {
                       }}
                       className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 text-base font-bold text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.005] transition-all"
                     >
-                      <Bot className="h-5 w-5" /> Humaniser — gratuit
+                      <Bot className="h-5 w-5" /> Humaniser mon texte
                     </button>
                   </div>
                 </div>
@@ -1230,10 +1230,10 @@ export default function Home() {
             {/* CTA under demos */}
             <div className="mt-10 text-center">
               <Link href="/app" className="inline-flex items-center gap-2 brand-gradient animate-cta-pulse rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform">
-                Essayer gratuitement
+                Analyser mon CV
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <p className="mt-3 text-xs text-gray-400">5 tokens offerts • Sans carte bancaire • Résultat en 30s</p>
+              <p className="mt-3 text-xs text-gray-400">Résultat en 30 secondes</p>
             </div>
           </div>
         </section>
@@ -1254,9 +1254,9 @@ export default function Home() {
               {/* Left — Clickable categories */}
               <div className="md:col-span-2 space-y-3">
                 {[
-                  { title: "Étudiants", icon: "🎓", desc: "Stage, alternance, lettres de motivation adaptées à chaque offre" },
-                  { title: "Jeunes diplômés", icon: "🚀", desc: "Premier emploi, CV optimisé, emails de relance professionnels" },
-                  { title: "En reconversion", icon: "🔄", desc: "Reformulation du parcours, mise en valeur des compétences transférables" },
+                  { title: "Étudiants", icon: "🎓", desc: "Stage, alternance, lettres de motivation adaptées à chaque offre", tags: ["Lettres sur-mesure", "CV ATS-ready", "Anti-plagiat"] },
+                  { title: "Jeunes diplômés", icon: "🚀", desc: "Premier emploi, CV optimisé, emails de relance professionnels", tags: ["Job matching", "Emails pro", "Score CV"] },
+                  { title: "En reconversion", icon: "🔄", desc: "Reformulation du parcours, mise en valeur des compétences transférables", tags: ["Reformulation IA", "Compétences transférables", "Humanizer"] },
                 ].map((cat, i) => (
                   <button
                     key={i}
@@ -1272,7 +1272,14 @@ export default function Home() {
                       <div>
                         <h3 className={`text-sm font-bold ${activeAudience === i ? "text-gray-900" : "text-gray-600"}`}>{cat.title}</h3>
                         {activeAudience === i && (
-                          <p className="text-xs text-gray-400 mt-0.5">{cat.desc}</p>
+                          <>
+                            <p className="text-xs text-gray-400 mt-0.5">{cat.desc}</p>
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {cat.tags.map((tag) => (
+                                <span key={tag} className="rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-semibold text-indigo-600">{tag}</span>
+                              ))}
+                            </div>
+                          </>
                         )}
                       </div>
                     </div>
@@ -1432,10 +1439,10 @@ export default function Home() {
               Analyse de CV, lettre de motivation, job matching, humanizer IA — 4 outils inclus avec tes tokens. Pas d&apos;abonnement.
             </p>
             <Link href="/app" className="inline-flex items-center gap-2 brand-gradient animate-cta-pulse rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform shadow-lg shadow-indigo-500/25">
-              Commencer gratuitement
+              Commencer maintenant
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <p className="mt-4 text-xs text-gray-400">5 tokens offerts • Sans carte bancaire</p>
+            <p className="mt-4 text-xs text-gray-400">Résultat en 30 secondes</p>
           </div>
         </section>
 
@@ -1453,12 +1460,8 @@ export default function Home() {
             <div className="space-y-3">
               {[
                 {
-                  q: "L'analyse de CV est vraiment gratuite ?",
-                  a: "Oui, totalement. Tu peux analyser ton CV autant de fois que tu veux, sans créer de compte payant. C'est notre manière de te montrer ce que l'IA peut faire avant que tu dépenses un centime.",
-                },
-                {
-                  q: "C'est quoi exactement un token ?",
-                  a: "1 token = 1 utilisation d'un outil. Générer une lettre de motivation coûte 1 token. Réécrire ton CV pour une offre coûte 1 token. Tu reçois 5 tokens gratuits à l'inscription pour tester.",
+                  q: "Comment fonctionne le système de tokens ?",
+                  a: "1 token = 1 utilisation d'un outil. Analyser un CV, générer une lettre de motivation, ou humaniser un texte coûte chacun 1 token. Les packs démarrent à 4,99€.",
                 },
                 {
                   q: "Les textes générés sont détectables comme IA ?",
@@ -1542,18 +1545,18 @@ export default function Home() {
                 </ul>
               </div>
 
-              {/* Ressources */}
+              {/* Plus */}
               <div className="sm:col-span-2">
-                <h4 className="text-[13px] font-semibold text-white uppercase tracking-wider mb-4">Ressources</h4>
+                <h4 className="text-[13px] font-semibold text-white uppercase tracking-wider mb-4">Plus</h4>
                 <ul className="space-y-3">
                   {[
-                    { label: "Guide du CV parfait", href: "#" },
-                    { label: "Modèles de lettres", href: "#" },
-                    { label: "Conseils entretien", href: "#" },
-                    { label: "Blog", href: "#" },
+                    { label: "Email pro", href: "/email-pro" },
+                    { label: "Reformulation", href: "/reformulate" },
+                    { label: "Détection plagiat", href: "/plagiarism" },
+                    { label: "Parrainage", href: "/referral" },
                   ].map((link) => (
                     <li key={link.label}>
-                      <a href={link.href} className="text-[13px] text-gray-400 hover:text-white transition-colors">{link.label}</a>
+                      <Link href={link.href} className="text-[13px] text-gray-400 hover:text-white transition-colors">{link.label}</Link>
                     </li>
                   ))}
                 </ul>
