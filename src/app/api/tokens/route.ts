@@ -70,7 +70,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: stripeSession.url });
   } catch (error) {
-    console.error("Token purchase error:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("Token purchase error:", errMsg, error instanceof Error ? error.stack : "");
     return NextResponse.json(
       { error: "Erreur lors de l'achat" },
       { status: 500 }

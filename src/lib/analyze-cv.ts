@@ -4,11 +4,12 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 async function generateJSON(prompt: string, maxTokens: number = 4000): Promise<string> {
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: prompt,
     config: {
       maxOutputTokens: maxTokens,
       responseMimeType: "application/json",
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
   return response.text ?? "";

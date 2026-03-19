@@ -84,7 +84,7 @@ export async function researchCompany(
   }
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: `Fais une recherche sur l'entreprise "${companyName}".
 ${
   webContent
@@ -108,6 +108,7 @@ Utilise tes connaissances sur cette entreprise si elle est connue. Si tu ne la c
     config: {
       maxOutputTokens: 1500,
       responseMimeType: "application/json",
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
 
