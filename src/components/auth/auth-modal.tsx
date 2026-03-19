@@ -52,10 +52,10 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
 }
 
 const benefits = [
-  { icon: Coins, text: "5 tokens offerts" },
-  { icon: FileText, text: "Analyse CV gratuite" },
-  { icon: Sparkles, text: "Lettre de motivation IA" },
-  { icon: Bot, text: "Indétectable par GPTZero" },
+  { icon: FileText, text: "Corrections détaillées de ton CV" },
+  { icon: Sparkles, text: "CV réécrit et optimisé par l'IA" },
+  { icon: Bot, text: "Score de 34 → 90+ en 30 secondes" },
+  { icon: CheckCircle2, text: "Passe les filtres ATS des recruteurs" },
 ];
 
 function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
@@ -160,10 +160,10 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
               <Mail className="h-6 w-6 text-indigo-600" />
             </div>
             <h3 className="mt-4 text-lg font-bold text-gray-900">
-              Accédez à Seora CV
+              Débloque ton résultat complet
             </h3>
             <p className="mt-2 text-sm text-gray-500">
-              Entrez votre email pour commencer
+              Entre ton email pour voir les corrections
             </p>
           </div>
 
@@ -205,11 +205,7 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
           </form>
 
           <div className="mt-4 flex items-center justify-center gap-2">
-            <div className="flex items-center gap-1 text-[11px] text-gray-400">
-              <Coins className="h-3 w-3" /> 5 tokens offerts
-            </div>
-            <span className="text-gray-300">&bull;</span>
-            <span className="text-[11px] text-gray-400">Sans carte bancaire</span>
+            <span className="text-[11px] text-gray-400">🔒 Tes données restent confidentielles</span>
           </div>
 
           <p className="mt-4 text-center text-[10px] text-gray-400">
