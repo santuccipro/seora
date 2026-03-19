@@ -229,10 +229,7 @@ export default function Home() {
                               <tool.icon className="h-3.5 w-3.5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-[12px] font-semibold text-gray-900 truncate">{tool.label}</p>
-                                {"badge" in tool && tool.badge && <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-bold text-emerald-700">{tool.badge}</span>}
-                              </div>
+                              <p className="text-[12px] font-semibold text-gray-900 truncate">{tool.label}</p>
                               <p className="text-[10px] text-gray-400 truncate">{tool.desc}</p>
                             </div>
                           </Link>
