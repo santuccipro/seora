@@ -371,7 +371,7 @@ export default function Home() {
                     }
                   }}
                 >
-                  <input ref={fileInputRef} type="file" accept=".pdf,.docx,.jpg,.jpeg,.png,.heic,.webp" className="hidden"
+                  <input ref={fileInputRef} type="file" accept=".pdf,.docx,image/*" className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
@@ -487,7 +487,7 @@ export default function Home() {
                         onClick={() => setHumInputMode("file")}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${humInputMode === "file" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                       >
-                        📄 Importer un fichier
+                        📄 Choisir un fichier
                       </button>
                     </div>
 
@@ -514,7 +514,7 @@ export default function Home() {
                     {/* File mode */}
                     {humInputMode === "file" && (
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">📎 Importer votre document</label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">📎 Choisir un fichier ou une photo</label>
                         <div
                           onDragOver={(e) => { e.preventDefault(); setHumDragOver(true); }}
                           onDragLeave={() => setHumDragOver(false)}
@@ -527,7 +527,7 @@ export default function Home() {
                           <input
                             ref={humFileRef}
                             type="file"
-                            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.heic,.webp"
+                            accept=".pdf,.docx,.txt,image/*"
                             className="hidden"
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleHumFile(f); }}
                           />

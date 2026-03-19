@@ -385,7 +385,7 @@ export default function Home() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.heic,.webp"
+              accept=".pdf,.doc,.docx,.txt,image/*"
               onChange={onFileChange}
               className="hidden"
             />
