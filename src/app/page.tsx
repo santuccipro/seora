@@ -474,12 +474,6 @@ export default function Home() {
                       Parcourir mes fichiers
                     </div>
                   </div>
-                  {/* Quick info */}
-                  <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 sm:gap-x-8 sm:gap-y-2 mt-4 sm:mt-6 text-[10px] sm:text-xs text-gray-400 px-2 sm:px-0">
-                    <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-400 shrink-0" /> Confidentiel</span>
-                    <span className="flex items-center gap-1.5"><Zap className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-400 shrink-0" /> Résultat en 30s</span>
-                    <span className="flex items-center gap-1.5"><Shield className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-indigo-400 shrink-0" /> Données supprimées</span>
-                  </div>
                 </div>
               )}
 
@@ -766,17 +760,9 @@ export default function Home() {
               )}
             </div>
 
-            {/* Bottom trust badges */}
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:gap-8 mt-6 text-[11px] sm:text-xs text-gray-400">
-              <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 shrink-0" /> Données sécurisées</span>
-              <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 shrink-0" /> Résultat en 30s</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> 100% gratuit</span>
-            </div>
           </div>
         </section>
 
-        {/* Trust Badges */}
-        <TrustBadges />
 
         {/* ══════════════════════════════════════ */}
         {/*  4. DEMO — 3 separate animated cards   */}
@@ -784,12 +770,9 @@ export default function Home() {
         <section className="py-8 sm:py-10">
           <div className="mx-auto max-w-5xl px-6">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-3">
+              <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl">
                 Regarde ce que l&apos;IA fait de ton CV <span className="brand-gradient-text">en 30 secondes</span>
               </h2>
-              <p className="text-sm text-gray-500 max-w-md mx-auto">
-                Dépose ton CV, l&apos;IA l&apos;analyse et le corrige automatiquement.
-              </p>
             </div>
 
             {/* Tab selector */}
