@@ -409,8 +409,8 @@ export default function Home() {
                     onClick={() => setActiveInteractive(tab.key)}
                     className={`flex flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-semibold transition-all duration-200 ${
                       activeInteractive === tab.key
-                        ? "bg-white text-gray-900 shadow-md"
-                        : "text-gray-500 hover:text-gray-700"
+                        ? "brand-gradient text-white shadow-lg shadow-indigo-500/20"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-white/60"
                     }`}
                   >
                     <tab.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
