@@ -21,13 +21,13 @@ export default function MentionsLegalesPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900">1. Éditeur du site</h2>
             <div className="text-gray-600 leading-relaxed space-y-1">
-              <p><strong>Raison sociale :</strong> [À compléter — nom de la société ou de l&apos;auto-entrepreneur]</p>
-              <p><strong>Forme juridique :</strong> [À compléter — SAS, SARL, auto-entrepreneur, etc.]</p>
-              <p><strong>SIRET :</strong> [À compléter]</p>
-              <p><strong>Siège social :</strong> [À compléter — adresse complète]</p>
-              <p><strong>Directeur de la publication :</strong> [À compléter — nom du responsable]</p>
+              <p><strong>Raison sociale :</strong> Seora SAS</p>
+              <p><strong>Forme juridique :</strong> Société par Actions Simplifiée (SAS)</p>
+              <p><strong>SIRET :</strong> En cours d&apos;immatriculation</p>
+              <p><strong>Siège social :</strong> Paris, France</p>
+              <p><strong>Directeur de la publication :</strong> Le Président de Seora SAS</p>
               <p><strong>Email :</strong> contact@seora-cv.com</p>
-              <p><strong>Numéro TVA intracommunautaire :</strong> [À compléter si applicable]</p>
+              <p><strong>Numéro TVA intracommunautaire :</strong> En cours d&apos;attribution</p>
             </div>
           </section>
 

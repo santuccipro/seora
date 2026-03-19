@@ -54,7 +54,7 @@ export default function ConfidentialitePage() {
             <ul className="list-disc pl-6 text-gray-600 space-y-1 mt-2">
               <li><strong>Supabase (Supabase Inc.) :</strong> hébergement de la base de données — serveurs EU</li>
               <li><strong>Vercel (Vercel Inc.) :</strong> hébergement de l&apos;application web — serveurs EU/US</li>
-              <li><strong>Anthropic (Anthropic PBC) :</strong> traitement IA des analyses de CV — serveurs US</li>
+              <li><strong>Google (Google LLC — Gemini API) :</strong> traitement IA des analyses de CV — serveurs US</li>
               <li><strong>Stripe (Stripe Inc.) :</strong> traitement des paiements — conforme PCI DSS</li>
               <li><strong>Resend (Resend Inc.) :</strong> envoi des emails transactionnels — serveurs US</li>
             </ul>
@@ -108,7 +108,7 @@ export default function ConfidentialitePage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900">9. Traitement IA des données</h2>
             <p className="text-gray-600 leading-relaxed">
-              Le contenu de votre CV est envoyé à l&apos;API Anthropic Claude pour analyse. Ce traitement est nécessaire à l&apos;exécution du service. Anthropic ne conserve pas les données transmises au-delà du temps de traitement et ne les utilise pas pour entraîner ses modèles. Pour plus d&apos;informations, consultez la politique de confidentialité d&apos;Anthropic.
+              Le contenu de votre CV est envoyé à l&apos;API Google Gemini pour analyse. Ce traitement est nécessaire à l&apos;exécution du service. Google ne conserve pas les données transmises via l&apos;API payante au-delà du temps de traitement et ne les utilise pas pour entraîner ses modèles. Pour plus d&apos;informations, consultez la politique de confidentialité de Google.
             </p>
           </section>
 
