@@ -398,7 +398,10 @@ export default function Home() {
 
             {/* Tabs — pill style */}
             <div className="flex items-center justify-center mb-6 sm:mb-8">
-              <div className="inline-flex items-center gap-0.5 sm:gap-1 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200/60 p-1 sm:p-1.5 shadow-sm w-full sm:w-auto">
+              <div className="relative inline-flex items-center gap-0.5 sm:gap-1 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200/60 p-1 sm:p-1.5 shadow-sm w-full sm:w-auto">
+                {/* Floating glow aura */}
+                <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-indigo-400/20 via-purple-400/20 to-pink-400/20 blur-xl animate-pulse pointer-events-none" />
+                <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 blur-md pointer-events-none animate-float-slow" />
                 {[
                   { key: "cv" as const, icon: BarChart3, label: "Analyse CV" },
                   { key: "letter" as const, icon: PenTool, label: "Lettre de motivation" },
