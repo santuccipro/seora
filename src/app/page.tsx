@@ -767,25 +767,29 @@ export default function Home() {
         {/* ══════════════════════════════════════ */}
         {/*  4. DEMO — 3 separate animated cards   */}
         {/* ══════════════════════════════════════ */}
-        <section className="py-8 sm:py-10">
-          <div className="mx-auto max-w-5xl px-6">
-            <div className="text-center mb-6">
+        <section className="py-10 sm:py-14">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 border border-indigo-100 px-4 py-1.5 text-[11px] font-semibold text-indigo-600 mb-4">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100"><Zap className="h-3 w-3" /></span>
+                Démo en direct
+              </div>
               <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl">
-                Regarde ce que l&apos;IA fait de ton CV <span className="brand-gradient-text">en 30 secondes</span>
+                Comment ça marche ?
               </h2>
             </div>
 
             {/* Tab selector */}
-            <div className="flex items-center justify-center gap-2 mb-8">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-8">
               {[
                 { icon: BarChart3, label: "Analyse CV", idx: 0 },
-                { icon: PenTool, label: "Lettre de motivation", idx: 2 },
-                { icon: Bot, label: "Humanizer IA", idx: 3 },
+                { icon: PenTool, label: "Lettre", idx: 2 },
+                { icon: Bot, label: "Humanizer", idx: 3 },
               ].map((tab) => (
                 <button
                   key={tab.idx}
                   onClick={() => { setActiveDemo(tab.idx); setAutoCycleDemo(false); setTimeout(() => setAutoCycleDemo(true), 20000); }}
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 sm:px-4 py-2.5 text-xs font-semibold transition-all ${
                     activeDemo === tab.idx
                       ? "brand-gradient text-white shadow-lg shadow-indigo-500/20"
                       : "glass-card text-gray-500 hover:text-gray-900"
@@ -799,6 +803,47 @@ export default function Home() {
 
             {/* Single card at a time */}
             <div className="mx-auto max-w-lg">
+
+              {/* Timeline steps */}
+              {activeDemo === 0 && (
+                <div className="flex items-center justify-center gap-0 mb-6 animate-fade-up" style={{ animationDuration: "0.3s" }}>
+                  {["Dépose ton CV", "Analyse IA", "Score initial", "Optimisation", "CV prêt"].map((step, i) => (
+                    <div key={step} className="flex items-center">
+                      <div className="flex flex-col items-center">
+                        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-indigo-100 text-[10px] sm:text-[11px] font-bold text-indigo-600">{i + 1}</div>
+                        <span className="mt-1 text-[8px] sm:text-[9px] text-gray-400 font-medium text-center w-12 sm:w-14 leading-tight">{step}</span>
+                      </div>
+                      {i < 4 && <div className="h-px w-4 sm:w-6 bg-indigo-200 mt-[-10px]" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {activeDemo === 2 && (
+                <div className="flex items-center justify-center gap-0 mb-6 animate-fade-up" style={{ animationDuration: "0.3s" }}>
+                  {["Choisis le secteur", "Infos entreprise", "Génération IA", "Lettre prête"].map((step, i) => (
+                    <div key={step} className="flex items-center">
+                      <div className="flex flex-col items-center">
+                        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-blue-100 text-[10px] sm:text-[11px] font-bold text-blue-600">{i + 1}</div>
+                        <span className="mt-1 text-[8px] sm:text-[9px] text-gray-400 font-medium text-center w-14 sm:w-16 leading-tight">{step}</span>
+                      </div>
+                      {i < 3 && <div className="h-px w-5 sm:w-8 bg-blue-200 mt-[-10px]" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {activeDemo === 3 && (
+                <div className="flex items-center justify-center gap-0 mb-6 animate-fade-up" style={{ animationDuration: "0.3s" }}>
+                  {["Texte détecté IA", "Humanisation", "Résultat 100%"].map((step, i) => (
+                    <div key={step} className="flex items-center">
+                      <div className="flex flex-col items-center">
+                        <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-orange-100 text-[10px] sm:text-[11px] font-bold text-orange-600">{i + 1}</div>
+                        <span className="mt-1 text-[8px] sm:text-[9px] text-gray-400 font-medium text-center w-16 sm:w-20 leading-tight">{step}</span>
+                      </div>
+                      {i < 2 && <div className="h-px w-8 sm:w-12 bg-orange-200 mt-[-10px]" />}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* ─── Demo 1: Analyse CV ─── */}
               {activeDemo === 0 && (
