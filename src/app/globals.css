@@ -637,3 +637,34 @@ button, a, input, textarea {
 .anim-h-phase1 { animation: h-p1 10s infinite; }
 .anim-h-phase2 { animation: h-p2 10s infinite; }
 .anim-h-phase3 { animation: h-p3 10s infinite; }
+
+/* ─── TIMELINE STEP INDICATORS ─── */
+/* Analyse CV: 5 steps, 12s — synced with a-p1..a-p5 */
+@keyframes tl-a1 { 0%,0.1% { background:#6366f1;color:#fff;box-shadow:0 0 8px rgba(99,102,241,0.4) } 15% { background:#6366f1;color:#fff;box-shadow:0 0 8px rgba(99,102,241,0.4) } 16% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-a2 { 0%,16% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 17% { background:#6366f1;color:#fff;box-shadow:0 0 8px rgba(99,102,241,0.4) } 29% { background:#6366f1;color:#fff;box-shadow:0 0 8px rgba(99,102,241,0.4) } 30% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-a3 { 0%,31% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 32% { background:#6366f1;color:#fff;box-shadow:0 0 8px rgba(99,102,241,0.4) } 44% { background:#6366f1;color:#fff;box-shadow:0 0 8px rgba(99,102,241,0.4) } 45% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-a4 { 0%,46% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 47% { background:#6366f1;color:#fff;box-shadow:0 0 8px rgba(99,102,241,0.4) } 64% { background:#6366f1;color:#fff;box-shadow:0 0 8px rgba(99,102,241,0.4) } 65% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-a5 { 0%,66% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 67% { background:#10b981;color:#fff;box-shadow:0 0 8px rgba(16,185,129,0.4) } 93% { background:#10b981;color:#fff;box-shadow:0 0 8px rgba(16,185,129,0.4) } 96% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+.tl-a-step1 { animation: tl-a1 12s infinite; }
+.tl-a-step2 { animation: tl-a2 12s infinite; }
+.tl-a-step3 { animation: tl-a3 12s infinite; }
+.tl-a-step4 { animation: tl-a4 12s infinite; }
+.tl-a-step5 { animation: tl-a5 12s infinite; }
+
+/* Lettre: 4 steps, 14s — synced with c-p1..c-p4 */
+@keyframes tl-c1 { 0%,0.1% { background:#3b82f6;color:#fff;box-shadow:0 0 8px rgba(59,130,246,0.4) } 19% { background:#3b82f6;color:#fff;box-shadow:0 0 8px rgba(59,130,246,0.4) } 20% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-c2 { 0%,21% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 22% { background:#3b82f6;color:#fff;box-shadow:0 0 8px rgba(59,130,246,0.4) } 34% { background:#3b82f6;color:#fff;box-shadow:0 0 8px rgba(59,130,246,0.4) } 35% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-c3 { 0%,36% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 37% { background:#3b82f6;color:#fff;box-shadow:0 0 8px rgba(59,130,246,0.4) } 49% { background:#3b82f6;color:#fff;box-shadow:0 0 8px rgba(59,130,246,0.4) } 50% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-c4 { 0%,51% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 52% { background:#10b981;color:#fff;box-shadow:0 0 8px rgba(16,185,129,0.4) } 93% { background:#10b981;color:#fff;box-shadow:0 0 8px rgba(16,185,129,0.4) } 96% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+.tl-c-step1 { animation: tl-c1 14s infinite; }
+.tl-c-step2 { animation: tl-c2 14s infinite; }
+.tl-c-step3 { animation: tl-c3 14s infinite; }
+.tl-c-step4 { animation: tl-c4 14s infinite; }
+
+/* Humanizer: 3 steps, 10s — synced with h-p1..h-p3 */
+@keyframes tl-h1 { 0%,0.1% { background:#f97316;color:#fff;box-shadow:0 0 8px rgba(249,115,22,0.4) } 29% { background:#f97316;color:#fff;box-shadow:0 0 8px rgba(249,115,22,0.4) } 30% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-h2 { 0%,31% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 32% { background:#f97316;color:#fff;box-shadow:0 0 8px rgba(249,115,22,0.4) } 54% { background:#f97316;color:#fff;box-shadow:0 0 8px rgba(249,115,22,0.4) } 55% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+@keyframes tl-h3 { 0%,56% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 57% { background:#10b981;color:#fff;box-shadow:0 0 8px rgba(16,185,129,0.4) } 93% { background:#10b981;color:#fff;box-shadow:0 0 8px rgba(16,185,129,0.4) } 96% { background:#e5e7eb;color:#9ca3af;box-shadow:none } 100% { background:#e5e7eb;color:#9ca3af;box-shadow:none } }
+.tl-h-step1 { animation: tl-h1 10s infinite; }
+.tl-h-step2 { animation: tl-h2 10s infinite; }
+.tl-h-step3 { animation: tl-h3 10s infinite; }

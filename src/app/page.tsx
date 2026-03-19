@@ -819,13 +819,27 @@ export default function Home() {
                       <p className="text-[11px] text-gray-400">Score détaillé sur 6 critères en 30 secondes</p>
                     </div>
                   </div>
+                  {/* Timeline */}
+                  <div className="flex items-center justify-center gap-0 px-4 sm:px-6 py-3 border-b border-gray-100">
+                    {[
+                      { n: 1, label: "Upload", cls: "tl-a-step1" },
+                      { n: 2, label: "Analyse", cls: "tl-a-step2" },
+                      { n: 3, label: "Score", cls: "tl-a-step3" },
+                      { n: 4, label: "Optimisation", cls: "tl-a-step4" },
+                      { n: 5, label: "Résultat", cls: "tl-a-step5" },
+                    ].map((s, i) => (
+                      <div key={s.n} className="flex items-center">
+                        <div className="flex flex-col items-center">
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold transition-all ${s.cls}`}>{s.n}</div>
+                          <span className="mt-1 text-[8px] text-gray-400 font-medium">{s.label}</span>
+                        </div>
+                        {i < 4 && <div className="h-px w-4 sm:w-6 bg-gray-200 mt-[-10px]" />}
+                      </div>
+                    ))}
+                  </div>
                   <div className="relative h-[340px] overflow-hidden">
                     {/* Phase 1: Upload */}
                     <div className="anim-phase anim-a-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white">1</span>
-                        <span className="text-[10px] font-semibold text-indigo-600">Dépose ton CV</span>
-                      </div>
                       <div className="anim-a-file w-24 h-32 rounded-xl bg-white border-2 border-dashed border-indigo-300 flex flex-col items-center justify-center shadow-lg shadow-indigo-100/50">
                         <FileText className="h-8 w-8 text-indigo-400 mb-2" />
                         <span className="text-[9px] font-bold text-indigo-500">mon-cv.pdf</span>
@@ -838,10 +852,6 @@ export default function Home() {
                     </div>
                     {/* Phase 2: Scanning */}
                     <div className="anim-phase anim-a-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[9px] font-bold text-white">2</span>
-                        <span className="text-[10px] font-semibold text-indigo-600">Analyse IA</span>
-                      </div>
                       <div className="w-full max-w-xs">
                         <div className="rounded-xl bg-white border border-gray-200/80 p-5 shadow-sm space-y-3 relative overflow-hidden">
                           <div className="anim-a-scanline absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
@@ -870,10 +880,6 @@ export default function Home() {
                     </div>
                     {/* Phase 3: Bad Score (red) */}
                     <div className="anim-phase anim-a-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-red-50 border border-red-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">3</span>
-                        <span className="text-[10px] font-semibold text-red-600">Score initial</span>
-                      </div>
                       <div className="anim-a-score-pop">
                         <svg width="120" height="120" viewBox="0 0 120 120">
                           <circle cx="60" cy="60" r="50" fill="none" stroke="#E5E7EB" strokeWidth="8" />
@@ -909,10 +915,6 @@ export default function Home() {
                     </div>
                     {/* Phase 4: Magic Seora fix */}
                     <div className="anim-phase anim-a-phase4 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-purple-50 border border-purple-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-purple-500 text-[9px] font-bold text-white">4</span>
-                        <span className="text-[10px] font-semibold text-purple-600">Optimisation</span>
-                      </div>
                       <div className="relative">
                         <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 anim-a-magic-glow">
                           <Sparkles className="h-8 w-8 text-white" />
@@ -937,10 +939,6 @@ export default function Home() {
                     </div>
                     {/* Phase 5: Good Score (green) */}
                     <div className="anim-phase anim-a-phase5 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">5</span>
-                        <span className="text-[10px] font-semibold text-emerald-600">CV prêt</span>
-                      </div>
                       <div className="anim-a-score-pop">
                         <svg width="120" height="120" viewBox="0 0 120 120">
                           <circle cx="60" cy="60" r="50" fill="none" stroke="#E5E7EB" strokeWidth="8" />
@@ -991,13 +989,26 @@ export default function Home() {
                       <p className="text-[11px] text-gray-400">Générée par l&apos;IA, adaptée à l&apos;entreprise</p>
                     </div>
                   </div>
+                  {/* Timeline */}
+                  <div className="flex items-center justify-center gap-0 px-4 sm:px-6 py-3 border-b border-gray-100">
+                    {[
+                      { n: 1, label: "Secteur", cls: "tl-c-step1" },
+                      { n: 2, label: "Entreprise", cls: "tl-c-step2" },
+                      { n: 3, label: "Génération", cls: "tl-c-step3" },
+                      { n: 4, label: "Résultat", cls: "tl-c-step4" },
+                    ].map((s, i) => (
+                      <div key={s.n} className="flex items-center">
+                        <div className="flex flex-col items-center">
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold transition-all ${s.cls}`}>{s.n}</div>
+                          <span className="mt-1 text-[8px] text-gray-400 font-medium">{s.label}</span>
+                        </div>
+                        {i < 3 && <div className="h-px w-6 sm:w-10 bg-gray-200 mt-[-10px]" />}
+                      </div>
+                    ))}
+                  </div>
                   <div className="relative h-[380px] overflow-hidden">
                     {/* Phase 1: Choix du secteur */}
                     <div className="anim-phase anim-c-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">1</span>
-                        <span className="text-[10px] font-semibold text-blue-600">Choisis le secteur</span>
-                      </div>
                       <p className="text-[10px] font-semibold text-gray-600 mb-3">Choisis ton secteur</p>
                       <div className="w-full max-w-xs space-y-2">
                         {[
@@ -1017,10 +1028,6 @@ export default function Home() {
                     </div>
                     {/* Phase 2: Saisie entreprise */}
                     <div className="anim-phase anim-c-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">2</span>
-                        <span className="text-[10px] font-semibold text-blue-600">Infos entreprise</span>
-                      </div>
                       <div className="w-full max-w-xs space-y-4">
                         <div>
                           <p className="text-[10px] font-semibold text-gray-500 mb-1.5">Secteur</p>
@@ -1047,10 +1054,6 @@ export default function Home() {
                     </div>
                     {/* Phase 3: Génération */}
                     <div className="anim-phase anim-c-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">3</span>
-                        <span className="text-[10px] font-semibold text-blue-600">Génération IA</span>
-                      </div>
                       <div className="relative">
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 anim-a-magic-glow">
                           <PenTool className="h-7 w-7 text-white" />
@@ -1074,11 +1077,7 @@ export default function Home() {
                       </div>
                     </div>
                     {/* Phase 4: Lettre générée */}
-                    <div className="anim-phase anim-c-phase4 absolute inset-0 flex flex-col p-5 pt-9 overflow-hidden">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">4</span>
-                        <span className="text-[10px] font-semibold text-emerald-600">Lettre prête</span>
-                      </div>
+                    <div className="anim-phase anim-c-phase4 absolute inset-0 flex flex-col p-5 overflow-hidden">
                       <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 mb-3 flex items-center justify-between">
                         <div>
                           <p className="text-[9px] text-blue-500 font-semibold">L&apos;Oréal Paris — Marketing Digital</p>
@@ -1125,13 +1124,25 @@ export default function Home() {
                       <p className="text-[11px] text-gray-400">Rendez vos textes indétectables par les outils IA</p>
                     </div>
                   </div>
+                  {/* Timeline */}
+                  <div className="flex items-center justify-center gap-0 px-4 sm:px-6 py-3 border-b border-gray-100">
+                    {[
+                      { n: 1, label: "Détection", cls: "tl-h-step1" },
+                      { n: 2, label: "Humanisation", cls: "tl-h-step2" },
+                      { n: 3, label: "Résultat", cls: "tl-h-step3" },
+                    ].map((s, i) => (
+                      <div key={s.n} className="flex items-center">
+                        <div className="flex flex-col items-center">
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold transition-all ${s.cls}`}>{s.n}</div>
+                          <span className="mt-1 text-[8px] text-gray-400 font-medium">{s.label}</span>
+                        </div>
+                        {i < 2 && <div className="h-px w-8 sm:w-14 bg-gray-200 mt-[-10px]" />}
+                      </div>
+                    ))}
+                  </div>
                   <div className="relative h-[340px] overflow-hidden">
                     {/* Phase 1: Texte IA détecté */}
                     <div className="anim-phase anim-h-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-red-50 border border-red-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">1</span>
-                        <span className="text-[10px] font-semibold text-red-600">Texte détecté IA</span>
-                      </div>
                       <div className="w-full max-w-xs">
                         <div className="rounded-xl bg-red-50 border border-red-200/60 p-4 mb-4">
                           <div className="flex items-center justify-between mb-2">
@@ -1154,10 +1165,6 @@ export default function Home() {
                     </div>
                     {/* Phase 2: Humanisation en cours */}
                     <div className="anim-phase anim-h-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white">2</span>
-                        <span className="text-[10px] font-semibold text-orange-600">Humanisation</span>
-                      </div>
                       <div className="relative">
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/30 anim-a-magic-glow">
                           <Bot className="h-7 w-7 text-white" />
@@ -1182,10 +1189,6 @@ export default function Home() {
                     </div>
                     {/* Phase 3: Résultat */}
                     <div className="anim-phase anim-h-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1">
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">3</span>
-                        <span className="text-[10px] font-semibold text-emerald-600">Résultat</span>
-                      </div>
                       <div className="w-full max-w-xs space-y-3">
                         <div className="grid grid-cols-2 gap-2">
                           <div className="rounded-xl bg-red-50 border border-red-100/60 p-3">
