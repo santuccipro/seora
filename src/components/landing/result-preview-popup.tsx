@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   X,
   Lock,
@@ -127,7 +127,9 @@ function AnalyzingAnimation({
   const currentSteps = steps[type];
   const TOTAL_MS = 40000; // exactly 40 seconds
 
-  const stableOnDone = useCallback(onDone, [onDone]);
+  // Store onDone in a ref so the effect never restarts when onDone changes
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   useEffect(() => {
     const numSteps = currentSteps.length;
@@ -153,13 +155,13 @@ function AnalyzingAnimation({
     }, 200);
 
     // Fire onDone at exactly 40s
-    const doneTimer = setTimeout(stableOnDone, TOTAL_MS);
+    const doneTimer = setTimeout(() => onDoneRef.current(), TOTAL_MS);
 
     return () => {
       clearInterval(interval);
       clearTimeout(doneTimer);
     };
-  }, [currentSteps.length, stableOnDone]);
+  }, [currentSteps.length]);
 
   const icons: Record<PreviewType, typeof BarChart3> = {
     cv: BarChart3,
