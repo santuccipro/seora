@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { RadarChart } from "@/components/charts/radar-chart";
 import { toast } from "sonner";
@@ -23,6 +23,9 @@ import {
   ArrowRight,
   Copy,
   Check,
+  TrendingUp,
+  BarChart3,
+  Target,
 } from "lucide-react";
 
 /* ───────── Types ───────── */
@@ -76,13 +79,11 @@ export default function Home() {
   const [loadingJobMatch, setLoadingJobMatch] = useState(false);
 
   // UI state
-  const [showAuth, setShowAuth] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
   const [activeTab, setActiveTab] = useState<"results" | "corrections" | "cover-letter" | "job-match">("results");
 
   // Theatrical loading
   const [theatricalStep, setTheatricalStep] = useState(-1);
-  const [fakeScore, setFakeScore] = useState(0);
 
   // Cover letter form
   const [clCompany, setClCompany] = useState("");
@@ -119,11 +120,9 @@ export default function Home() {
       setJobMatch(null);
       setActiveTab("results");
       setTheatricalStep(0);
-      setFakeScore(Math.floor(Math.random() * 25) + 48);
 
       const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-      // Theatrical animation (always runs)
       const animate = async () => {
         const delays = [2500, 3000, 3500, 2500, 2000];
         for (let i = 0; i < delays.length; i++) {
@@ -132,7 +131,6 @@ export default function Home() {
         }
       };
 
-      // Real API call (only if authenticated)
       const callApi = async (): Promise<Analysis | null> => {
         if (!session) return null;
         const formData = new FormData();
@@ -302,250 +300,180 @@ export default function Home() {
     }
   };
 
+  const theatricalSteps = [
+    "Extraction du contenu du CV",
+    "Analyse de la structure et mise en page",
+    "Évaluation des compétences clés",
+    "Vérification de la cohérence globale",
+    "Calcul du score final",
+  ];
+
   return (
-    <div className="min-h-screen bg-[#fafafa]">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-indigo-50/30">
       {/* ═══════ NAV ═══════ */}
-      <nav className="sticky top-0 z-50 border-b border-gray-200/60 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-black">
-              <FileText className="h-3.5 w-3.5 text-white" />
+      <nav className="sticky top-0 z-50 border-b border-white/20 bg-white/70 backdrop-blur-2xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
+          <a href="/" className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/20">
+              <BarChart3 className="h-4.5 w-4.5 text-white" />
             </div>
-            <span className="text-[15px] font-semibold tracking-tight">Seora CV</span>
-          </div>
+            <span className="text-lg font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">Seora</span>
+          </a>
 
           <div className="flex items-center gap-3">
-            {session ? (
+            {session && (
               <>
                 {tokens !== null && (
                   <button
                     onClick={() => setShowTokens(true)}
-                    className="flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                    className="flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100/60 px-4 py-2 text-xs font-semibold text-indigo-700 hover:shadow-md transition-all"
                   >
-                    <Coins className="h-3 w-3" />
+                    <Coins className="h-3.5 w-3.5" />
                     {tokens} token{tokens !== 1 ? "s" : ""}
                   </button>
                 )}
                 <div className="relative group">
-                  <button className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
-                    {session.user?.name || session.user?.email}
-                    <ChevronDown className="h-3 w-3" />
+                  <button className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors">
+                    <div className="h-6 w-6 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white">
+                      {(session.user?.name || session.user?.email || "U")[0].toUpperCase()}
+                    </div>
+                    <ChevronDown className="h-3 w-3 text-gray-400" />
                   </button>
-                  <div className="absolute right-0 top-full pt-1 hidden group-hover:block">
-                    <button
-                      onClick={() => signOut()}
-                      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 shadow-sm hover:bg-gray-50"
-                    >
-                      <LogOut className="h-3 w-3" />
-                      Déconnexion
-                    </button>
+                  <div className="absolute right-0 top-full pt-2 hidden group-hover:block">
+                    <div className="rounded-xl border border-gray-200 bg-white p-1 shadow-xl shadow-gray-200/50 min-w-[160px]">
+                      <div className="px-3 py-2 border-b border-gray-100">
+                        <p className="text-xs font-medium text-gray-900 truncate">{session.user?.email}</p>
+                      </div>
+                      <button
+                        onClick={() => signOut()}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 mt-1"
+                      >
+                        <LogOut className="h-3 w-3" />
+                        Déconnexion
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>
-            ) : (
-              <button
-                onClick={() => setShowAuth(true)}
-                className="rounded-full bg-black px-4 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
-              >
-                Se connecter
-              </button>
             )}
           </div>
         </div>
       </nav>
 
-      {/* ═══════ HERO + UPLOAD ═══════ */}
-      <div className="mx-auto max-w-5xl px-5">
-        <div className="pb-6 pt-16 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-            Votre CV, analysé par l&apos;IA
-          </h1>
-          <p className="mx-auto mt-3 max-w-lg text-base text-gray-500">
-            Déposez votre CV et obtenez un score détaillé, des corrections précises et une lettre de motivation personnalisée.
-          </p>
-        </div>
-
-        {/* Upload Zone */}
-        <div className="mx-auto max-w-2xl">
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            onClick={() => !uploading && fileInputRef.current?.click()}
-            className={`
-              group relative cursor-pointer rounded-2xl border-2 border-dashed
-              ${dragOver ? "border-indigo-500 bg-indigo-50/50" : "border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50/50"}
-              ${uploading ? "pointer-events-none" : ""}
-              px-6 py-14 text-center transition-all
-            `}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.txt,image/*"
-              onChange={onFileChange}
-              className="hidden"
-            />
-
-            {uploading ? (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Analyse en cours...</p>
-                  <p className="mt-1 text-xs text-gray-500">{fileName}</p>
-                </div>
-                <div className="mx-auto h-1 w-48 overflow-hidden rounded-full bg-gray-200">
-                  <div className="h-full rounded-full bg-indigo-500" style={{ animation: "progress 3s ease-in-out" }} />
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 group-hover:bg-gray-200 transition-colors">
-                  <Upload className="h-5 w-5 text-gray-500" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    Glissez votre CV ici ou <span className="text-indigo-600">parcourez</span>
-                  </p>
-                  <p className="mt-1 text-xs text-gray-400">PDF, DOC, DOCX, TXT ou Photo • 10 MB max</p>
-                </div>
-              </div>
-            )}
+      <div className="mx-auto max-w-6xl px-5">
+        {/* ═══════ HERO + UPLOAD ═══════ */}
+        <div className="pt-12 pb-4">
+          <div className="max-w-2xl mx-auto text-center mb-8">
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 border border-indigo-100/60 px-4 py-1.5 mb-6">
+              <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+              <span className="text-xs font-semibold text-indigo-600">Analyse IA en temps réel</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
+              Analyse ton CV
+            </h1>
+            <p className="mt-3 text-base text-gray-500">
+              Upload ton CV et obtiens un score détaillé, des corrections et une lettre de motivation personnalisée.
+            </p>
           </div>
 
-          {!session && !analysis && !uploading && theatricalStep < 0 && (
-            <p className="mt-3 text-center text-xs text-gray-400">
-              Analyse gratuite • Aucune carte bancaire requise
-            </p>
-          )}
+          {/* Upload Zone */}
+          <div className="mx-auto max-w-xl">
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={onDrop}
+              onClick={() => !uploading && fileInputRef.current?.click()}
+              className={`
+                group relative cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-300
+                ${dragOver
+                  ? "border-indigo-500 bg-indigo-50/60 scale-[1.02]"
+                  : "border-gray-200 bg-white/60 hover:border-indigo-300 hover:bg-indigo-50/30 hover:shadow-lg hover:shadow-indigo-100/50"
+                }
+                ${uploading ? "pointer-events-none" : ""}
+                px-6 py-10 text-center backdrop-blur-sm
+              `}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,image/*"
+                onChange={onFileChange}
+                className="hidden"
+              />
+
+              {uploading ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-full bg-indigo-400/20 animate-ping" />
+                    <div className="relative h-12 w-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Analyse en cours...</p>
+                    <p className="mt-0.5 text-xs text-gray-400">{fileName}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100/50 group-hover:scale-110 transition-transform">
+                    <Upload className="h-6 w-6 text-indigo-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      Glisse ton CV ici ou <span className="text-indigo-600 font-semibold">parcourir</span>
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">PDF, DOCX, TXT ou Photo • 10 MB max</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ═══════ THEATRICAL LOADING ═══════ */}
         {uploading && theatricalStep >= 0 && (
-          <div className="mx-auto max-w-2xl mt-8">
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full bg-indigo-400/20 animate-ping" />
-                  <div className="relative h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">Analyse approfondie en cours</p>
-                  <p className="text-xs text-gray-400">{fileName}</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {[
-                  "Extraction du contenu du CV",
-                  "Analyse de la structure et mise en page",
-                  "Évaluation des compétences clés",
-                  "Vérification de la cohérence globale",
-                  "Calcul du score final",
-                ].map((step, i) => (
-                  <div key={i} className={`flex items-center gap-3 transition-all duration-700 ${theatricalStep > i ? "opacity-100" : theatricalStep === i ? "opacity-70" : "opacity-25"}`}>
+          <div className="mx-auto max-w-xl mt-6 animate-fade-up">
+            <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-xl shadow-gray-200/30">
+              <div className="space-y-3">
+                {theatricalSteps.map((step, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-3 transition-all duration-500 ${
+                      theatricalStep > i ? "opacity-100" : theatricalStep === i ? "opacity-80" : "opacity-20"
+                    }`}
+                  >
                     {theatricalStep > i ? (
-                      <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
+                        <CheckCircle2 className="h-4 w-4 text-white" />
                       </div>
                     ) : theatricalStep === i ? (
-                      <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-500" />
+                      <div className="h-7 w-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shrink-0 shadow-sm">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
                       </div>
                     ) : (
-                      <div className="h-6 w-6 rounded-full border-2 border-gray-200 shrink-0" />
+                      <div className="h-7 w-7 rounded-full border-2 border-gray-200 shrink-0" />
                     )}
-                    <span className={`text-sm ${theatricalStep > i ? "text-gray-900 font-medium" : theatricalStep === i ? "text-gray-600" : "text-gray-300"}`}>{step}</span>
-                    {theatricalStep > i && <span className="text-[10px] text-green-500 font-medium ml-auto">Terminé</span>}
+                    <span className={`text-sm ${
+                      theatricalStep > i ? "text-gray-900 font-medium" : theatricalStep === i ? "text-indigo-700 font-medium" : "text-gray-300"
+                    }`}>
+                      {step}
+                    </span>
+                    {theatricalStep > i && (
+                      <span className="ml-auto text-[10px] font-semibold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        Terminé
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
 
-              <div className="mt-8">
-                <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                  <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 transition-all duration-1000 ease-out" style={{ width: `${Math.min(((theatricalStep + 1) / 6) * 100, 100)}%` }} />
-                </div>
-              </div>
-
-              {theatricalStep >= 2 && (
-                <div className="mt-6 pt-4 border-t border-gray-100">
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium mb-3">Moteur d&apos;analyse</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {["NLP sémantique v3", "Matching ATS multi-format", "Scoring pondéré 47 critères", "Parsing contextuel deep-learning"].map((t) => (
-                      <span key={t} className="inline-flex items-center rounded-full bg-indigo-50/80 border border-indigo-100/60 px-2.5 py-0.5 text-[10px] font-medium text-indigo-500">{t}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {theatricalStep >= 3 && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium mb-3">Vérifié avec</p>
-                  <div className="flex items-center gap-6">
-                    {["GPTZero", "Originality.ai", "LinkedIn", "Indeed"].map((name) => (
-                      <span key={name} className="text-xs font-semibold text-gray-400">{name}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ═══════ GATED RESULTS (non-auth) ═══════ */}
-        {!uploading && theatricalStep >= 5 && !session && !analysis && (
-          <div ref={resultsRef} className="mx-auto max-w-4xl pt-12 pb-20">
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center mb-6">
-              <ScoreRing score={fakeScore} size={180} />
-              <p className="mt-3 text-sm text-gray-500">
-                {fakeScore >= 60 ? "Bon CV, quelques améliorations possibles" : "Des améliorations importantes à faire"}
-              </p>
-            </div>
-
-            <div className="relative rounded-2xl border border-gray-200 bg-white overflow-hidden">
-              <div className="p-8 filter blur-[6px] pointer-events-none select-none" aria-hidden="true">
-                <div className="space-y-3 mb-6">
-                  <div className="h-4 bg-gray-100 rounded-full w-3/4" />
-                  <div className="h-4 bg-gray-100 rounded-full w-full" />
-                  <div className="h-4 bg-gray-100 rounded-full w-5/6" />
-                  <div className="h-4 bg-gray-100 rounded-full w-2/3" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded-xl bg-green-50 p-4">
-                    <div className="h-3 bg-green-200 rounded w-1/2 mb-3" />
-                    <div className="space-y-2">
-                      <div className="h-3 bg-green-100 rounded w-full" />
-                      <div className="h-3 bg-green-100 rounded w-4/5" />
-                      <div className="h-3 bg-green-100 rounded w-3/4" />
-                    </div>
-                  </div>
-                  <div className="rounded-xl bg-orange-50 p-4">
-                    <div className="h-3 bg-orange-200 rounded w-1/2 mb-3" />
-                    <div className="space-y-2">
-                      <div className="h-3 bg-orange-100 rounded w-full" />
-                      <div className="h-3 bg-orange-100 rounded w-4/5" />
-                      <div className="h-3 bg-orange-100 rounded w-3/4" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-white via-white/95 to-white/60">
-                <div className="text-center px-6">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 mb-4">
-                    <Lock className="h-6 w-6 text-indigo-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">Débloquez votre analyse complète</h3>
-                  <p className="text-sm text-gray-500 mt-2 mb-6 max-w-sm mx-auto">Créez votre compte gratuit pour voir les détails, corrections et recommandations.</p>
-                  <button onClick={() => setShowAuth(true)} className="inline-flex items-center gap-2 rounded-xl bg-black px-8 py-3.5 text-sm font-semibold text-white hover:bg-gray-800 shadow-lg transition-all">
-                    <ArrowRight className="h-4 w-4" />
-                    Créer mon compte — c&apos;est gratuit
-                  </button>
-                  <p className="text-xs text-gray-400 mt-3">Sans carte bancaire • 3 tokens offerts</p>
+              <div className="mt-6">
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 transition-all duration-1000 ease-out"
+                    style={{ width: `${Math.min(((theatricalStep + 1) / 6) * 100, 100)}%` }}
+                  />
                 </div>
               </div>
             </div>
@@ -554,22 +482,22 @@ export default function Home() {
 
         {/* ═══════ RESULTS ═══════ */}
         {analysis && (
-          <div ref={resultsRef} className="mx-auto max-w-4xl animate-fade-up pt-12 pb-20">
+          <div ref={resultsRef} className="mx-auto max-w-5xl animate-fade-up pt-8 pb-20">
             {/* Tab Navigation */}
-            <div className="mb-8 flex items-center gap-1 rounded-xl bg-gray-100 p-1">
+            <div className="mb-8 flex items-center gap-1.5 rounded-2xl bg-gray-100/80 p-1.5 backdrop-blur-sm">
               {[
                 { id: "results" as const, label: "Résultats", icon: Zap },
                 { id: "corrections" as const, label: "Corrections", icon: Sparkles, cost: 2 },
-                { id: "cover-letter" as const, label: "Lettre de motivation", icon: FileText, cost: 3 },
-                { id: "job-match" as const, label: "Matcher une offre", icon: Briefcase, cost: 2 },
+                { id: "cover-letter" as const, label: "Lettre", icon: FileText, cost: 3 },
+                { id: "job-match" as const, label: "Matcher", icon: Target, cost: 2 },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-medium transition-all
+                    flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-3 text-xs font-semibold transition-all
                     ${activeTab === tab.id
-                      ? "bg-white text-gray-900 shadow-sm"
+                      ? "bg-white text-gray-900 shadow-md shadow-gray-200/50"
                       : "text-gray-500 hover:text-gray-700"
                     }
                   `}
@@ -577,7 +505,9 @@ export default function Home() {
                   <tab.icon className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">{tab.label}</span>
                   {tab.cost && (
-                    <span className="rounded bg-gray-200 px-1 py-0.5 text-[10px] font-medium text-gray-500">
+                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                      activeTab === tab.id ? "bg-indigo-100 text-indigo-600" : "bg-gray-200/80 text-gray-400"
+                    }`}>
                       {tab.cost}t
                     </span>
                   )}
@@ -588,50 +518,68 @@ export default function Home() {
             {/* ── Tab: Results ── */}
             {activeTab === "results" && (
               <div className="space-y-6 animate-fade-in">
+                {/* Score + Radar */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-8">
+                  <div className="flex flex-col items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-8 shadow-sm">
                     <ScoreRing score={analysis.score} size={180} />
-                    <p className="mt-3 text-sm text-gray-500">
-                      {analysis.score >= 80 ? "Excellent CV !" : analysis.score >= 60 ? "Bon CV, quelques améliorations possibles" : "Des améliorations importantes à faire"}
+                    <p className="mt-4 text-sm font-medium text-gray-600">
+                      {analysis.score >= 80
+                        ? "Excellent CV !"
+                        : analysis.score >= 60
+                        ? "Bon CV, quelques améliorations possibles"
+                        : "Des améliorations importantes à faire"}
                     </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <TrendingUp className="h-3.5 w-3.5 text-indigo-500" />
+                      <span className="text-xs text-indigo-600 font-medium">Seora peut booster ton score à 90+</span>
+                    </div>
                   </div>
 
                   {analysis.scoreBreakdown && (
-                    <div className="flex items-center justify-center rounded-2xl border border-gray-200 bg-white p-6">
+                    <div className="flex items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
                       <RadarChart data={analysis.scoreBreakdown} size={260} />
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Résumé de l&apos;analyse</h3>
+                {/* Summary */}
+                <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-3">
+                    <BarChart3 className="h-4 w-4 text-indigo-500" />
+                    Résumé de l&apos;analyse
+                  </h3>
                   <p className="text-sm leading-relaxed text-gray-600">{analysis.summary}</p>
                 </div>
 
+                {/* Strengths & Weaknesses */}
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <div className="rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white border border-emerald-200/40 p-6 shadow-sm">
+                    <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-4">
+                      <div className="h-6 w-6 rounded-lg bg-emerald-100 flex items-center justify-center">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      </div>
                       Points forts
                     </h3>
-                    <ul className="space-y-2">
+                    <ul className="space-y-2.5">
                       {analysis.strengths.map((s, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                          <div className="mt-1.5 h-1 w-1 rounded-full bg-green-400 flex-shrink-0" />
+                        <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
+                          <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
                           {s}
                         </li>
                       ))}
                     </ul>
                   </div>
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-                      <AlertTriangle className="h-4 w-4 text-orange-500" />
+                  <div className="rounded-2xl bg-gradient-to-br from-amber-50/80 to-white border border-amber-200/40 p-6 shadow-sm">
+                    <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-4">
+                      <div className="h-6 w-6 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                      </div>
                       À améliorer
                     </h3>
-                    <ul className="space-y-2">
+                    <ul className="space-y-2.5">
                       {analysis.weaknesses.map((w, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                          <div className="mt-1.5 h-1 w-1 rounded-full bg-orange-400 flex-shrink-0" />
+                        <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
+                          <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-400 flex-shrink-0" />
                           {w}
                         </li>
                       ))}
@@ -639,11 +587,12 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* CTA: Get corrections */}
                 {!corrections && (
                   <button
                     onClick={handleCorrections}
                     disabled={loadingCorrections}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-3.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 hover:opacity-95 disabled:opacity-50 transition-all"
                   >
                     {loadingCorrections ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -651,7 +600,7 @@ export default function Home() {
                       <Sparkles className="h-4 w-4" />
                     )}
                     {loadingCorrections ? "Génération des corrections..." : "Obtenir les corrections détaillées"}
-                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px]">2 tokens</span>
+                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold">2 tokens</span>
                   </button>
                 )}
               </div>
@@ -663,30 +612,36 @@ export default function Home() {
                 {corrections ? (
                   <div className="space-y-4">
                     {corrections.corrections.map((c, i) => (
-                      <div key={i} className="rounded-2xl border border-gray-200 bg-white p-6">
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-indigo-600 mb-3">
+                      <div key={i} className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                        <h4 className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-indigo-600 mb-4">
                           {c.section}
                         </h4>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <div className="rounded-lg bg-red-50 p-3">
-                            <p className="text-[10px] font-medium text-red-600 mb-1">AVANT</p>
-                            <p className="text-sm text-red-900">{c.before}</p>
+                          <div className="rounded-xl bg-red-50/80 border border-red-100/60 p-4">
+                            <p className="text-[10px] font-bold text-red-500 mb-1.5 uppercase tracking-wider">Avant</p>
+                            <p className="text-sm text-red-900/80 leading-relaxed">{c.before}</p>
                           </div>
-                          <div className="rounded-lg bg-green-50 p-3">
-                            <p className="text-[10px] font-medium text-green-600 mb-1">APRÈS</p>
-                            <p className="text-sm text-green-900">{c.after}</p>
+                          <div className="rounded-xl bg-emerald-50/80 border border-emerald-100/60 p-4">
+                            <p className="text-[10px] font-bold text-emerald-500 mb-1.5 uppercase tracking-wider">Après</p>
+                            <p className="text-sm text-emerald-900/80 leading-relaxed">{c.after}</p>
                           </div>
                         </div>
-                        <p className="mt-3 text-xs text-gray-500">{c.explanation}</p>
+                        <p className="mt-3 text-xs text-gray-500 leading-relaxed">{c.explanation}</p>
                       </div>
                     ))}
 
                     {corrections.tips && corrections.tips.length > 0 && (
-                      <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                        <h4 className="text-sm font-semibold text-gray-900 mb-3">Conseils supplémentaires</h4>
-                        <ul className="space-y-1.5">
+                      <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                        <h4 className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-3">
+                          <Sparkles className="h-4 w-4 text-indigo-500" />
+                          Conseils supplémentaires
+                        </h4>
+                        <ul className="space-y-2">
                           {corrections.tips.map((t, i) => (
-                            <li key={i} className="text-sm text-gray-600">• {t}</li>
+                            <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                              <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                              {t}
+                            </li>
                           ))}
                         </ul>
                       </div>
@@ -710,94 +665,101 @@ export default function Home() {
               <div className="animate-fade-in">
                 {coverLetter ? (
                   <div className="space-y-4">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-gray-900">Votre lettre de motivation</h3>
+                    <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                          <FileText className="h-4 w-4 text-indigo-500" />
+                          Ta lettre de motivation
+                        </h3>
                         <CopyButton text={coverLetter.coverLetter} />
                       </div>
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 font-[system-ui]">
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 font-[system-ui] bg-gray-50/50 rounded-xl p-5 border border-gray-100">
                         {coverLetter.coverLetter}
                       </div>
                     </div>
 
                     {coverLetter.companyInsights.length > 0 && (
-                      <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                        <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
+                      <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                        <h4 className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-3">
                           <Building2 className="h-4 w-4 text-indigo-500" />
                           Insights entreprise utilisés
                         </h4>
-                        <ul className="space-y-1.5">
+                        <ul className="space-y-2">
                           {coverLetter.companyInsights.map((c, i) => (
-                            <li key={i} className="text-sm text-gray-600">• {c}</li>
+                            <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                              <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                              {c}
+                            </li>
                           ))}
                         </ul>
                       </div>
                     )}
 
                     <button
-                      onClick={() => { setCoverLetter(null); }}
-                      className="text-sm text-gray-500 hover:text-gray-700"
+                      onClick={() => setCoverLetter(null)}
+                      className="text-sm text-gray-500 hover:text-indigo-600 transition-colors font-medium"
                     >
                       ← Générer une nouvelle lettre
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1">Lettre de motivation IA</h3>
-                      <p className="text-xs text-gray-500 mb-5">
-                        L&apos;IA scrape le site de l&apos;entreprise et génère une lettre personnalisée basée sur votre CV et les valeurs de l&apos;entreprise.
-                      </p>
+                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100/50 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-indigo-500" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900">Lettre de motivation IA</h3>
+                        <p className="text-xs text-gray-500">
+                          L&apos;IA scrape le site de l&apos;entreprise et génère une lettre personnalisée.
+                        </p>
+                      </div>
+                    </div>
 
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Entreprise *</label>
-                            <input
-                              type="text"
-                              value={clCompany}
-                              onChange={(e) => setClCompany(e.target.value)}
-                              placeholder="ex: Google"
-                              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Site web (optionnel)</label>
-                            <input
-                              type="url"
-                              value={clUrl}
-                              onChange={(e) => setClUrl(e.target.value)}
-                              placeholder="https://google.com"
-                              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
-                            />
-                          </div>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Entreprise *</label>
+                          <input
+                            type="text"
+                            value={clCompany}
+                            onChange={(e) => setClCompany(e.target.value)}
+                            placeholder="ex: Google"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                          />
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Description du poste *</label>
-                          <textarea
-                            value={clJob}
-                            onChange={(e) => setClJob(e.target.value)}
-                            placeholder="Collez ici la description du poste..."
-                            rows={5}
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm resize-none"
+                          <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Site web (optionnel)</label>
+                          <input
+                            type="url"
+                            value={clUrl}
+                            onChange={(e) => setClUrl(e.target.value)}
+                            placeholder="https://google.com"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                           />
                         </div>
                       </div>
-
-                      <button
-                        onClick={handleCoverLetter}
-                        disabled={loadingCoverLetter || !clCompany || !clJob}
-                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40"
-                      >
-                        {loadingCoverLetter ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-4 w-4" />
-                        )}
-                        {loadingCoverLetter ? "Recherche + génération..." : "Générer la lettre"}
-                        <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px]">3 tokens</span>
-                      </button>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Description du poste *</label>
+                        <textarea
+                          value={clJob}
+                          onChange={(e) => setClJob(e.target.value)}
+                          placeholder="Collez ici la description du poste..."
+                          rows={5}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm resize-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                        />
+                      </div>
                     </div>
+
+                    <button
+                      onClick={handleCoverLetter}
+                      disabled={loadingCoverLetter || !clCompany || !clJob}
+                      className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 hover:opacity-95 disabled:opacity-40 transition-all"
+                    >
+                      {loadingCoverLetter ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {loadingCoverLetter ? "Recherche + génération..." : "Générer la lettre"}
+                      <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold">3 tokens</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -808,87 +770,95 @@ export default function Home() {
               <div className="animate-fade-in">
                 {jobMatch ? (
                   <div className="space-y-4">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                      <div className="flex items-center gap-4 mb-4">
+                    <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                      <div className="flex items-center gap-5 mb-5">
                         <ScoreRing score={jobMatch.matchScore} size={100} label="Compatibilité" />
                         <div>
-                          <h3 className="text-sm font-semibold text-gray-900">Score de matching</h3>
-                          <p className="text-xs text-gray-500 mt-1">{jobMatch.globalAdvice}</p>
+                          <h3 className="text-sm font-bold text-gray-900">Score de matching</h3>
+                          <p className="text-xs text-gray-500 mt-1 leading-relaxed">{jobMatch.globalAdvice}</p>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 mt-4">
-                        <div className="rounded-lg bg-green-50 p-3">
-                          <p className="text-[10px] font-semibold text-green-600 mb-1">MOTS-CLÉS PRÉSENTS</p>
-                          <div className="flex flex-wrap gap-1">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-emerald-50/80 border border-emerald-100/60 p-4">
+                          <p className="text-[10px] font-bold text-emerald-600 mb-2 uppercase tracking-wider">Mots-clés présents</p>
+                          <div className="flex flex-wrap gap-1.5">
                             {jobMatch.presentKeywords.map((k, i) => (
-                              <span key={i} className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] text-green-700">{k}</span>
+                              <span key={i} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">{k}</span>
                             ))}
                           </div>
                         </div>
-                        <div className="rounded-lg bg-red-50 p-3">
-                          <p className="text-[10px] font-semibold text-red-600 mb-1">MOTS-CLÉS MANQUANTS</p>
-                          <div className="flex flex-wrap gap-1">
+                        <div className="rounded-xl bg-red-50/80 border border-red-100/60 p-4">
+                          <p className="text-[10px] font-bold text-red-600 mb-2 uppercase tracking-wider">Mots-clés manquants</p>
+                          <div className="flex flex-wrap gap-1.5">
                             {jobMatch.missingKeywords.map((k, i) => (
-                              <span key={i} className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">{k}</span>
+                              <span key={i} className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{k}</span>
                             ))}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Suggestions</h4>
-                      <ul className="space-y-1.5">
+                    <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                      <h4 className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-3">
+                        <Sparkles className="h-4 w-4 text-indigo-500" />
+                        Suggestions
+                      </h4>
+                      <ul className="space-y-2">
                         {jobMatch.suggestions.map((s, i) => (
-                          <li key={i} className="text-sm text-gray-600">• {s}</li>
+                          <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                            <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                            {s}
+                          </li>
                         ))}
                       </ul>
                     </div>
 
-                    <div className="rounded-2xl border border-gray-200 bg-white p-6">
+                    <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-semibold text-gray-900">CV adapté</h4>
+                        <h4 className="text-sm font-bold text-gray-900">CV adapté</h4>
                         <CopyButton text={jobMatch.adaptedCV} />
                       </div>
-                      <pre className="whitespace-pre-wrap text-xs leading-relaxed text-gray-700 font-[system-ui]">
+                      <pre className="whitespace-pre-wrap text-xs leading-relaxed text-gray-700 font-[system-ui] bg-gray-50/50 rounded-xl p-5 border border-gray-100">
                         {jobMatch.adaptedCV}
                       </pre>
                     </div>
 
-                    <button
-                      onClick={() => setJobMatch(null)}
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                    >
+                    <button onClick={() => setJobMatch(null)} className="text-sm text-gray-500 hover:text-indigo-600 transition-colors font-medium">
                       ← Nouveau matching
                     </button>
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-1">Matcher votre CV à une offre</h3>
-                    <p className="text-xs text-gray-500 mb-5">
-                      Collez une offre d&apos;emploi. L&apos;IA compare avec votre CV et génère une version adaptée.
-                    </p>
+                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100/50 flex items-center justify-center">
+                        <Target className="h-5 w-5 text-indigo-500" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900">Matcher ton CV à une offre</h3>
+                        <p className="text-xs text-gray-500">Colle une offre d&apos;emploi et l&apos;IA adapte ton CV.</p>
+                      </div>
+                    </div>
 
                     <div className="space-y-3">
                       <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Titre du poste</label>
+                        <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Titre du poste</label>
                         <input
                           type="text"
                           value={jmTitle}
                           onChange={(e) => setJmTitle(e.target.value)}
                           placeholder="ex: Développeur Full Stack"
-                          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Description du poste *</label>
+                        <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Description du poste *</label>
                         <textarea
                           value={jmDescription}
                           onChange={(e) => setJmDescription(e.target.value)}
                           placeholder="Collez ici l'offre d'emploi..."
                           rows={6}
-                          className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm resize-none"
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm resize-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                         />
                       </div>
                     </div>
@@ -896,15 +866,11 @@ export default function Home() {
                     <button
                       onClick={handleJobMatch}
                       disabled={loadingJobMatch || !jmDescription || !analysis}
-                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40"
+                      className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 hover:opacity-95 disabled:opacity-40 transition-all"
                     >
-                      {loadingJobMatch ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Briefcase className="h-4 w-4" />
-                      )}
+                      {loadingJobMatch ? <Loader2 className="h-4 w-4 animate-spin" /> : <Briefcase className="h-4 w-4" />}
                       {loadingJobMatch ? "Analyse en cours..." : "Analyser la compatibilité"}
-                      <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px]">2 tokens</span>
+                      <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold">2 tokens</span>
                     </button>
                   </div>
                 )}
@@ -913,70 +879,41 @@ export default function Home() {
           </div>
         )}
 
-        {/* ─── Pre-analysis: Feature preview ─── */}
-        {!analysis && !uploading && theatricalStep < 5 && (
-          <div className="mx-auto max-w-3xl pb-20 pt-16">
+        {/* ─── Pre-analysis: empty state ─── */}
+        {!analysis && !uploading && theatricalStep < 0 && (
+          <div className="mx-auto max-w-3xl pb-20 pt-8">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
-                { icon: Zap, title: "Score IA détaillé", desc: "Analyse sur 6 critères avec radar chart" },
-                { icon: Sparkles, title: "Corrections précises", desc: "Avant/après pour chaque section du CV" },
-                { icon: Building2, title: "Lettre personnalisée", desc: "Scraping + IA pour cibler l'entreprise" },
+                { icon: Zap, title: "Score détaillé", desc: "Analyse sur 6 critères avec radar chart", color: "from-amber-400 to-orange-500" },
+                { icon: Sparkles, title: "Corrections IA", desc: "Avant/après pour chaque section du CV", color: "from-indigo-400 to-purple-500" },
+                { icon: Building2, title: "Lettre perso", desc: "Scraping + IA ciblant l'entreprise", color: "from-emerald-400 to-teal-500" },
               ].map((f, i) => (
-                <div key={i} className="rounded-xl border border-gray-200 bg-white p-5 text-center">
-                  <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
-                    <f.icon className="h-4 w-4 text-gray-600" />
+                <div key={i} className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+                  <div className={`mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${f.color} shadow-lg`}>
+                    <f.icon className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="mt-3 text-sm font-semibold text-gray-900">{f.title}</h3>
-                  <p className="mt-1 text-xs text-gray-500">{f.desc}</p>
+                  <h3 className="mt-4 text-sm font-bold text-gray-900">{f.title}</h3>
+                  <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">{f.desc}</p>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-12 text-center">
-              <p className="text-xs text-gray-400 uppercase tracking-widest mb-4">Tarifs simples</p>
-              <div className="overflow-x-auto">
-                <div className="inline-flex items-center gap-4 sm:gap-6 rounded-xl border border-gray-200 bg-white px-4 sm:px-6 py-4">
-                  <div className="text-center min-w-[60px]">
-                    <p className="text-base sm:text-lg font-bold text-gray-900">Gratuit</p>
-                    <p className="text-[10px] text-gray-400">1ère analyse</p>
-                  </div>
-                  <div className="h-8 w-px bg-gray-200 flex-shrink-0" />
-                  <div className="text-center min-w-[50px]">
-                    <p className="text-base sm:text-lg font-bold text-gray-900">4,99€</p>
-                    <p className="text-[10px] text-gray-400">5 tokens</p>
-                  </div>
-                  <div className="h-8 w-px bg-gray-200 flex-shrink-0" />
-                  <div className="text-center min-w-[50px]">
-                    <p className="text-base sm:text-lg font-bold text-gray-900">9,99€</p>
-                    <p className="text-[10px] text-gray-400">15 tokens</p>
-                  </div>
-                  <div className="h-8 w-px bg-gray-200 flex-shrink-0" />
-                  <div className="text-center min-w-[55px]">
-                    <p className="text-base sm:text-lg font-bold text-gray-900">24,99€</p>
-                    <p className="text-[10px] text-gray-400">50 tokens</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* ═══════ AUTH MODAL ═══════ */}
-      {showAuth && !session && (
-        <Modal onClose={() => setShowAuth(false)}>
-          <AuthForm onSuccess={() => setShowAuth(false)} />
-        </Modal>
-      )}
-
       {/* ═══════ TOKENS MODAL ═══════ */}
       {showTokens && (
         <Modal onClose={() => setShowTokens(false)}>
           <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Acheter des tokens</h2>
-            <p className="text-xs text-gray-500 mb-5">
-              Solde actuel : {tokens} token{tokens !== 1 ? "s" : ""}
-            </p>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <Coins className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Acheter des tokens</h2>
+                <p className="text-xs text-gray-500">Solde actuel : <span className="font-semibold text-indigo-600">{tokens} token{tokens !== 1 ? "s" : ""}</span></p>
+              </div>
+            </div>
             <div className="space-y-3">
               {[
                 { id: "pack-5", tokens: 5, price: "4,99€", perToken: "1,00€" },
@@ -986,26 +923,26 @@ export default function Home() {
                 <button
                   key={pack.id}
                   onClick={() => buyTokens(pack.id)}
-                  className={`flex w-full items-center justify-between rounded-xl border p-4 text-left transition-all hover:border-gray-300 ${
-                    pack.popular ? "border-indigo-200 bg-indigo-50/30" : "border-gray-200 bg-white"
+                  className={`flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition-all hover:shadow-md ${
+                    pack.popular ? "border-indigo-300 bg-gradient-to-r from-indigo-50/50 to-purple-50/50" : "border-gray-200 bg-white hover:border-gray-300"
                   }`}
                 >
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-sm font-bold text-gray-900">
                       {pack.tokens} tokens
                       {pack.popular && (
-                        <span className="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
+                        <span className="ml-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-2 py-0.5 text-[10px] font-bold text-white">
                           Populaire
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-gray-400">{pack.perToken}/token</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{pack.perToken}/token</p>
                   </div>
-                  <p className="text-lg font-bold text-gray-900">{pack.price}</p>
+                  <p className="text-xl font-extrabold text-gray-900">{pack.price}</p>
                 </button>
               ))}
             </div>
-            <p className="mt-4 text-center text-[10px] text-gray-400">
+            <p className="mt-5 text-center text-[10px] text-gray-400">
               Paiement sécurisé par Stripe • Tokens sans expiration
             </p>
           </div>
@@ -1013,12 +950,12 @@ export default function Home() {
       )}
 
       {/* ═══════ FOOTER ═══════ */}
-      <footer className="border-t border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
+      <footer className="border-t border-gray-200/60 bg-white/50 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
           <p className="text-xs text-gray-400">© 2026 Seora CV</p>
-          <div className="flex gap-4">
-            <a href="/cgu" className="text-xs text-gray-400 hover:text-gray-600">CGU</a>
-            <a href="/confidentialite" className="text-xs text-gray-400 hover:text-gray-600">Confidentialité</a>
+          <div className="flex gap-5">
+            <a href="/cgu" className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">CGU</a>
+            <a href="/confidentialite" className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">Confidentialité</a>
           </div>
         </div>
       </footer>
@@ -1031,33 +968,16 @@ export default function Home() {
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md animate-scale-in rounded-2xl bg-white shadow-xl">
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-md" onClick={onClose} />
+      <div className="relative w-full max-w-md animate-scale-in rounded-2xl bg-white/95 backdrop-blur-xl shadow-2xl border border-white/20">
         <button
           onClick={onClose}
-          className="absolute right-3 top-3 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="absolute right-3 top-3 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
         {children}
       </div>
-    </div>
-  );
-}
-
-function AuthForm({ onSuccess }: { onSuccess: () => void }) {
-  void onSuccess;
-  return (
-    <div className="p-6 text-center">
-      <h2 className="text-lg font-semibold text-gray-900 mb-1">Connexion</h2>
-      <p className="text-xs text-gray-500 mb-5">5 tokens offerts à l&apos;inscription</p>
-      <a
-        href="/auth/signin"
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
-      >
-        <ArrowRight className="h-4 w-4" />
-        Se connecter avec email
-      </a>
     </div>
   );
 }
@@ -1080,22 +1000,22 @@ function LockedFeature({
   const hasEnough = tokens !== null && tokens >= cost;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100">
-        <Lock className="h-5 w-5 text-gray-400" />
+    <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/60 p-8 text-center shadow-sm">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-200/60">
+        <Lock className="h-6 w-6 text-gray-400" />
       </div>
-      <h3 className="mt-4 text-sm font-semibold text-gray-900">{title}</h3>
-      <p className="mt-1 text-xs text-gray-500">{description}</p>
+      <h3 className="mt-4 text-base font-bold text-gray-900">{title}</h3>
+      <p className="mt-1.5 text-sm text-gray-500">{description}</p>
       <button
         onClick={onUnlock}
         disabled={loading || !hasEnough}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40"
+        className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 hover:opacity-95 disabled:opacity-40 transition-all"
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
         Débloquer ({cost} tokens)
       </button>
       {!hasEnough && (
-        <p className="mt-2 text-xs text-red-500">
+        <p className="mt-3 text-xs text-red-500 font-medium">
           Pas assez de tokens ({tokens ?? 0}/{cost})
         </p>
       )}
@@ -1113,10 +1033,10 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-50"
+      className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-all"
     >
-      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-      {copied ? "Copié" : "Copier"}
+      {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+      {copied ? "Copié !" : "Copier"}
     </button>
   );
 }

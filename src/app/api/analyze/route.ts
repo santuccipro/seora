@@ -64,11 +64,33 @@ export async function POST(req: NextRequest) {
       let cvText: string;
 
       if (file.type === "application/pdf") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pdfModule = await import("pdf-parse") as any;
-        const pdf = pdfModule.default || pdfModule;
-        const pdfData = await pdf(buffer);
-        cvText = pdfData.text;
+        // Parse PDF by spawning a Node subprocess (avoids Turbopack worker bundling issues)
+        const { writeFileSync, unlinkSync, readFileSync } = await import("fs");
+        const { execSync } = await import("child_process");
+        const { join } = await import("path");
+        const { tmpdir } = await import("os");
+        const tmpPdf = join(tmpdir(), `seora_cv_${Date.now()}.pdf`);
+        const tmpOut = join(tmpdir(), `seora_cv_${Date.now()}.txt`);
+        writeFileSync(tmpPdf, buffer);
+        try {
+          execSync(`node -e "
+            const { PDFParse } = require('pdf-parse');
+            const fs = require('fs');
+            const buf = fs.readFileSync('${tmpPdf}');
+            const uint8 = new Uint8Array(buf);
+            const parser = new PDFParse(uint8);
+            parser.getText().then(result => {
+              const text = result.pages.map(p => p.text).join('\\n');
+              fs.writeFileSync('${tmpOut}', text);
+            }).catch(e => {
+              fs.writeFileSync('${tmpOut}', '');
+            });
+          "`, { timeout: 30000 });
+          cvText = readFileSync(tmpOut, "utf-8");
+        } finally {
+          try { unlinkSync(tmpPdf); } catch {}
+          try { unlinkSync(tmpOut); } catch {}
+        }
       } else {
         cvText = buffer.toString("utf-8");
       }
