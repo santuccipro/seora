@@ -158,6 +158,7 @@ export default function Home() {
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Erreur réseau";
         toast.error(message);
+        setTheatricalStep(-1);
       }
 
       setUploading(false);
@@ -340,6 +341,27 @@ export default function Home() {
                     {tokens} token{tokens !== 1 ? "s" : ""}
                   </button>
                 )}
+                {/* TEMPORARY BYPASS - DELETE BEFORE PRODUCTION */}
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/bypass-tokens", { method: "POST" });
+                      const data = await res.json();
+                      if (res.ok) {
+                        setTokens(data.tokens);
+                        toast.success(data.message);
+                      } else {
+                        toast.error(data.error || "Erreur");
+                      }
+                    } catch {
+                      toast.error("Erreur réseau");
+                    }
+                  }}
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-2 text-[10px] font-bold text-white shadow-sm hover:shadow-md transition-all"
+                >
+                  <Zap className="h-3 w-3" />
+                  +5 tokens
+                </button>
                 <div className="relative group">
                   <button className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors">
                     <div className="h-6 w-6 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white">
@@ -661,6 +683,24 @@ export default function Home() {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+
+                    {/* CTA: Open CV Editor */}
+                    {analysis && (
+                      <div className="rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 p-6 text-center shadow-lg">
+                        <h4 className="text-lg font-bold text-white mb-2">Recrée ton CV optimisé</h4>
+                        <p className="text-sm text-indigo-100 mb-4">
+                          L&apos;IA reconstruit ton CV avec un design professionnel. Tu pourras modifier le texte, ajouter ta photo et exporter en PDF.
+                        </p>
+                        <button
+                          onClick={() => window.location.href = `/cv-editor?id=${analysis.id}`}
+                          className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-bold text-indigo-600 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]"
+                        >
+                          <FileText className="h-4 w-4" />
+                          Ouvrir l&apos;Éditeur de CV
+                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-600">2 tokens</span>
+                        </button>
                       </div>
                     )}
                   </div>

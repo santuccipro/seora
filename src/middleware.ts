@@ -27,5 +27,6 @@ export const config = {
     "/plagiarism/:path*",
     "/reformulate/:path*",
     "/email-pro/:path*",
+    "/cv-editor/:path*",
   ],
 };

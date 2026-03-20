@@ -78,6 +78,7 @@ model CVAnalysis {
   weaknesses      String?
   corrections     String?
   correctedCV     String?
+  structuredCV    String?
   status          String   @default("pending")
   tokensUsed      Int      @default(0)
   shareToken      String?  @unique

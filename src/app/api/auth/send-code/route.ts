@@ -62,8 +62,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Code envoyé",
-      // Remove this in production - only for dev/testing
-      ...(process.env.NODE_ENV === "development" ? { code } : {}),
     });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);

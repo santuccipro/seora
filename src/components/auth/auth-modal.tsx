@@ -27,17 +27,17 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
       <div
         className="fixed inset-0 bg-black/30 backdrop-blur-md"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-lg animate-scale-in glass-strong rounded-3xl p-0 shadow-2xl overflow-hidden">
+      <div className="relative w-full sm:max-w-lg animate-slide-up sm:animate-scale-in bg-white sm:glass-strong rounded-t-3xl sm:rounded-3xl p-0 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 z-10 rounded-full p-1.5 text-gray-400 hover:bg-gray-100/50 transition-colors"
+          className="absolute right-4 top-4 z-10 rounded-full p-2 text-gray-400 hover:bg-gray-100/50 transition-colors"
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
         </button>
         <OTPAuthForm
           onSuccess={() => {
@@ -63,7 +63,6 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
-  const [devCode, setDevCode] = useState("");
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handleSendCode = async (e: React.FormEvent) => {
@@ -81,7 +80,6 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
         toast.error(data.error);
         return;
       }
-      if (data.code) setDevCode(data.code);
       setStep("code");
       toast.success("Code envoyé à " + email);
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
@@ -152,14 +150,14 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <div className="p-8">
+    <div className="px-6 py-8 sm:p-8">
       {step === "email" ? (
         <>
           <div className="text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50">
               <Mail className="h-6 w-6 text-indigo-600" />
             </div>
-            <h3 className="mt-4 text-lg font-bold text-gray-900">
+            <h3 className="mt-4 text-xl font-bold text-gray-900">
               Débloque ton résultat complet
             </h3>
             <p className="mt-2 text-sm text-gray-500">
@@ -172,28 +170,29 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
             {benefits.map((b) => (
               <div
                 key={b.text}
-                className="flex items-center gap-2 rounded-xl bg-gray-50/80 px-3 py-2"
+                className="flex items-center gap-2 rounded-xl bg-gray-50/80 px-3 py-2.5"
               >
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                <span className="text-xs text-gray-600">{b.text}</span>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span className="text-xs text-gray-600 leading-tight">{b.text}</span>
               </div>
             ))}
           </div>
 
           <form onSubmit={handleSendCode} className="mt-5 space-y-3">
+            {/* text-base (16px) prevents iOS Safari auto-zoom on focus */}
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="votre@email.com"
               required
-              autoFocus
-              className="w-full rounded-xl border border-gray-200/60 bg-white/60 px-4 py-3 text-sm outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 backdrop-blur-sm"
+              autoComplete="email"
+              className="w-full rounded-xl border border-gray-200/60 bg-white px-4 py-3.5 text-base outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 placeholder:text-gray-400"
             />
             <button
               type="submit"
               disabled={loading || !email}
-              className="flex w-full items-center justify-center gap-2 rounded-xl brand-gradient px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 shadow-lg shadow-indigo-500/25"
+              className="flex w-full items-center justify-center gap-2 rounded-xl brand-gradient px-4 py-3.5 text-base font-semibold text-white disabled:opacity-50 shadow-lg shadow-indigo-500/25 active:scale-[0.98] transition-transform"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -208,7 +207,7 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
             <span className="text-[11px] text-gray-400">🔒 Tes données restent confidentielles</span>
           </div>
 
-          <p className="mt-4 text-center text-[10px] text-gray-400">
+          <p className="mt-3 text-center text-[10px] text-gray-400">
             En continuant, vous acceptez nos{" "}
             <Link href="/cgu" className="underline hover:text-gray-600">
               CGU
@@ -228,20 +227,16 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
               <Shield className="h-6 w-6 text-emerald-600" />
             </div>
-            <h3 className="mt-4 text-lg font-bold text-gray-900">
+            <h3 className="mt-4 text-xl font-bold text-gray-900">
               Vérification
             </h3>
             <p className="mt-2 text-sm text-gray-500">
-              Code envoyé à <strong>{email}</strong>
+              Code envoyé à <strong className="text-gray-700">{email}</strong>
             </p>
-            {devCode && (
-              <p className="mt-1 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-700 inline-block">
-                Dev: <strong>{devCode}</strong>
-              </p>
-            )}
+            <p className="mt-1 text-xs text-gray-400">Vérifie tes spams si tu ne le vois pas</p>
           </div>
           <div
-            className="mt-6 flex justify-center gap-2"
+            className="mt-6 flex justify-center gap-2.5 sm:gap-3"
             onPaste={handlePaste}
           >
             {code.map((digit, i) => (
@@ -252,15 +247,16 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
                 }}
                 type="text"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 maxLength={1}
                 value={digit}
                 onChange={(e) => handleCodeChange(i, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(i, e)}
-                className={`h-12 w-12 rounded-xl border text-center text-lg font-bold outline-none transition-all backdrop-blur-sm ${
+                className={`h-13 w-12 sm:h-14 sm:w-13 rounded-xl border-2 text-center text-xl font-bold outline-none transition-all ${
                   digit
-                    ? "border-indigo-300 bg-indigo-50/80 text-indigo-700"
-                    : "border-gray-200/60 bg-white/60"
-                } focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100`}
+                    ? "border-indigo-400 bg-indigo-50 text-indigo-700"
+                    : "border-gray-200 bg-white"
+                } focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100`}
               />
             ))}
           </div>
@@ -269,13 +265,13 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
               <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
             </div>
           )}
-          <div className="mt-5 flex items-center justify-between">
+          <div className="mt-6 flex items-center justify-between">
             <button
               onClick={() => {
                 setStep("email");
                 setCode(["", "", "", "", "", ""]);
               }}
-              className="text-xs text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-500 hover:text-gray-700 py-2"
             >
               &larr; Changer d&apos;email
             </button>
@@ -285,7 +281,7 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
                   preventDefault: () => {},
                 } as React.FormEvent)
               }
-              className="text-xs text-indigo-600 font-medium hover:underline"
+              className="text-sm text-indigo-600 font-medium hover:underline py-2"
             >
               Renvoyer le code
             </button>

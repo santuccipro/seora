@@ -104,6 +104,72 @@ Minimum 3 points forts et 3 axes d'amélioration. Sois spécifique avec des exem
   return JSON.parse(text);
 }
 
+// ===== STRUCTURE CV (for editor) =====
+
+export async function structureCV(cvText: string) {
+  const text = await generateJSON(`Tu es un expert RH français. Extrais et AMÉLIORE le contenu de ce CV en JSON structuré.
+
+CV:
+${cvText}
+
+Réponds avec un JSON au format:
+{
+  "header": {
+    "firstName": "<prénom>",
+    "lastName": "<nom>",
+    "title": "<titre professionnel optimisé, ex: 'Chef de Projet Marketing Digital'>",
+    "email": "<email>",
+    "phone": "<téléphone>",
+    "location": "<ville>",
+    "linkedin": "<url linkedin si présent, sinon null>",
+    "website": "<url site si présent, sinon null>"
+  },
+  "summary": "<accroche professionnelle de 2-3 phrases, percutante et optimisée ATS. Si absente du CV original, CRÉE-EN une pertinente.>",
+  "experiences": [
+    {
+      "id": "<id unique ex: exp_1>",
+      "company": "<entreprise>",
+      "position": "<poste amélioré avec titre plus impactant>",
+      "startDate": "<date début>",
+      "endDate": "<date fin ou Présent>",
+      "location": "<lieu si disponible>",
+      "bullets": ["<bullet point amélioré avec verbe d'action + résultat chiffré>", ...]
+    }
+  ],
+  "education": [
+    {
+      "id": "<id unique ex: edu_1>",
+      "school": "<établissement>",
+      "degree": "<diplôme complet>",
+      "startDate": "<année début>",
+      "endDate": "<année fin>",
+      "description": "<mention, spécialisation, ou détail pertinent si disponible>"
+    }
+  ],
+  "skills": [
+    {
+      "category": "<catégorie ex: Marketing Digital, Outils, Développement>",
+      "items": ["<compétence 1>", "<compétence 2>", ...]
+    }
+  ],
+  "languages": [
+    { "name": "<langue>", "level": "<niveau: Natif, Courant, B2, etc.>" }
+  ],
+  "interests": ["<centre d'intérêt>", ...]
+}
+
+RÈGLES CRITIQUES:
+- AMÉLIORE chaque bullet point avec des verbes d'action forts (Piloté, Optimisé, Développé, Conçu...)
+- AJOUTE des chiffres/résultats quand c'est possible (ex: "+15% de trafic", "équipe de 5 personnes")
+- CRÉE un summary/accroche professionnel si absent
+- OPTIMISE les titres de poste pour les ATS
+- ORGANISE les compétences par catégories logiques
+- Garde TOUTES les informations du CV original, n'invente rien
+- Les IDs doivent être uniques (exp_1, exp_2, edu_1, etc.)`, 6000);
+
+  return JSON.parse(text);
+}
+
 // ===== CV CORRECTIONS =====
 
 export async function generateCorrections(cvText: string): Promise<CVCorrectionsResult> {

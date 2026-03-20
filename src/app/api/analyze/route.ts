@@ -63,7 +63,31 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(await file.arrayBuffer());
       let cvText: string;
 
-      if (file.type === "application/pdf") {
+      const isImage = file.type.startsWith("image/");
+
+      if (isImage) {
+        // Use Gemini Vision to OCR the image
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const base64 = buffer.toString("base64");
+        const ocrResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { inlineData: { mimeType: file.type, data: base64 } },
+                { text: "Extrais tout le texte de cette image de CV. Retourne uniquement le texte brut, sans commentaire ni mise en forme markdown." },
+              ],
+            },
+          ],
+          config: {
+            maxOutputTokens: 4000,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        });
+        cvText = ocrResponse.text ?? "";
+      } else if (file.type === "application/pdf") {
         // Parse PDF by spawning a Node subprocess (avoids Turbopack worker bundling issues)
         const { writeFileSync, unlinkSync, readFileSync } = await import("fs");
         const { execSync } = await import("child_process");
