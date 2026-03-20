@@ -38,8 +38,16 @@ interface Analysis {
   weaknesses: string[];
 }
 
+interface Correction {
+  section: string;
+  // API may return either naming convention
+  before?: string; after?: string; explanation?: string;
+  original?: string; suggestion?: string; reason?: string;
+  priority?: string;
+}
+
 interface Corrections {
-  corrections: { section: string; before: string; after: string; explanation: string }[];
+  corrections: Correction[];
   correctedCV: string;
   tips?: string[];
 }
@@ -619,14 +627,23 @@ export default function Home() {
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <div className="rounded-xl bg-red-50/80 border border-red-100/60 p-4">
                             <p className="text-[10px] font-bold text-red-500 mb-1.5 uppercase tracking-wider">Avant</p>
-                            <p className="text-sm text-red-900/80 leading-relaxed">{c.before}</p>
+                            <p className="text-sm text-red-900/80 leading-relaxed">{c.before || c.original || "—"}</p>
                           </div>
                           <div className="rounded-xl bg-emerald-50/80 border border-emerald-100/60 p-4">
                             <p className="text-[10px] font-bold text-emerald-500 mb-1.5 uppercase tracking-wider">Après</p>
-                            <p className="text-sm text-emerald-900/80 leading-relaxed">{c.after}</p>
+                            <p className="text-sm text-emerald-900/80 leading-relaxed">{c.after || c.suggestion || "—"}</p>
                           </div>
                         </div>
-                        <p className="mt-3 text-xs text-gray-500 leading-relaxed">{c.explanation}</p>
+                        <p className="mt-3 text-xs text-gray-500 leading-relaxed">{c.explanation || c.reason || ""}</p>
+                        {c.priority && (
+                          <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            c.priority === "haute" ? "bg-red-100 text-red-600" :
+                            c.priority === "moyenne" ? "bg-amber-100 text-amber-600" :
+                            "bg-gray-100 text-gray-500"
+                          }`}>
+                            Priorité {c.priority}
+                          </span>
+                        )}
                       </div>
                     ))}
 
