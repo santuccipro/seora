@@ -197,7 +197,7 @@ export default function CVEditorPage() {
     if (!cvRef.current) return;
     setExporting(true);
     try {
-      const html2canvasModule = await import("html2canvas");
+      const html2canvasModule = await import("html2canvas-pro");
       const html2canvas = html2canvasModule.default;
       const { jsPDF } = await import("jspdf");
 
