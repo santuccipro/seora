@@ -8,7 +8,6 @@ import Link from "next/link";
 import { useAuthModal } from "@/components/auth/auth-context";
 import { ResultPreviewPopup } from "@/components/landing/result-preview-popup";
 import { InlinePricing } from "@/components/landing/inline-pricing";
-import { TrustBadges } from "@/components/landing/trust-badges";
 import {
   Upload,
   Loader2,
@@ -30,6 +29,8 @@ import {
   Sparkles,
   Bot,
   Search,
+  Plus,
+  Camera,
 } from "lucide-react";
 
 
@@ -41,20 +42,8 @@ export default function Home() {
   const router = useRouter();
   const { openAuthModal } = useAuthModal();
   const [dragOver, setDragOver] = useState(false);
-  const [landingHumanizerText, setLandingHumanizerText] = useState("");
   const [landingCompany, setLandingCompany] = useState("");
   const [landingJob, setLandingJob] = useState("");
-  const [landingContractType, setLandingContractType] = useState("");
-  const [landingSector, setLandingSector] = useState("");
-  const [showSectorSuggestions, setShowSectorSuggestions] = useState(false);
-  const [sectorSuggestions, setSectorSuggestions] = useState<string[]>([]);
-  const [humInputMode, setHumInputMode] = useState<"text" | "file">("text");
-  const [humDragOver, setHumDragOver] = useState(false);
-  const [humFileName, setHumFileName] = useState("");
-  const humFileRef = useRef<HTMLInputElement>(null);
-  const [humTone, setHumTone] = useState("");
-  const [letterCvName, setLetterCvName] = useState("");
-  const letterCvRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [tokens, setTokens] = useState<number | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -62,10 +51,10 @@ export default function Home() {
   const [activeDemo, setActiveDemo] = useState(0);
   const [activeAudience, setActiveAudience] = useState(0);
   const [showResultPreview, setShowResultPreview] = useState(false);
-  const [resultPreviewType, setResultPreviewType] = useState<"cv" | "letter" | "humanizer">("cv");
+  const [resultPreviewType, setResultPreviewType] = useState<"cv" | "letter">("cv");
   const [showInlinePricing, setShowInlinePricing] = useState(false);
   const [autoCycleDemo, setAutoCycleDemo] = useState(true);
-  const [activeInteractive, setActiveInteractive] = useState<"cv" | "letter" | "humanizer">("cv");
+  const [activeInteractive, setActiveInteractive] = useState<"cv" | "create" | "letter" | "photo">("cv");
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
   const [liveCount, setLiveCount] = useState(847);
@@ -94,67 +83,12 @@ export default function Home() {
     }
   };
 
-  const sectors = [
-    "Tech & IT", "Finance & Banque", "Conseil & Audit", "Marketing & Communication",
-    "Industrie & Ingénierie", "Santé & Pharma", "Luxe & Mode", "Grande Distribution",
-    "Énergie & Environnement", "BTP & Immobilier", "Média & Divertissement",
-    "Transport & Logistique", "Droit & Juridique", "Ressources Humaines", "Éducation & Formation",
-    "Agroalimentaire", "Télécoms", "Assurance", "Startup & Innovation", "Fonction publique",
-  ];
 
-  const handleSectorInput = (value: string) => {
-    setLandingSector(value);
-    if (value.length > 0) {
-      const filtered = sectors.filter((s) =>
-        s.toLowerCase().includes(value.toLowerCase())
-      ).slice(0, 5);
-      setSectorSuggestions(filtered);
-      setShowSectorSuggestions(filtered.length > 0);
-    } else {
-      setShowSectorSuggestions(false);
-    }
-  };
 
-  const contractTypes = ["Stage", "Alternance", "CDI", "CDD", "Freelance", "VIE"];
-
-  const humTones = ["Naturel", "Académique", "Professionnel", "Décontracté"];
-
-  const handleHumFile = (file: File) => {
-    const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "image/jpeg", "image/png", "image/heic", "image/webp"];
-    if (!validTypes.includes(file.type) && !file.type.startsWith("image/") && !file.name.endsWith(".txt") && !file.name.endsWith(".docx") && !file.name.endsWith(".pdf") && !file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".heic") && !file.name.endsWith(".webp")) {
-      toast.error("Format accepté : PDF, DOCX, TXT ou Photo"); return;
-    }
-    setHumFileName(file.name);
-    const reader = new FileReader();
-    if (file.type === "text/plain" || file.name.endsWith(".txt")) {
-      reader.onload = (e) => { setLandingHumanizerText(e.target?.result as string || ""); setHumInputMode("text"); };
-      reader.readAsText(file);
-    } else {
-      reader.onload = (e) => {
-        sessionStorage.setItem("seora_humanizer_file", e.target?.result as string);
-        sessionStorage.setItem("seora_humanizer_filename", file.name);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleLetterCv = (file: File) => {
-    if (!file.type.includes("pdf") && !file.type.startsWith("image/") && !file.name.endsWith(".pdf") && !file.name.endsWith(".docx") && !file.name.endsWith(".jpg") && !file.name.endsWith(".jpeg") && !file.name.endsWith(".png") && !file.name.endsWith(".heic") && !file.name.endsWith(".webp")) {
-      toast.error("PDF, DOCX ou Photo uniquement"); return;
-    }
-    setLetterCvName(file.name);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      sessionStorage.setItem("seora_cl_cv_file", e.target?.result as string);
-      sessionStorage.setItem("seora_cl_cv_filename", file.name);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Auto-cycle demo tabs: Analyse CV (12s) → Lettre (14s) → Humanizer (10s)
+  // Auto-cycle demo tabs
   useEffect(() => {
     if (!autoCycleDemo) return;
-    const durations: Record<number, number> = { 0: 12000, 2: 14000, 3: 10000 };
+    const durations: Record<number, number> = { 0: 12000, 2: 10000, 3: 14000 };
     const order = [0, 2, 3];
     const currentDuration = durations[activeDemo] || 12000;
     const timer = setTimeout(() => {
@@ -222,10 +156,7 @@ export default function Home() {
                           { href: "/app", icon: BarChart3, label: "Analyse CV", desc: "Score sur 6 critères", color: "text-indigo-600 bg-indigo-50" },
                           { href: "/cover-letter", icon: PenTool, label: "Lettre de motivation", desc: "Adaptée à l'offre", color: "text-blue-600 bg-blue-50" },
                           { href: "/job-match", icon: Briefcase, label: "Job Matching", desc: "CV sur-mesure", color: "text-emerald-600 bg-emerald-50" },
-                          { href: "/humanize", icon: Bot, label: "Humanizer IA", desc: "Texte indétectable", color: "text-orange-600 bg-orange-50" },
-                          { href: "/plagiarism", icon: Search, label: "Détection plagiat", desc: "Vérifier l'originalité", color: "text-violet-600 bg-violet-50" },
-                          { href: "/reformulate", icon: FileText, label: "Reformulation", desc: "Réécriture intelligente", color: "text-cyan-600 bg-cyan-50" },
-                          { href: "/email-pro", icon: Mail, label: "Email pro", desc: "Emails professionnels", color: "text-rose-600 bg-rose-50" },
+                          { href: "/cv-editor", icon: Plus, label: "Créer ton CV", desc: "Templates pro", color: "text-purple-600 bg-purple-50" },
                           { href: "/compteur-mots", icon: Zap, label: "Compteur de mots", desc: "Outil rapide", color: "text-amber-600 bg-amber-50" },
                         ].map((tool) => (
                           <Link
@@ -258,7 +189,7 @@ export default function Home() {
                       {tokens !== null ? tokens : "..."} tokens
                     </div>
                     <Link href="/app" className="brand-gradient rounded-xl px-4 py-2 text-[13px] font-semibold text-white shadow-md shadow-indigo-500/25">
-                      Dashboard
+                      Mon compte
                     </Link>
                   </>
                 ) : (
@@ -302,7 +233,7 @@ export default function Home() {
                 onClick={() => document.getElementById('hero-upload')?.scrollIntoView({ behavior: 'smooth' })}
                 className="brand-gradient animate-cta-pulse flex items-center gap-2 rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform"
               >
-                Analyse ton CV maintenant
+                Commencer gratuitement
                 <ArrowRight className="h-4 w-4" />
               </button>
               <p className="text-xs text-gray-400">Résultat en 30 secondes.</p>
@@ -317,33 +248,56 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ═══ INTERACTIVE TABS — merged into hero ═══ */}
+          {/* ═══ INTERACTIVE FEATURE SELECTOR ═══ */}
           <div className="mx-auto max-w-4xl px-4 sm:px-6 mt-10 sm:mt-14">
-            {/* Tabs — pill style */}
-            <div id="hero-upload" className="flex items-center justify-center mb-6 sm:mb-8">
-              <div className="relative inline-flex items-center gap-0.5 sm:gap-1 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200/60 p-1 sm:p-1.5 shadow-sm w-full sm:w-auto">
-                {/* Floating glow aura */}
-                <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-indigo-400/20 via-purple-400/20 to-pink-400/20 blur-xl animate-pulse pointer-events-none" />
-                <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 blur-md pointer-events-none animate-float-slow" />
-                {[
-                  { key: "cv" as const, icon: BarChart3, label: "Analyse CV" },
-                  { key: "letter" as const, icon: PenTool, label: "Lettre de motivation" },
-                  { key: "humanizer" as const, icon: Bot, label: "Humanizer IA" },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveInteractive(tab.key)}
-                    className={`flex flex-1 sm:flex-none items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-sm font-semibold transition-all duration-200 ${
-                      activeInteractive === tab.key
-                        ? "brand-gradient text-white shadow-lg shadow-indigo-500/20"
-                        : "text-gray-500 hover:text-gray-700 hover:bg-white/60"
-                    }`}
-                  >
-                    <tab.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                    <span className="truncate">{tab.label}</span>
-                  </button>
-                ))}
-              </div>
+            {/* Section label */}
+            <div id="hero-upload" className="text-center mb-5 sm:mb-7">
+              <p className="text-xs sm:text-sm font-semibold uppercase tracking-widest text-indigo-500 mb-1">Que veux-tu faire ?</p>
+              <p className="text-[11px] sm:text-xs text-gray-400">Choisis un outil pour commencer</p>
+            </div>
+
+            {/* Feature cards grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5 sm:mb-6">
+              {[
+                { key: "cv" as const, icon: BarChart3, label: "Analyser", desc: "mon CV", color: "from-indigo-500 to-purple-600", ring: "ring-indigo-500/30", badge: "1 token" },
+                { key: "create" as const, icon: Plus, label: "Créer", desc: "mon CV", color: "from-emerald-400 to-teal-500", ring: "ring-emerald-500/30", badge: "2 tokens" },
+                { key: "letter" as const, icon: PenTool, label: "Lettre", desc: "de motivation", color: "from-blue-500 to-indigo-600", ring: "ring-blue-500/30", badge: "3 tokens" },
+                { key: "photo" as const, icon: Camera, label: "Photo", desc: "Pro IA", color: "from-pink-400 to-rose-500", ring: "ring-pink-500/30", badge: "Bientôt" },
+              ].map((card) => (
+                <button
+                  key={card.key}
+                  onClick={() => setActiveInteractive(card.key)}
+                  className={`relative group flex flex-col items-center rounded-2xl p-3 sm:p-4 transition-all duration-300 cursor-pointer ${
+                    activeInteractive === card.key
+                      ? `bg-white shadow-xl shadow-gray-900/10 ring-2 ${card.ring} scale-[1.03]`
+                      : "bg-white/50 hover:bg-white/80 hover:shadow-md border border-transparent hover:border-gray-200/60"
+                  }`}
+                >
+                  {/* Active indicator dot */}
+                  {activeInteractive === card.key && (
+                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 h-1.5 w-8 rounded-full bg-gradient-to-r ${card.color}" style={{background: `linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-to))`}}>
+                      <div className={`h-1.5 w-8 rounded-full bg-gradient-to-r ${card.color}`} />
+                    </div>
+                  )}
+                  <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-2 sm:mb-3 shadow-sm transition-transform duration-300 ${
+                    activeInteractive === card.key ? "scale-110 shadow-md" : "group-hover:scale-105"
+                  }`}>
+                    <card.icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                  </div>
+                  <p className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">{card.label}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-400 leading-tight">{card.desc}</p>
+                  <span className={`mt-1.5 sm:mt-2 rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold ${
+                    activeInteractive === card.key
+                      ? "bg-gradient-to-r " + card.color + " text-white"
+                      : "bg-gray-100 text-gray-500"
+                  }`}>{card.badge}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Arrow indicator */}
+            <div className="flex justify-center mb-3">
+              <ChevronDown className="h-4 w-4 text-gray-300 animate-bounce" />
             </div>
 
             {/* Content card */}
@@ -396,9 +350,56 @@ export default function Home() {
                     </div>
                     <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
                     <p className="text-xs sm:text-sm text-gray-400 mb-5 sm:mb-8">PDF, DOCX ou Photo • Analyse instantanée</p>
-                    <div className="px-6 sm:px-8 py-3 rounded-xl brand-gradient text-white text-sm font-semibold shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 transition-all">
+                    <div className="px-6 sm:px-8 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-semibold shadow-md shadow-orange-500/25 hover:shadow-lg hover:shadow-orange-500/40 transition-all">
                       Parcourir mes fichiers
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Create CV Tab */}
+              {activeInteractive === "create" && (
+                <div className="p-3 sm:p-10 md:p-14">
+                  <div className="border-2 border-dashed rounded-2xl py-10 sm:py-20 md:py-24 px-4 sm:px-6 flex flex-col items-center justify-center border-gray-200 hover:border-emerald-400 hover:bg-emerald-50/30 transition-all cursor-pointer"
+                    onClick={() => {
+                      if (session) { router.push("/cv-editor"); } else { openAuthModal(); }
+                    }}
+                  >
+                    <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center mb-4 sm:mb-5 shadow-lg shadow-emerald-500/20">
+                      <Plus className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                    </div>
+                    <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1">Pas encore de CV ?</p>
+                    <p className="text-xs sm:text-sm text-gray-400 mb-2">Crée-le en quelques minutes avec notre wizard guidé</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 mb-5 sm:mb-8">
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700">6 templates pro</span>
+                      <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">Export PDF</span>
+                      <span className="rounded-full bg-purple-100 px-3 py-1 text-[11px] font-semibold text-purple-700">Guidé étape par étape</span>
+                    </div>
+                    <div className="px-6 sm:px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-semibold shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-500/40 transition-all">
+                      Créer mon CV
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Photo Pro Tab */}
+              {activeInteractive === "photo" && (
+                <div className="p-3 sm:p-10 md:p-14">
+                  <div className="border-2 border-dashed rounded-2xl py-10 sm:py-20 md:py-24 px-4 sm:px-6 flex flex-col items-center justify-center border-gray-200 transition-all">
+                    <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-2xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center mb-4 sm:mb-5 shadow-lg shadow-pink-500/20">
+                      <Camera className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                    </div>
+                    <p className="text-lg sm:text-xl font-bold text-gray-900 mb-1">Photo Pro par IA</p>
+                    <p className="text-xs sm:text-sm text-gray-400 mb-2 text-center max-w-md">Envoie un simple selfie et notre IA le transforme en photo professionnelle pour ton CV</p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 mb-5 sm:mb-8">
+                      <span className="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-semibold text-pink-700">Fond neutre pro</span>
+                      <span className="rounded-full bg-violet-100 px-3 py-1 text-[11px] font-semibold text-violet-700">Retouche IA</span>
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-700">HD portrait</span>
+                    </div>
+                    <div className="px-6 sm:px-8 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-semibold shadow-md shadow-pink-500/25 opacity-60 cursor-not-allowed">
+                      Bientôt disponible
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-3">Disponible très prochainement</p>
                   </div>
                 </div>
               )}
@@ -459,8 +460,6 @@ export default function Home() {
                         if (!landingCompany.trim() || !landingJob.trim()) { toast.error("Remplis au moins l'entreprise et l'offre"); return; }
                         sessionStorage.setItem("seora_cl_company", landingCompany);
                         sessionStorage.setItem("seora_cl_job", landingJob);
-                        if (landingContractType) sessionStorage.setItem("seora_cl_contract", landingContractType);
-                        if (landingSector) sessionStorage.setItem("seora_cl_sector", landingSector);
                         if (session) { router.push("/cover-letter"); } else { setResultPreviewType("letter"); setShowResultPreview(true); }
                       }}
                       className="w-full flex items-center justify-center gap-2.5 rounded-xl brand-gradient px-6 py-4 text-base font-bold text-white shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-[1.005] transition-all"
@@ -471,123 +470,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Humanizer Tab */}
-              {activeInteractive === "humanizer" && (
-                <div className="p-4 sm:p-8 md:p-12">
-                  <div className="space-y-6">
-                    {/* Input mode toggle */}
-                    <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1 w-fit">
-                      <button
-                        onClick={() => setHumInputMode("text")}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${humInputMode === "text" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                      >
-                        ✏️ Coller du texte
-                      </button>
-                      <button
-                        onClick={() => setHumInputMode("file")}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${humInputMode === "file" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                      >
-                        📄 Choisir un fichier
-                      </button>
-                    </div>
-
-                    {/* Text mode */}
-                    {humInputMode === "text" && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">📝 Texte à humaniser</label>
-                        <textarea
-                          value={landingHumanizerText}
-                          onChange={(e) => setLandingHumanizerText(e.target.value)}
-                          placeholder="Commencez à taper ou collez votre texte IA (ChatGPT, Gemini, Claude...)"
-                          rows={10}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-5 py-4 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 resize-none transition-all"
-                        />
-                        <div className="flex items-center justify-between mt-1.5 px-1">
-                          <p className="text-xs text-gray-400">Minimum 50 caractères requis</p>
-                          <p className={`text-xs font-medium ${landingHumanizerText.length >= 50 ? "text-emerald-500" : "text-gray-400"}`}>
-                            {landingHumanizerText.length} caractère{landingHumanizerText.length !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* File mode */}
-                    {humInputMode === "file" && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">📎 Choisir un fichier ou une photo</label>
-                        <div
-                          onDragOver={(e) => { e.preventDefault(); setHumDragOver(true); }}
-                          onDragLeave={() => setHumDragOver(false)}
-                          onDrop={(e) => { e.preventDefault(); setHumDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleHumFile(f); }}
-                          onClick={() => humFileRef.current?.click()}
-                          className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-16 cursor-pointer transition-all ${
-                            humDragOver ? "border-orange-400 bg-orange-50" : humFileName ? "border-emerald-300 bg-emerald-50" : "border-gray-300 bg-gray-50 hover:border-orange-300 hover:bg-orange-50/50"
-                          }`}
-                        >
-                          <input
-                            ref={humFileRef}
-                            type="file"
-                            accept=".pdf,.docx,.txt,image/*"
-                            className="hidden"
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleHumFile(f); }}
-                          />
-                          {humFileName ? (
-                            <>
-                              <div className="h-12 w-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-3">
-                                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
-                              </div>
-                              <p className="text-sm font-semibold text-emerald-700">{humFileName}</p>
-                              <p className="text-xs text-emerald-500 mt-1">Fichier importé • Cliquez pour changer</p>
-                            </>
-                          ) : (
-                            <>
-                              <div className="h-12 w-12 rounded-xl bg-orange-100 flex items-center justify-center mb-3">
-                                <Upload className="h-6 w-6 text-orange-600" />
-                              </div>
-                              <p className="text-sm font-semibold text-gray-700">Glissez votre fichier ici</p>
-                              <p className="text-xs text-gray-400 mt-1">PDF, DOCX, TXT ou Photo • 10 Mo max</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tone selection */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-3">🎨 Style d&apos;écriture souhaité</label>
-                      <div className="flex flex-wrap gap-2.5">
-                        {humTones.map((tone) => (
-                          <button
-                            key={tone}
-                            onClick={() => setHumTone(humTone === tone ? "" : tone)}
-                            className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all border ${
-                              humTone === tone
-                                ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
-                                : "bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:bg-orange-50"
-                            }`}
-                          >
-                            {tone}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Submit */}
-                    <button
-                      onClick={() => {
-                        if (humInputMode === "text" && landingHumanizerText.length < 50) { toast.error("Minimum 50 caractères"); return; }
-                        if (humInputMode === "file" && !humFileName) { toast.error("Importe un fichier"); return; }
-                        if (humInputMode === "text") sessionStorage.setItem("seora_humanizer_text", landingHumanizerText);
-                        if (humTone) sessionStorage.setItem("seora_humanizer_tone", humTone);
-                        if (session) { router.push("/humanize"); } else { setResultPreviewType("humanizer"); setShowResultPreview(true); }
-                      }}
-                      className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 text-base font-bold text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.005] transition-all"
-                    >
-                      <Bot className="h-5 w-5" /> Humaniser mon texte
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* School logos — moved here from trust bar */}
@@ -1445,7 +1327,7 @@ export default function Home() {
                   {[
                     { label: "Analyse CV", href: "/app" },
                     { label: "Lettre de motivation", href: "/cover-letter" },
-                    { label: "Humanizer IA", href: "/humanize" },
+                    { label: "Créer ton CV", href: "/cv-editor" },
                     { label: "Job Matching", href: "/job-match" },
                   ].map((link) => (
                     <li key={link.label}>
@@ -1460,9 +1342,7 @@ export default function Home() {
                 <h4 className="text-[13px] font-semibold text-white uppercase tracking-wider mb-4">Plus</h4>
                 <ul className="space-y-3">
                   {[
-                    { label: "Email pro", href: "/email-pro" },
-                    { label: "Reformulation", href: "/reformulate" },
-                    { label: "Détection plagiat", href: "/plagiarism" },
+                    { label: "Compteur de mots", href: "/compteur-mots" },
                     { label: "Parrainage", href: "/referral" },
                   ].map((link) => (
                     <li key={link.label}>
@@ -1521,12 +1401,12 @@ export default function Home() {
         onUnlock={() => {
           setShowResultPreview(false);
           if (session) {
-            const routes = { cv: "/app", letter: "/cover-letter", humanizer: "/humanize" };
+            const routes = { cv: "/app", letter: "/cover-letter" };
             router.push(routes[resultPreviewType]);
           } else {
             setShowInlinePricing(true);
             openAuthModal(() => {
-              const routes = { cv: "/app", letter: "/cover-letter", humanizer: "/humanize" };
+              const routes = { cv: "/app", letter: "/cover-letter" };
               window.location.href = routes[resultPreviewType];
             });
           }

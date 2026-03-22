@@ -10,6 +10,14 @@
   --color-danger: #DC2626;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -441,9 +449,23 @@ body {
   background: #9CA3AF;
 }
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* ═══════════════════════════════════════ */
 /*        FOCUS                           */
 /* ═══════════════════════════════════════ */
+:focus-visible {
+  outline: 2px solid #4F46E5;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: #4F46E5;
@@ -674,3 +696,35 @@ button, a, input, textarea {
 .tl-h-step1 { animation: tl-h1 10s infinite; }
 .tl-h-step2 { animation: tl-h2 10s infinite; }
 .tl-h-step3 { animation: tl-h3 10s infinite; }
+
+/* ─── Photo crop zoom slider — larger thumb for mobile ─── */
+input[type="range"].accent-indigo-500::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #6366f1;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+input[type="range"].accent-indigo-500::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #6366f1;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+input[type="range"].accent-indigo-500::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: #e0e7ff;
+}
+input[type="range"].accent-indigo-500::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: #e0e7ff;
+}

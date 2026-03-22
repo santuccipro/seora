@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,6 +8,15 @@ export async function POST(req: NextRequest) {
 
     if (!email || !code) {
       return NextResponse.json({ error: "Email et code requis" }, { status: 400 });
+    }
+
+    // Rate limit verification attempts to prevent brute-force
+    const { success: rateLimitOk } = rateLimit(`verify-code:${email}`, 10, 600_000);
+    if (!rateLimitOk) {
+      return NextResponse.json(
+        { error: "Trop de tentatives. Réessayez dans 10 minutes." },
+        { status: 429 }
+      );
     }
 
     // Find the verification token

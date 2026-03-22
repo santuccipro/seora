@@ -155,7 +155,8 @@ Réponds avec un JSON au format:
   "languages": [
     { "name": "<langue>", "level": "<niveau: Natif, Courant, B2, etc.>" }
   ],
-  "interests": ["<centre d'intérêt>", ...]
+  "interests": ["<centre d'intérêt>", ...],
+  "detectedTheme": "<secteur détecté: banque/finance, tech/IT, design/créatif, médical/santé, admin/juridique, startup/digital, hôtellerie/tourisme, commerce, etc. Basé sur les expériences et compétences du candidat>"
 }
 
 RÈGLES CRITIQUES:

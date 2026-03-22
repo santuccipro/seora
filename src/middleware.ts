@@ -21,12 +21,7 @@ export const config = {
     "/referral/:path*",
     "/analyse/:path*",
     "/job-match/:path*",
-    "/lettre/:path*",
     "/cover-letter/:path*",
-    "/humanize/:path*",
-    "/plagiarism/:path*",
-    "/reformulate/:path*",
-    "/email-pro/:path*",
     "/cv-editor/:path*",
   ],
 };

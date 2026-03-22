@@ -109,7 +109,7 @@ export default function JobMatchPage() {
               </label>
               {analyses.length === 0 ? (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
-                  Vous devez d&apos;abord analyser un CV depuis le Dashboard avant de pouvoir le matcher.
+                  Vous devez d&apos;abord analyser un CV depuis votre espace avant de pouvoir le matcher.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -146,21 +146,22 @@ export default function JobMatchPage() {
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 placeholder="Titre du poste (ex: Développeur React Senior)"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm mb-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base mb-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
               />
               <textarea
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
                 placeholder="Collez ici le texte complet de l'offre d'emploi..."
                 rows={10}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
               />
+              <p className="mt-1.5 text-[11px] text-gray-400">{jobDescription.length} caractères</p>
             </div>
 
             <button
               onClick={handleMatch}
               disabled={loading || !selectedCV || !jobDescription.trim()}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-6 py-4 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 active:scale-[0.98]"
             >
               {loading ? (
                 <>

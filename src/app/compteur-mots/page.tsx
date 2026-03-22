@@ -343,12 +343,12 @@ export default function CompteurMots() {
             <button
               onClick={() =>
                 openAuthModal(() => {
-                  window.location.href = "/humanize";
+                  window.location.href = "/cover-letter";
                 })
               }
               className="flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
             >
-              Humaniser un texte <ArrowRight className="h-4 w-4" />
+              Lettre de motivation <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>

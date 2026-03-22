@@ -43,23 +43,15 @@ export function Navbar() {
                 href="/app"
                 className="rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all"
               >
-                Mon espace
+                Mon compte
               </Link>
             ) : (
-              <>
-                <button
-                  onClick={() => signIn()}
-                  className="rounded-full px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-indigo-600 transition-colors"
-                >
-                  Connexion
-                </button>
-                <button
-                  onClick={() => signIn()}
-                  className="rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all"
-                >
-                  Analyser mon CV
-                </button>
-              </>
+              <button
+                onClick={() => signIn()}
+                className="rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all"
+              >
+                Se connecter
+              </button>
             )}
           </div>
 
@@ -77,12 +69,21 @@ export function Navbar() {
             <a href="#fonctionnalites" className="block text-sm text-gray-600 py-2">Fonctionnalités</a>
             <a href="#tarifs" className="block text-sm text-gray-600 py-2">Tarifs</a>
             <a href="#faq" className="block text-sm text-gray-600 py-2">FAQ</a>
-            <button
-              onClick={() => signIn()}
-              className="w-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 px-5 py-2.5 text-sm font-medium text-white"
-            >
-              Analyser mon CV
-            </button>
+            {session ? (
+              <Link
+                href="/app"
+                className="block w-full text-center rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 px-5 py-2.5 text-sm font-medium text-white"
+              >
+                Mon compte
+              </Link>
+            ) : (
+              <button
+                onClick={() => signIn()}
+                className="w-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 px-5 py-2.5 text-sm font-medium text-white"
+              >
+                Se connecter
+              </button>
+            )}
           </div>
         )}
       </div>

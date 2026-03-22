@@ -4,20 +4,21 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import type { StructuredCV } from "@/lib/cv-types";
+import { motion, AnimatePresence } from "framer-motion";
+import type { StructuredCV, CVTheme, CVThemeId } from "@/lib/cv-types";
+import { CV_THEMES, getThemeForSector } from "@/lib/cv-types";
 import {
   Download,
   ArrowLeft,
+  ArrowRight,
   Loader2,
   Plus,
   X,
   Camera,
-  Palette,
   Mail,
   Phone,
   MapPin,
   Linkedin,
-  Globe,
   Briefcase,
   GraduationCap,
   Wrench,
@@ -25,37 +26,51 @@ import {
   Heart,
   User,
   Sparkles,
+  ChevronDown,
+  Trash2,
+  Palette,
+  Check,
+  Eye,
 } from "lucide-react";
+import ProgressBar from "@/components/cv-wizard/progress-bar";
+import {
+  StepContact,
+  StepProfile,
+  StepSkills,
+  StepExperiences,
+  StepEducation,
+  StepLanguagesInterests,
+  StepStyle,
+  type CustomColors,
+} from "@/components/cv-wizard/steps";
 
-const ACCENT_COLORS = [
-  { name: "Indigo", value: "#4F46E5", bg: "#EEF2FF", light: "#E0E7FF" },
-  { name: "Emerald", value: "#059669", bg: "#ECFDF5", light: "#D1FAE5" },
-  { name: "Rose", value: "#E11D48", bg: "#FFF1F2", light: "#FFE4E6" },
-  { name: "Slate", value: "#334155", bg: "#F8FAFC", light: "#F1F5F9" },
-  { name: "Amber", value: "#D97706", bg: "#FFFBEB", light: "#FEF3C7" },
-];
+const TOTAL_STEPS = 7;
 
-/* ─── Editable Text Component ─── */
-function EditableText({
+/* ─── Inline Editable Field (for preview/edit mode) ─── */
+function EditField({
   value,
   onChange,
   className = "",
   multiline = false,
-  placeholder = "Cliquer pour modifier...",
-  style,
+  placeholder = "Modifier...",
 }: {
   value: string;
   onChange: (v: string) => void;
   className?: string;
   multiline?: boolean;
   placeholder?: string;
-  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [editing, setEditing] = useState(false);
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    if (ref.current && !active) {
+      ref.current.innerText = value || placeholder;
+    }
+  }, [value, placeholder, active]);
 
   const handleBlur = () => {
-    setEditing(false);
+    setActive(false);
     const text = ref.current?.innerText || "";
     if (text !== value) onChange(text);
   };
@@ -65,7 +80,7 @@ function EditableText({
       ref={ref}
       contentEditable
       suppressContentEditableWarning
-      onFocus={() => setEditing(true)}
+      onFocus={() => setActive(true)}
       onBlur={handleBlur}
       onKeyDown={(e) => {
         if (e.key === "Enter" && !multiline) {
@@ -73,18 +88,851 @@ function EditableText({
           ref.current?.blur();
         }
       }}
-      style={style}
-      className={`outline-none transition-all rounded px-0.5 -mx-0.5 ${
-        editing
-          ? "ring-2 ring-blue-300 bg-blue-50/50"
-          : "hover:bg-gray-100/60 cursor-text"
+      className={`outline-none transition-all rounded-lg ${
+        active
+          ? "ring-2 ring-indigo-300 bg-indigo-50/50 px-2 py-1 -mx-2"
+          : "hover:bg-gray-100/60 cursor-text px-0 py-0"
       } ${!value ? "text-gray-400 italic" : ""} ${className}`}
-      dangerouslySetInnerHTML={{ __html: value || placeholder }}
     />
   );
 }
 
-/* ─── Main Editor Page ─── */
+/* ─── Section Card (preview editor) ─── */
+function SectionCard({
+  icon: Icon,
+  title,
+  accent,
+  children,
+  defaultOpen = true,
+}: {
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  title: string;
+  accent: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-5 py-4 text-left"
+      >
+        <div
+          className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
+          style={{ backgroundColor: accent + "18" }}
+        >
+          <Icon className="h-4 w-4" style={{ color: accent }} />
+        </div>
+        <span className="text-sm font-semibold text-gray-900 flex-1">{title}</span>
+        <ChevronDown
+          className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && <div className="px-5 pb-5 pt-0">{children}</div>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════ */
+/*        PDF TEMPLATE RENDERER (hidden A4)       */
+/* ═══════════════════════════════════════════════ */
+function PDFTemplate({
+  cv,
+  theme,
+  innerRef,
+}: {
+  cv: StructuredCV;
+  theme: CVTheme;
+  innerRef: React.Ref<HTMLDivElement>;
+}) {
+  const t = theme;
+  const isRight = t.sidebarPosition === "right";
+
+  const sectionHeading = (label: string) => (
+    <div
+      style={{
+        fontSize: "11px",
+        fontWeight: 700,
+        textTransform: "uppercase" as const,
+        letterSpacing: "0.1em",
+        color: t.headingColor,
+        marginBottom: "10px",
+        paddingBottom: t.sectionDivider === "line" ? "5px" : t.sectionDivider === "thick" ? "6px" : "4px",
+        borderBottom:
+          t.sectionDivider === "line"
+            ? `1px solid ${t.borderColor}`
+            : t.sectionDivider === "thick"
+            ? `3px solid ${t.accentColor}`
+            : t.sectionDivider === "dots"
+            ? `2px dotted ${t.accentColor}`
+            : "none",
+      }}
+    >
+      {label}
+    </div>
+  );
+
+  const sidebarHeading = (label: string) => (
+    <div
+      style={{
+        fontSize: "10px",
+        fontWeight: 700,
+        textTransform: "uppercase" as const,
+        letterSpacing: "0.12em",
+        marginBottom: "10px",
+        color: t.sidebarAccent,
+      }}
+    >
+      {label}
+    </div>
+  );
+
+  const tagBorderRadius =
+    t.tagStyle === "pill" ? "999px" : t.tagStyle === "rounded" ? "6px" : "3px";
+
+  /* ── SIDEBAR ── */
+  const sidebar = (
+    <div
+      style={{
+        width: "250px",
+        flexShrink: 0,
+        backgroundColor: t.sidebarBg,
+        color: t.sidebarText,
+        padding: "36px 22px 30px",
+        display: "flex",
+        flexDirection: "column" as const,
+        gap: "20px",
+      }}
+    >
+      {/* Photo / Initials */}
+      <div style={{ textAlign: "center" as const, marginBottom: "2px" }}>
+        {cv.header.photoUrl ? (
+          <img
+            src={cv.header.photoUrl}
+            alt=""
+            style={{
+              width: "90px",
+              height: "90px",
+              borderRadius: "50%",
+              objectFit: "cover" as const,
+              border: `3px solid ${t.sidebarAccent}`,
+              margin: "0 auto",
+              display: "block",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "90px",
+              height: "90px",
+              borderRadius: "50%",
+              backgroundColor: t.sidebarTagBg,
+              margin: "0 auto",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "28px",
+              fontWeight: 700,
+              color: t.sidebarAccent,
+              border: `2px solid ${t.sidebarAccent}`,
+            }}
+          >
+            {cv.header.firstName?.[0]}
+            {cv.header.lastName?.[0]}
+          </div>
+        )}
+      </div>
+
+      {/* Contact */}
+      <div>
+        {sidebarHeading("Contact")}
+        <div style={{ display: "flex", flexDirection: "column" as const, gap: "7px" }}>
+          {cv.header.email && (
+            <div style={{ fontSize: "9px", display: "flex", alignItems: "center", gap: "7px", opacity: 0.9 }}>
+              <span style={{ color: t.sidebarAccent, fontSize: "10px", width: "14px", textAlign: "center" as const }}>✉</span>
+              {cv.header.email}
+            </div>
+          )}
+          {cv.header.phone && (
+            <div style={{ fontSize: "9px", display: "flex", alignItems: "center", gap: "7px", opacity: 0.9 }}>
+              <span style={{ color: t.sidebarAccent, fontSize: "10px", width: "14px", textAlign: "center" as const }}>☎</span>
+              {cv.header.phone}
+            </div>
+          )}
+          {cv.header.location && (
+            <div style={{ fontSize: "9px", display: "flex", alignItems: "center", gap: "7px", opacity: 0.9 }}>
+              <span style={{ color: t.sidebarAccent, fontSize: "10px", width: "14px", textAlign: "center" as const }}>◉</span>
+              {cv.header.location}
+            </div>
+          )}
+          {cv.header.linkedin && (
+            <div style={{ fontSize: "9px", display: "flex", alignItems: "center", gap: "7px", opacity: 0.9 }}>
+              <span style={{ color: t.sidebarAccent, fontSize: "10px", width: "14px", textAlign: "center" as const, fontWeight: 700 }}>in</span>
+              {cv.header.linkedin}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Skills */}
+      {cv.skills.length > 0 && (
+        <div>
+          {sidebarHeading("Compétences")}
+          {cv.skills.map((cat, ci) => (
+            <div key={ci} style={{ marginBottom: "10px" }}>
+              <div style={{ fontSize: "9px", fontWeight: 600, marginBottom: "5px", opacity: 0.8 }}>
+                {cat.category}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "3px" }}>
+                {cat.items.map((item, ii) => (
+                  <span
+                    key={ii}
+                    style={{
+                      fontSize: "8px",
+                      fontWeight: 500,
+                      backgroundColor: t.sidebarTagBg,
+                      borderRadius: tagBorderRadius,
+                      padding: "3px 7px",
+                      color: t.sidebarText,
+                    }}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Languages */}
+      {cv.languages.length > 0 && (
+        <div>
+          {sidebarHeading("Langues")}
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: "5px" }}>
+            {cv.languages.map((lang, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "9px", opacity: 0.9 }}>{lang.name}</span>
+                <span
+                  style={{
+                    fontSize: "7.5px",
+                    fontWeight: 600,
+                    backgroundColor: t.sidebarTagBg,
+                    borderRadius: tagBorderRadius,
+                    padding: "2px 7px",
+                    textTransform: "uppercase" as const,
+                    letterSpacing: "0.03em",
+                    color: t.sidebarAccent,
+                  }}
+                >
+                  {lang.level}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Interests */}
+      {cv.interests && cv.interests.length > 0 && (
+        <div>
+          {sidebarHeading("Intérêts")}
+          <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "3px" }}>
+            {cv.interests.map((interest, i) => (
+              <span
+                key={i}
+                style={{
+                  fontSize: "8px",
+                  backgroundColor: t.sidebarTagBg,
+                  borderRadius: tagBorderRadius,
+                  padding: "3px 7px",
+                  color: t.sidebarText,
+                  opacity: 0.85,
+                }}
+              >
+                {interest}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  /* ── MAIN CONTENT ── */
+  const mainContent = (
+    <div style={{ flex: 1, padding: "36px 30px 30px", backgroundColor: t.mainBg, overflow: "hidden" }}>
+      {/* Name */}
+      <div style={{ marginBottom: "6px" }}>
+        {t.nameStyle === "stacked" ? (
+          <>
+            <div style={{ fontSize: "26px", fontWeight: 800, color: t.mainText, lineHeight: 1.1 }}>
+              {cv.header.firstName}
+            </div>
+            <div style={{ fontSize: "26px", fontWeight: 800, color: t.accentColor, lineHeight: 1.1 }}>
+              {cv.header.lastName}
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1.1 }}>
+            <span style={{ color: t.mainText }}>{cv.header.firstName} </span>
+            <span style={{ color: t.accentColor }}>{cv.header.lastName}</span>
+          </div>
+        )}
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 500,
+            color: t.subTextColor,
+            marginTop: "5px",
+            textTransform: "uppercase" as const,
+            letterSpacing: "0.06em",
+          }}
+        >
+          {cv.header.title}
+        </div>
+      </div>
+
+      {/* Separator */}
+      <div
+        style={{
+          height: t.sectionDivider === "thick" ? "3px" : "2px",
+          background: `linear-gradient(90deg, ${t.accentColor}, transparent)`,
+          marginBottom: "16px",
+          borderRadius: "2px",
+        }}
+      />
+
+      {/* Summary */}
+      {cv.summary && (
+        <div style={{ marginBottom: "16px" }}>
+          {sectionHeading("Profil")}
+          <div style={{ fontSize: "9.5px", color: t.subTextColor, lineHeight: 1.65 }}>{cv.summary}</div>
+        </div>
+      )}
+
+      {/* Experiences */}
+      {cv.experiences.length > 0 && (
+        <div style={{ marginBottom: "14px" }}>
+          {sectionHeading("Expériences Professionnelles")}
+          {cv.experiences.map((exp, i) => (
+            <div
+              key={exp.id}
+              style={{
+                marginBottom: "12px",
+                paddingLeft: t.borderLeftStyle ? "11px" : "0",
+                borderLeft: t.borderLeftStyle
+                  ? `2px solid ${i === 0 ? t.accentColor : t.borderColor}`
+                  : "none",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ fontSize: "10.5px", fontWeight: 700, color: t.mainText }}>{exp.position}</div>
+                <div style={{ fontSize: "8.5px", color: t.subTextColor, whiteSpace: "nowrap" as const, marginLeft: "8px" }}>
+                  {exp.startDate} – {exp.endDate}
+                </div>
+              </div>
+              <div style={{ fontSize: "9px", fontWeight: 600, color: t.accentColor, marginTop: "1px" }}>
+                {exp.company}
+                {exp.location ? ` — ${exp.location}` : ""}
+              </div>
+              <ul style={{ margin: "4px 0 0 0", padding: 0, listStyle: "none" }}>
+                {exp.bullets.map((b, bi) => (
+                  <li
+                    key={bi}
+                    style={{
+                      fontSize: "9px",
+                      color: t.subTextColor,
+                      lineHeight: 1.55,
+                      paddingLeft: "10px",
+                      position: "relative" as const,
+                      marginBottom: "2px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute" as const,
+                        left: 0,
+                        color: t.bulletColor,
+                        fontSize: "5px",
+                        top: "4px",
+                      }}
+                    >
+                      ●
+                    </span>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Education */}
+      {cv.education.length > 0 && (
+        <div>
+          {sectionHeading("Formation")}
+          {cv.education.map((edu, i) => (
+            <div
+              key={edu.id}
+              style={{
+                marginBottom: "10px",
+                paddingLeft: t.borderLeftStyle ? "11px" : "0",
+                borderLeft: t.borderLeftStyle
+                  ? `2px solid ${i === 0 ? t.accentColor : t.borderColor}`
+                  : "none",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ fontSize: "10.5px", fontWeight: 700, color: t.mainText }}>{edu.degree}</div>
+                <div style={{ fontSize: "8.5px", color: t.subTextColor, marginLeft: "8px" }}>
+                  {edu.startDate} – {edu.endDate}
+                </div>
+              </div>
+              <div style={{ fontSize: "9px", fontWeight: 600, color: t.accentColor, marginTop: "1px" }}>
+                {edu.school}
+              </div>
+              {edu.description && (
+                <div style={{ fontSize: "9px", color: t.subTextColor, marginTop: "2px", lineHeight: 1.5 }}>
+                  {edu.description}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div
+      ref={innerRef}
+      style={{
+        display: "none",
+        width: "794px",
+        height: "1123px",
+        fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ display: "flex", height: "100%", flexDirection: isRight ? "row-reverse" : "row" as "row" | "row-reverse" }}>
+        {sidebar}
+        {mainContent}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════ */
+/*        PREVIEW / INLINE EDITOR (post-wizard)   */
+/* ═══════════════════════════════════════════════ */
+function PreviewEditor({
+  cv,
+  setCv,
+  theme,
+  onExport,
+  exporting,
+  onBack,
+}: {
+  cv: StructuredCV;
+  setCv: React.Dispatch<React.SetStateAction<StructuredCV>>;
+  theme: CVTheme;
+  onExport: () => void;
+  exporting: boolean;
+  onBack: () => void;
+}) {
+  const updateHeader = useCallback(
+    (field: string, value: string) => {
+      setCv((prev) => ({ ...prev, header: { ...prev.header, [field]: value } }));
+    },
+    [setCv]
+  );
+
+  const updateExperience = useCallback(
+    (idx: number, field: string, value: string | string[]) => {
+      setCv((prev) => {
+        const exps = [...prev.experiences];
+        exps[idx] = { ...exps[idx], [field]: value };
+        return { ...prev, experiences: exps };
+      });
+    },
+    [setCv]
+  );
+
+  const updateEducation = useCallback(
+    (idx: number, field: string, value: string) => {
+      setCv((prev) => {
+        const edus = [...prev.education];
+        edus[idx] = { ...edus[idx], [field]: value };
+        return { ...prev, education: edus };
+      });
+    },
+    [setCv]
+  );
+
+  const updateSkillItems = useCallback(
+    (catIdx: number, items: string[]) => {
+      setCv((prev) => {
+        const skills = [...prev.skills];
+        skills[catIdx] = { ...skills[catIdx], items };
+        return { ...prev, skills };
+      });
+    },
+    [setCv]
+  );
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const size = Math.min(img.width, img.height, 400);
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d")!;
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
+        updateHeader("photoUrl", canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-5 space-y-3">
+      {/* Header Card */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-start gap-4">
+          <div className="shrink-0">
+            {cv.header.photoUrl ? (
+              <div className="relative group">
+                <img
+                  src={cv.header.photoUrl}
+                  alt="Photo"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2"
+                  style={{ borderColor: theme.accentColor }}
+                />
+                <button
+                  onClick={() => updateHeader("photoUrl", "")}
+                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 shadow-sm"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <label
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors"
+                style={{ borderColor: theme.accentColor + "60" }}
+              >
+                <Camera className="h-5 w-5" style={{ color: theme.accentColor + "80" }} />
+                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+              </label>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap gap-x-2">
+              <EditField
+                value={cv.header.firstName}
+                onChange={(v) => updateHeader("firstName", v)}
+                className="text-lg sm:text-xl font-bold text-gray-900"
+              />
+              <EditField
+                value={cv.header.lastName}
+                onChange={(v) => updateHeader("lastName", v)}
+                className="text-lg sm:text-xl font-bold text-gray-900"
+              />
+            </div>
+            <EditField
+              value={cv.header.title}
+              onChange={(v) => updateHeader("title", v)}
+              className="text-sm text-gray-500 mt-1"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {cv.header.email && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Mail className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
+              <EditField value={cv.header.email} onChange={(v) => updateHeader("email", v)} className="text-sm text-gray-600" />
+            </div>
+          )}
+          {cv.header.phone && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Phone className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
+              <EditField value={cv.header.phone} onChange={(v) => updateHeader("phone", v)} className="text-sm text-gray-600" />
+            </div>
+          )}
+          {cv.header.location && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <MapPin className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
+              <EditField value={cv.header.location} onChange={(v) => updateHeader("location", v)} className="text-sm text-gray-600" />
+            </div>
+          )}
+          {cv.header.linkedin && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Linkedin className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
+              <EditField value={cv.header.linkedin} onChange={(v) => updateHeader("linkedin", v)} className="text-sm text-gray-600" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Summary */}
+      {cv.summary && (
+        <SectionCard icon={User} title="Profil" accent={theme.accentColor}>
+          <EditField
+            value={cv.summary}
+            onChange={(v) => setCv((prev) => ({ ...prev, summary: v }))}
+            className="text-sm text-gray-700 leading-relaxed"
+            multiline
+          />
+        </SectionCard>
+      )}
+
+      {/* Experiences */}
+      {cv.experiences.length > 0 && (
+        <SectionCard icon={Briefcase} title="Expériences" accent={theme.accentColor}>
+          <div className="space-y-5">
+            {cv.experiences.map((exp, i) => (
+              <div key={exp.id} className="relative">
+                {i > 0 && <div className="absolute -top-3 left-0 right-0 h-px bg-gray-100" />}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <EditField
+                      value={exp.position}
+                      onChange={(v) => updateExperience(i, "position", v)}
+                      className="text-sm font-semibold text-gray-900"
+                    />
+                    <EditField
+                      value={exp.company + (exp.location ? ` · ${exp.location}` : "")}
+                      onChange={(v) => {
+                        const parts = v.split("·").map((s) => s.trim());
+                        updateExperience(i, "company", parts[0]);
+                        if (parts[1]) updateExperience(i, "location", parts[1]);
+                      }}
+                      className="text-xs font-medium mt-0.5"
+                    />
+                  </div>
+                  <span
+                    className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0"
+                    style={{ backgroundColor: theme.accentColor + "15", color: theme.accentColor }}
+                  >
+                    {exp.startDate} – {exp.endDate}
+                  </span>
+                </div>
+
+                <div className="mt-2 space-y-1.5">
+                  {exp.bullets.map((bullet, bi) => (
+                    <div key={bi} className="flex gap-2 group items-start">
+                      <span
+                        className="mt-1.5 h-1.5 w-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: theme.accentColor }}
+                      />
+                      <EditField
+                        value={bullet}
+                        onChange={(v) => {
+                          const newBullets = [...exp.bullets];
+                          newBullets[bi] = v;
+                          updateExperience(i, "bullets", newBullets);
+                        }}
+                        className="text-sm text-gray-600 leading-relaxed flex-1"
+                      />
+                      <button
+                        onClick={() => {
+                          const newBullets = exp.bullets.filter((_, j) => j !== bi);
+                          updateExperience(i, "bullets", newBullets);
+                        }}
+                        className="mt-0.5 text-gray-300 hover:text-red-500 shrink-0 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() =>
+                      updateExperience(i, "bullets", [...exp.bullets, "Nouvelle réalisation..."])
+                    }
+                    className="flex items-center gap-1 text-xs font-medium mt-1 transition-colors"
+                    style={{ color: theme.accentColor }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Ajouter un point
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Education */}
+      {cv.education.length > 0 && (
+        <SectionCard icon={GraduationCap} title="Formation" accent={theme.accentColor}>
+          <div className="space-y-4">
+            {cv.education.map((edu, i) => (
+              <div key={edu.id}>
+                {i > 0 && <div className="h-px bg-gray-100 mb-4" />}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <EditField
+                      value={edu.degree}
+                      onChange={(v) => updateEducation(i, "degree", v)}
+                      className="text-sm font-semibold text-gray-900"
+                    />
+                    <EditField
+                      value={edu.school}
+                      onChange={(v) => updateEducation(i, "school", v)}
+                      className="text-xs text-gray-500 mt-0.5"
+                    />
+                  </div>
+                  <span
+                    className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0"
+                    style={{ backgroundColor: theme.accentColor + "15", color: theme.accentColor }}
+                  >
+                    {edu.startDate} – {edu.endDate}
+                  </span>
+                </div>
+                {edu.description && (
+                  <EditField
+                    value={edu.description}
+                    onChange={(v) => updateEducation(i, "description", v)}
+                    className="text-sm text-gray-500 mt-1"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Skills */}
+      {cv.skills.length > 0 && (
+        <SectionCard icon={Wrench} title="Compétences" accent={theme.accentColor}>
+          <div className="space-y-4">
+            {cv.skills.map((cat, ci) => (
+              <div key={ci}>
+                <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                  {cat.category}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {cat.items.map((item, ii) => (
+                    <span
+                      key={ii}
+                      className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: theme.accentColor + "15",
+                        color: theme.accentColor,
+                      }}
+                    >
+                      {item}
+                      <button
+                        onClick={() => updateSkillItems(ci, cat.items.filter((_, j) => j !== ii))}
+                        className="ml-0.5 hover:opacity-70"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <button
+                    onClick={() => updateSkillItems(ci, [...cat.items, "Nouvelle"])}
+                    className="rounded-full px-3 py-1.5 text-xs font-medium border border-dashed border-gray-300 text-gray-400 hover:text-gray-600 hover:border-gray-400 transition-colors"
+                  >
+                    + Ajouter
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Languages */}
+      {cv.languages.length > 0 && (
+        <SectionCard icon={Languages} title="Langues" accent={theme.accentColor}>
+          <div className="space-y-2">
+            {cv.languages.map((lang, i) => (
+              <div key={i} className="flex items-center justify-between py-1">
+                <span className="text-sm text-gray-700">{lang.name}</span>
+                <span
+                  className="rounded-full px-3 py-1 text-xs font-medium"
+                  style={{
+                    backgroundColor: theme.accentColor + "15",
+                    color: theme.accentColor,
+                  }}
+                >
+                  {lang.level}
+                </span>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Interests */}
+      {cv.interests && cv.interests.length > 0 && (
+        <SectionCard icon={Heart} title="Centres d'intérêt" accent={theme.accentColor} defaultOpen={false}>
+          <div className="flex flex-wrap gap-2">
+            {cv.interests.map((interest, i) => (
+              <span
+                key={i}
+                className="rounded-full px-3 py-1.5 text-xs font-medium"
+                style={{
+                  backgroundColor: theme.accentColor + "12",
+                  color: theme.accentColor,
+                }}
+              >
+                {interest}
+              </span>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Action buttons */}
+      <div className="pt-2 pb-8 space-y-3">
+        <button
+          onClick={onExport}
+          disabled={exporting}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-bold text-white transition-all active:scale-[0.98] shadow-lg"
+          style={{ backgroundColor: theme.accentColor }}
+        >
+          {exporting ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Génération du PDF...
+            </>
+          ) : (
+            <>
+              <Download className="h-5 w-5" />
+              Télécharger le CV en PDF
+            </>
+          )}
+        </button>
+        <button
+          onClick={onBack}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Modifier dans le wizard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════ */
+/*               MAIN EDITOR PAGE                 */
+/* ═══════════════════════════════════════════════ */
 export default function CVEditorPage() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
@@ -94,11 +942,41 @@ export default function CVEditorPage() {
   const [cv, setCv] = useState<StructuredCV | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [accent, setAccent] = useState(ACCENT_COLORS[0]);
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const cvRef = useRef<HTMLDivElement>(null);
+  const [selectedTheme, setSelectedTheme] = useState<CVThemeId>("modern");
+  const [customColors, setCustomColors] = useState<CustomColors>({
+    sidebarBg: "",
+    accentColor: "",
+    sidebarAccent: "",
+  });
+  const [currentStep, setCurrentStep] = useState(0);
+  const [wizardComplete, setWizardComplete] = useState(false);
+  const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
+  const cvPrintRef = useRef<HTMLDivElement>(null);
 
-  // Load structured CV data
+  // Build effective theme (base + custom overrides)
+  const baseTheme = CV_THEMES[selectedTheme];
+  const theme: CVTheme = {
+    ...baseTheme,
+    ...(customColors.sidebarBg && { sidebarBg: customColors.sidebarBg }),
+    ...(customColors.accentColor && {
+      accentColor: customColors.accentColor,
+      headingColor: customColors.accentColor,
+      bulletColor: customColors.accentColor,
+    }),
+    ...(customColors.sidebarAccent && { sidebarAccent: customColors.sidebarAccent }),
+  };
+
+  /* ── Warn before leaving ── */
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
+  /* ── Load structured CV ── */
   useEffect(() => {
     if (!analysisId) {
       toast.error("Aucune analyse trouvée");
@@ -115,6 +993,8 @@ export default function CVEditorPage() {
       .then((data) => {
         if (data.structuredCV) {
           setCv(data.structuredCV);
+          const detected = getThemeForSector(data.structuredCV.detectedTheme);
+          setSelectedTheme(detected);
         } else {
           toast.error(data.error || "Erreur");
           router.push("/app");
@@ -124,103 +1004,60 @@ export default function CVEditorPage() {
       .finally(() => setLoading(false));
   }, [analysisId, router]);
 
-  // Update helpers
+  /* ── Update helpers ── */
   const updateHeader = useCallback(
     (field: string, value: string) => {
-      setCv((prev) => prev ? { ...prev, header: { ...prev.header, [field]: value } } : prev);
+      setCv((prev) =>
+        prev ? { ...prev, header: { ...prev.header, [field]: value } } : prev
+      );
     },
     []
   );
 
-  const updateExperience = useCallback(
-    (idx: number, field: string, value: string | string[]) => {
-      setCv((prev) => {
-        if (!prev) return prev;
-        const exps = [...prev.experiences];
-        exps[idx] = { ...exps[idx], [field]: value };
-        return { ...prev, experiences: exps };
-      });
-    },
-    []
-  );
-
-  const updateEducation = useCallback(
-    (idx: number, field: string, value: string) => {
-      setCv((prev) => {
-        if (!prev) return prev;
-        const edus = [...prev.education];
-        edus[idx] = { ...edus[idx], [field]: value };
-        return { ...prev, education: edus };
-      });
-    },
-    []
-  );
-
-  const updateSkillItems = useCallback(
-    (catIdx: number, items: string[]) => {
-      setCv((prev) => {
-        if (!prev) return prev;
-        const skills = [...prev.skills];
-        skills[catIdx] = { ...skills[catIdx], items };
-        return { ...prev, skills };
-      });
-    },
-    []
-  );
-
-  // Photo upload
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      // Resize to 300x300 max
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const size = Math.min(img.width, img.height, 300);
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d")!;
-        const sx = (img.width - size) / 2;
-        const sy = (img.height - size) / 2;
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
-        updateHeader("photoUrl", canvas.toDataURL("image/jpeg", 0.85));
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
+  /* ── Navigation ── */
+  const goNext = () => {
+    if (currentStep < TOTAL_STEPS - 1) {
+      setDirection(1);
+      setCurrentStep((s) => s + 1);
+    } else {
+      setWizardComplete(true);
+    }
   };
 
-  // PDF Export
+  const goPrev = () => {
+    if (currentStep > 0) {
+      setDirection(-1);
+      setCurrentStep((s) => s - 1);
+    }
+  };
+
+  /* ── PDF Export ── */
   const handleExport = async () => {
-    if (!cvRef.current) return;
+    if (!cvPrintRef.current) return;
     setExporting(true);
     try {
       const html2canvasModule = await import("html2canvas-pro");
       const html2canvas = html2canvasModule.default;
       const { jsPDF } = await import("jspdf");
 
-      // Temporarily scroll to top and ensure full element is visible
-      const el = cvRef.current;
-      const originalScroll = window.scrollY;
-      window.scrollTo(0, 0);
+      const el = cvPrintRef.current;
+      el.style.display = "block";
+      el.style.position = "absolute";
+      el.style.left = "-9999px";
+      el.style.top = "0";
 
-      // Wait a tick for scroll to settle
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 250));
 
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
         width: el.scrollWidth,
         height: el.scrollHeight,
       });
 
-      window.scrollTo(0, originalScroll);
+      el.style.display = "none";
 
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       const pdf = new jsPDF("p", "mm", "a4");
@@ -231,7 +1068,7 @@ export default function CVEditorPage() {
         ? `CV_${cv.header.firstName}_${cv.header.lastName}.pdf`
         : "CV_Seora.pdf";
       pdf.save(name);
-      toast.success("CV exporté en PDF !");
+      toast.success("CV exporté !");
     } catch (err) {
       console.error("PDF export error:", err);
       toast.error("Erreur lors de l'export");
@@ -240,13 +1077,18 @@ export default function CVEditorPage() {
     }
   };
 
+  /* ── Loading state ── */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mx-auto" />
-          <p className="mt-3 text-sm text-gray-500">Génération de ton CV amélioré...</p>
-          <p className="mt-1 text-xs text-gray-400">L&apos;IA restructure et optimise ton contenu</p>
+        <div className="text-center px-6">
+          <div className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-indigo-50">
+            <Sparkles className="h-7 w-7 animate-pulse text-indigo-600" />
+          </div>
+          <p className="text-base font-semibold text-gray-900">Génération en cours...</p>
+          <p className="mt-1 text-sm text-gray-500">
+            L&apos;IA restructure et optimise ton CV
+          </p>
         </div>
       </div>
     );
@@ -254,425 +1096,191 @@ export default function CVEditorPage() {
 
   if (!cv) return null;
 
-  return (
-    <div className="min-h-screen bg-gray-100">
-      {/* ─── Toolbar ─── */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+  /* ── Slide animation variants ── */
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? 300 : -300,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      x: dir > 0 ? -300 : 300,
+      opacity: 0,
+    }),
+  };
+
+  /* ── Render current step ── */
+  const renderStep = () => {
+    const stepProps = { cv, setCv: setCv as React.Dispatch<React.SetStateAction<StructuredCV>>, updateHeader };
+
+    switch (currentStep) {
+      case 0:
+        return <StepContact {...stepProps} />;
+      case 1:
+        return <StepProfile {...stepProps} />;
+      case 2:
+        return <StepSkills {...stepProps} />;
+      case 3:
+        return <StepExperiences {...stepProps} />;
+      case 4:
+        return <StepEducation {...stepProps} />;
+      case 5:
+        return <StepLanguagesInterests {...stepProps} />;
+      case 6:
+        return (
+          <StepStyle
+            cv={cv}
+            selectedTheme={selectedTheme}
+            setSelectedTheme={setSelectedTheme}
+            customColors={customColors}
+            setCustomColors={setCustomColors}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  /* ── Wizard completed → show preview editor ── */
+  if (wizardComplete) {
+    return (
+      <div className="min-h-screen bg-gray-50/80">
+        {/* Sticky header */}
+        <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200/60">
+          <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
             <button
               onClick={() => router.push("/app")}
-              className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
-              Retour
+              <span className="hidden sm:inline">Retour</span>
             </button>
-            <div className="h-5 w-px bg-gray-200" />
+
             <div className="flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-indigo-600" />
-              <span className="text-sm font-semibold text-gray-900">Éditeur de CV</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Color picker */}
-            <div className="relative">
-              <button
-                onClick={() => setShowColorPicker(!showColorPicker)}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-              >
-                <div className="h-4 w-4 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: accent.value }} />
-                <Palette className="h-3.5 w-3.5" />
-              </button>
-              {showColorPicker && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg p-2 flex gap-1.5 z-50">
-                  {ACCENT_COLORS.map((c) => (
-                    <button
-                      key={c.name}
-                      onClick={() => { setAccent(c); setShowColorPicker(false); }}
-                      className={`h-7 w-7 rounded-full border-2 transition-all ${
-                        accent.name === c.name ? "border-gray-900 scale-110" : "border-white hover:scale-105"
-                      }`}
-                      style={{ backgroundColor: c.value }}
-                      title={c.name}
-                    />
-                  ))}
-                </div>
-              )}
+              <Eye className="h-4 w-4" style={{ color: theme.accentColor }} />
+              <span className="text-sm font-bold text-gray-900">Aperçu & Édition</span>
             </div>
 
-            {/* Photo upload */}
-            <label className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 cursor-pointer transition-colors">
-              <Camera className="h-3.5 w-3.5" />
-              Photo
-              <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-            </label>
-
-            {/* Export */}
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-white transition-all"
-              style={{ backgroundColor: accent.value }}
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all active:scale-95"
+              style={{ backgroundColor: theme.accentColor }}
             >
-              {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-              {exporting ? "Export..." : "Exporter PDF"}
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{exporting ? "Export..." : "PDF"}</span>
             </button>
           </div>
         </div>
+
+        <PreviewEditor
+          cv={cv}
+          setCv={setCv as React.Dispatch<React.SetStateAction<StructuredCV>>}
+          theme={theme}
+          onExport={handleExport}
+          exporting={exporting}
+          onBack={() => setWizardComplete(false)}
+        />
+
+        {/* Hidden PDF template */}
+        <PDFTemplate cv={cv} theme={theme} innerRef={cvPrintRef} />
       </div>
+    );
+  }
 
-      {/* ─── CV Preview ─── */}
-      <div className="py-8 px-4 flex justify-center">
-        <div className="w-full max-w-[210mm] shadow-2xl shadow-gray-300/50 rounded-lg overflow-hidden">
-          <div
-            ref={cvRef}
-            id="cv-preview"
-            className="bg-white w-full"
-            style={{ aspectRatio: "1/1.414", padding: "40px 44px", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}
-          >
-            {/* Header */}
-            <div className="flex gap-5 items-start mb-5">
-              {/* Photo */}
-              <div className="shrink-0">
-                {cv.header.photoUrl ? (
-                  <div className="relative group">
-                    <img
-                      src={cv.header.photoUrl}
-                      alt="Photo"
-                      className="w-20 h-20 rounded-full object-cover border-2"
-                      style={{ borderColor: accent.value }}
-                    />
-                    <button
-                      onClick={() => updateHeader("photoUrl", "")}
-                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="w-20 h-20 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors group">
-                    <Camera className="h-5 w-5 text-gray-400 group-hover:text-gray-500" />
-                    <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                  </label>
-                )}
-              </div>
+  /* ── Wizard mode ── */
+  return (
+    <div className="min-h-screen bg-gray-50/80 flex flex-col">
+      {/* ─── Sticky Header ─── */}
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200/60">
+        <div className="max-w-lg mx-auto px-4 py-3">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => router.push("/app")}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Retour</span>
+            </button>
 
-              {/* Name & title */}
-              <div className="flex-1 min-w-0">
-                <div className="flex gap-2">
-                  <EditableText
-                    value={cv.header.firstName}
-                    onChange={(v) => updateHeader("firstName", v)}
-                    className="text-2xl font-bold text-gray-900 leading-tight"
-                  />
-                  <EditableText
-                    value={cv.header.lastName}
-                    onChange={(v) => updateHeader("lastName", v)}
-                    className="text-2xl font-bold leading-tight"
-                    style={{ color: accent.value }}
-                  />
-                </div>
-                <EditableText
-                  value={cv.header.title}
-                  onChange={(v) => updateHeader("title", v)}
-                  className="text-sm font-medium mt-1"
-                  style={{ color: accent.value }}
-                />
-
-                {/* Contact row */}
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600">
-                  {cv.header.email && (
-                    <span className="flex items-center gap-1">
-                      <Mail className="h-3 w-3" style={{ color: accent.value }} />
-                      <EditableText value={cv.header.email} onChange={(v) => updateHeader("email", v)} className="text-xs" />
-                    </span>
-                  )}
-                  {cv.header.phone && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" style={{ color: accent.value }} />
-                      <EditableText value={cv.header.phone} onChange={(v) => updateHeader("phone", v)} className="text-xs" />
-                    </span>
-                  )}
-                  {cv.header.location && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" style={{ color: accent.value }} />
-                      <EditableText value={cv.header.location} onChange={(v) => updateHeader("location", v)} className="text-xs" />
-                    </span>
-                  )}
-                  {cv.header.linkedin && (
-                    <span className="flex items-center gap-1">
-                      <Linkedin className="h-3 w-3" style={{ color: accent.value }} />
-                      <EditableText value={cv.header.linkedin} onChange={(v) => updateHeader("linkedin", v)} className="text-xs" />
-                    </span>
-                  )}
-                </div>
-              </div>
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <span className="text-sm font-bold text-gray-900">Éditeur CV</span>
             </div>
 
-            {/* Separator */}
-            <div className="h-0.5 rounded-full mb-4" style={{ backgroundColor: accent.value }} />
-
-            {/* Summary */}
-            {cv.summary && (
-              <div className="mb-4">
-                <SectionTitle icon={User} label="Profil" accent={accent.value} />
-                <EditableText
-                  value={cv.summary}
-                  onChange={(v) => setCv((prev) => prev ? { ...prev, summary: v } : prev)}
-                  className="text-xs text-gray-700 leading-relaxed"
-                  multiline
-                />
-              </div>
-            )}
-
-            <div className="flex gap-6">
-              {/* ─── Left column: Experiences + Education ─── */}
-              <div className="flex-1 min-w-0 space-y-4">
-                {/* Experiences */}
-                {cv.experiences.length > 0 && (
-                  <div>
-                    <SectionTitle icon={Briefcase} label="Expériences" accent={accent.value} />
-                    <div className="space-y-3">
-                      {cv.experiences.map((exp, i) => (
-                        <div key={exp.id} className="group relative">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <EditableText
-                              value={exp.position}
-                              onChange={(v) => updateExperience(i, "position", v)}
-                              className="text-xs font-bold text-gray-900"
-                            />
-                            <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0">
-                              <EditableText
-                                value={`${exp.startDate} – ${exp.endDate}`}
-                                onChange={(v) => {
-                                  const parts = v.split("–").map((s) => s.trim());
-                                  updateExperience(i, "startDate", parts[0] || "");
-                                  updateExperience(i, "endDate", parts[1] || "");
-                                }}
-                                className="text-[10px] text-gray-400"
-                              />
-                            </span>
-                          </div>
-                          <EditableText
-                            value={exp.company + (exp.location ? ` · ${exp.location}` : "")}
-                            onChange={(v) => {
-                              const parts = v.split("·").map((s) => s.trim());
-                              updateExperience(i, "company", parts[0]);
-                              if (parts[1]) updateExperience(i, "location", parts[1]);
-                            }}
-                            className="text-[10px] font-medium"
-                            style={{ color: accent.value }}
-                          />
-                          <ul className="mt-1 space-y-0.5">
-                            {exp.bullets.map((bullet, bi) => (
-                              <li key={bi} className="flex gap-1.5 group/bullet">
-                                <span className="text-[10px] mt-0.5 shrink-0" style={{ color: accent.value }}>●</span>
-                                <EditableText
-                                  value={bullet}
-                                  onChange={(v) => {
-                                    const newBullets = [...exp.bullets];
-                                    newBullets[bi] = v;
-                                    updateExperience(i, "bullets", newBullets);
-                                  }}
-                                  className="text-[10px] text-gray-700 leading-relaxed flex-1"
-                                />
-                                <button
-                                  onClick={() => {
-                                    const newBullets = exp.bullets.filter((_, j) => j !== bi);
-                                    updateExperience(i, "bullets", newBullets);
-                                  }}
-                                  className="opacity-0 group-hover/bullet:opacity-100 text-red-400 hover:text-red-600 shrink-0"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                          <button
-                            onClick={() => {
-                              updateExperience(i, "bullets", [...exp.bullets, "Nouvelle réalisation..."]);
-                            }}
-                            className="mt-0.5 flex items-center gap-0.5 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                            style={{ color: accent.value }}
-                          >
-                            <Plus className="h-3 w-3" /> Ajouter
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Education */}
-                {cv.education.length > 0 && (
-                  <div>
-                    <SectionTitle icon={GraduationCap} label="Formation" accent={accent.value} />
-                    <div className="space-y-2">
-                      {cv.education.map((edu, i) => (
-                        <div key={edu.id}>
-                          <div className="flex items-baseline justify-between gap-2">
-                            <EditableText
-                              value={edu.degree}
-                              onChange={(v) => updateEducation(i, "degree", v)}
-                              className="text-xs font-bold text-gray-900"
-                            />
-                            <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0">
-                              {edu.startDate} – {edu.endDate}
-                            </span>
-                          </div>
-                          <EditableText
-                            value={edu.school}
-                            onChange={(v) => updateEducation(i, "school", v)}
-                            className="text-[10px] font-medium"
-                            style={{ color: accent.value }}
-                          />
-                          {edu.description && (
-                            <EditableText
-                              value={edu.description}
-                              onChange={(v) => updateEducation(i, "description", v)}
-                              className="text-[10px] text-gray-500 mt-0.5"
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ─── Right column: Skills, Languages, Interests ─── */}
-              <div className="w-[35%] shrink-0 space-y-4">
-                {/* Skills */}
-                {cv.skills.length > 0 && (
-                  <div>
-                    <SectionTitle icon={Wrench} label="Compétences" accent={accent.value} />
-                    <div className="space-y-2">
-                      {cv.skills.map((cat, ci) => (
-                        <div key={ci}>
-                          <EditableText
-                            value={cat.category}
-                            onChange={(v) => {
-                              setCv((prev) => {
-                                if (!prev) return prev;
-                                const skills = [...prev.skills];
-                                skills[ci] = { ...skills[ci], category: v };
-                                return { ...prev, skills };
-                              });
-                            }}
-                            className="text-[10px] font-bold text-gray-800"
-                          />
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {cat.items.map((item, ii) => (
-                              <span
-                                key={ii}
-                                className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9px] font-medium group/skill"
-                                style={{ backgroundColor: accent.light, color: accent.value }}
-                              >
-                                <EditableText
-                                  value={item}
-                                  onChange={(v) => {
-                                    const newItems = [...cat.items];
-                                    newItems[ii] = v;
-                                    updateSkillItems(ci, newItems);
-                                  }}
-                                  className="text-[9px]"
-                                />
-                                <button
-                                  onClick={() => updateSkillItems(ci, cat.items.filter((_, j) => j !== ii))}
-                                  className="opacity-0 group-hover/skill:opacity-100"
-                                >
-                                  <X className="h-2.5 w-2.5" />
-                                </button>
-                              </span>
-                            ))}
-                            <button
-                              onClick={() => updateSkillItems(ci, [...cat.items, "Nouvelle"])}
-                              className="rounded-full px-1.5 py-0.5 text-[9px] border border-dashed border-gray-300 text-gray-400 hover:text-gray-600 hover:border-gray-400"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Languages */}
-                {cv.languages.length > 0 && (
-                  <div>
-                    <SectionTitle icon={Languages} label="Langues" accent={accent.value} />
-                    <div className="space-y-1">
-                      {cv.languages.map((lang, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <EditableText
-                            value={lang.name}
-                            onChange={(v) => {
-                              setCv((prev) => {
-                                if (!prev) return prev;
-                                const langs = [...prev.languages];
-                                langs[i] = { ...langs[i], name: v };
-                                return { ...prev, languages: langs };
-                              });
-                            }}
-                            className="text-[10px] text-gray-700"
-                          />
-                          <span
-                            className="rounded-full px-2 py-0.5 text-[9px] font-medium"
-                            style={{ backgroundColor: accent.light, color: accent.value }}
-                          >
-                            {lang.level}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Interests */}
-                {cv.interests && cv.interests.length > 0 && (
-                  <div>
-                    <SectionTitle icon={Heart} label="Centres d'intérêt" accent={accent.value} />
-                    <div className="flex flex-wrap gap-1">
-                      {cv.interests.map((interest, i) => (
-                        <span
-                          key={i}
-                          className="rounded-full px-2 py-0.5 text-[9px] font-medium"
-                          style={{ backgroundColor: accent.bg, color: accent.value }}
-                        >
-                          {interest}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <div className="w-16" /> {/* spacer */}
           </div>
+
+          <ProgressBar currentStep={currentStep} totalSteps={TOTAL_STEPS} />
         </div>
       </div>
-    </div>
-  );
-}
 
-/* ─── Section Title Component ─── */
-function SectionTitle({
-  icon: Icon,
-  label,
-  accent,
-}: {
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-  label: string;
-  accent: string;
-}) {
-  return (
-    <div className="flex items-center gap-1.5 mb-2">
-      <Icon className="h-3.5 w-3.5" style={{ color: accent }} />
-      <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: accent }}>
-        {label}
-      </h3>
-      <div className="flex-1 h-px bg-gray-200" />
+      {/* ─── Step Content ─── */}
+      <div className="flex-1 max-w-lg mx-auto w-full px-4 py-6 overflow-hidden">
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={currentStep}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+          >
+            {renderStep()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* ─── Bottom Navigation ─── */}
+      <div className="sticky bottom-0 bg-white/90 backdrop-blur-xl border-t border-gray-200/60">
+        <div className="max-w-lg mx-auto px-4 py-4 flex gap-3">
+          {currentStep > 0 && (
+            <motion.button
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onClick={goPrev}
+              className="flex-1 flex items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all active:scale-[0.98]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Précédent
+            </motion.button>
+          )}
+
+          <motion.button
+            layout
+            onClick={goNext}
+            className={`flex items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-bold text-white transition-all active:scale-[0.98] shadow-lg ${
+              currentStep === 0 ? "w-full" : "flex-1"
+            }`}
+            style={{
+              background: `linear-gradient(135deg, #6366F1, #8B5CF6)`,
+            }}
+          >
+            {currentStep === TOTAL_STEPS - 1 ? (
+              <>
+                <Eye className="h-4 w-4" />
+                Voir mon CV
+              </>
+            ) : (
+              <>
+                Suivant
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Hidden PDF template */}
+      <PDFTemplate cv={cv} theme={theme} innerRef={cvPrintRef} />
     </div>
   );
 }

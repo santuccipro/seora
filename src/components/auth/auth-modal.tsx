@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 import {
@@ -24,10 +24,24 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
+    <div
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Authentification"
+    >
       <div
         className="fixed inset-0 bg-black/30 backdrop-blur-md"
         onClick={onClose}
@@ -35,6 +49,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       <div className="relative w-full sm:max-w-lg animate-slide-up sm:animate-scale-in bg-white sm:glass-strong rounded-t-3xl sm:rounded-3xl p-0 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
+          aria-label="Fermer"
           className="absolute right-4 top-4 z-10 rounded-full p-2 text-gray-400 hover:bg-gray-100/50 transition-colors"
         >
           <X className="h-5 w-5" />
@@ -152,7 +167,7 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <div className="px-6 py-8 sm:p-8">
       {step === "email" ? (
-        <>
+        <div key="email-step" className="animate-fade-in">
           <div className="text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50">
               <Mail className="h-6 w-6 text-indigo-600" />
@@ -220,9 +235,9 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
               Politique de confidentialité
             </Link>
           </p>
-        </>
+        </div>
       ) : (
-        <>
+        <div key="code-step" className="animate-fade-in">
           <div className="text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
               <Shield className="h-6 w-6 text-emerald-600" />
@@ -249,6 +264,7 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={1}
+                aria-label={`Chiffre ${i + 1} du code`}
                 value={digit}
                 onChange={(e) => handleCodeChange(i, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(i, e)}
@@ -286,7 +302,7 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
               Renvoyer le code
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
