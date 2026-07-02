@@ -57,7 +57,7 @@ export default function Home() {
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
   const [liveCount, setLiveCount] = useState(847);
-  const [activeTab, setActiveTab] = useState<"cv" | "memoire" | "letter" | "create" | "photo">("cv");
+  const [activeTab, setActiveTab] = useState<"cv" | "memoire" | "letter" | "create" | "photo">("memoire");
 
   const topCompanies = [
     "L'Oréal", "LVMH", "TotalEnergies", "Sanofi", "BNP Paribas", "Airbus", "Danone", "Société Générale",
@@ -252,8 +252,8 @@ export default function Home() {
             {/* ═══ TAB BAR + UNIFIED ACTION CARD ═══ */}
             {(() => {
               const TABS = [
-                { id: "cv" as const, label: "Analyse CV", shortLabel: "CV", icon: BarChart3, tokens: "1 token", tokenColor: "bg-indigo-100 text-indigo-600" },
                 { id: "memoire" as const, label: "Mémoire / DPP", shortLabel: "Mémoire", icon: Bot, tokens: "3 tokens", tokenColor: "bg-orange-100 text-orange-600" },
+                { id: "cv" as const, label: "Analyse CV", shortLabel: "CV", icon: BarChart3, tokens: "1 token", tokenColor: "bg-indigo-100 text-indigo-600" },
                 { id: "letter" as const, label: "Lettre motiv.", shortLabel: "Lettre", icon: PenTool, tokens: "3 tokens", tokenColor: "bg-blue-100 text-blue-600" },
                 { id: "create" as const, label: "Créer CV", shortLabel: "Créer", icon: Plus, tokens: "Gratuit", tokenColor: "bg-emerald-100 text-emerald-600" },
                 { id: "photo" as const, label: "Photo Pro", shortLabel: "Photo", icon: Camera, tokens: "1 token", tokenColor: "bg-pink-100 text-pink-600" },
