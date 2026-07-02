@@ -57,7 +57,7 @@ export default function Home() {
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
   const [liveCount, setLiveCount] = useState(847);
-  const [activeTab, setActiveTab] = useState<"cv" | "memoire" | "letter" | "create" | "photo">("memoire");
+  const [activeTab, setActiveTab] = useState<"detect" | "memoire" | "create" | "photo" | "letter">("detect");
 
   const topCompanies = [
     "L'Oréal", "LVMH", "TotalEnergies", "Sanofi", "BNP Paribas", "Airbus", "Danone", "Société Générale",
@@ -252,11 +252,11 @@ export default function Home() {
             {/* ═══ TAB BAR + UNIFIED ACTION CARD ═══ */}
             {(() => {
               const TABS = [
-                { id: "memoire" as const, label: "Mémoire / DPP", shortLabel: "Mémoire", icon: Bot, tokens: "3 tokens", tokenColor: "bg-orange-100 text-orange-600" },
-                { id: "cv" as const, label: "Analyse CV", shortLabel: "CV", icon: BarChart3, tokens: "1 token", tokenColor: "bg-indigo-100 text-indigo-600" },
+                { id: "detect" as const, label: "Détection IA", shortLabel: "Détection", icon: Search, tokens: "1 token", tokenColor: "bg-violet-100 text-violet-700" },
+                { id: "memoire" as const, label: "Analyse doc", shortLabel: "Doc", icon: Bot, tokens: "3 tokens", tokenColor: "bg-orange-100 text-orange-600" },
+                { id: "create" as const, label: "Création CV IA", shortLabel: "Créer", icon: Plus, tokens: "Gratuit", tokenColor: "bg-emerald-100 text-emerald-600" },
+                { id: "photo" as const, label: "Photo pro", shortLabel: "Photo", icon: Camera, tokens: "1 token", tokenColor: "bg-pink-100 text-pink-600" },
                 { id: "letter" as const, label: "Lettre motiv.", shortLabel: "Lettre", icon: PenTool, tokens: "3 tokens", tokenColor: "bg-blue-100 text-blue-600" },
-                { id: "create" as const, label: "Créer CV", shortLabel: "Créer", icon: Plus, tokens: "Gratuit", tokenColor: "bg-emerald-100 text-emerald-600" },
-                { id: "photo" as const, label: "Photo Pro", shortLabel: "Photo", icon: Camera, tokens: "1 token", tokenColor: "bg-pink-100 text-pink-600" },
               ];
               const active = TABS.find(t => t.id === activeTab) ?? TABS[0];
               const jobChars = landingJob.length;
@@ -296,6 +296,53 @@ export default function Home() {
                       Clique sur un onglet pour changer d&apos;outil · <span className={`font-semibold px-1.5 py-0.5 rounded-full ${active.tokenColor}`}>{active.tokens}</span>
                     </p>
                   </div>
+
+                  {/* === Détection IA texte === */}
+                  {activeTab === "detect" && (
+                    <div className="relative rounded-3xl bg-white border-2 border-violet-200/60 shadow-2xl shadow-violet-500/[0.06] overflow-hidden transition-[border-color] duration-300 hover:border-violet-300">
+                      <div className="p-5 sm:p-8">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-md shadow-violet-500/20">
+                            <Search className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Détection IA de texte</h3>
+                            <p className="text-xs text-gray-400">Colle un texte, on te dit s&apos;il est repéré comme IA + zones à risque</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
+                        </div>
+                        <textarea
+                          value={landingJob}
+                          onChange={(e) => setLandingJob(e.target.value.slice(0, 10000))}
+                          placeholder="Colle ici le texte que tu veux vérifier (mémoire, dissertation, article, email...)"
+                          rows={6}
+                          maxLength={10000}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-y transition-colors"
+                        />
+                        <div className="mt-2 flex items-center justify-between">
+                          <p className="text-[10px] text-gray-500">
+                            {landingJob.length.toLocaleString("fr-FR")} / 10 000 caractères
+                          </p>
+                          <p className="text-[10px] text-gray-400">Min. 100 caractères pour lancer</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (landingJob.trim().length < 100) { toast.error("Texte trop court (min. 100 caractères)."); return; }
+                            sessionStorage.setItem("seora_ai_text", landingJob);
+                            if (session) { router.push("/ai-detector"); } else { openAuthModal(() => { window.location.href = "/ai-detector"; }); }
+                          }}
+                          className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:shadow-lg transition-shadow"
+                        >
+                          <Sparkles className="h-4 w-4" /> Analyser le texte
+                        </button>
+                        <div className="mt-4 flex items-center justify-center gap-4 text-[11px] text-gray-500">
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-violet-500" /> 4 détecteurs</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-violet-500" /> Zones highlight</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-violet-500" /> FR · EN · ES</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* === Analyse CV === */}
                   {activeTab === "cv" && (

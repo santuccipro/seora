@@ -786,3 +786,49 @@ function jaccardSimilarity(a: string, b: string): number {
   const union = new Set([...wordsA, ...wordsB]).size;
   return union === 0 ? 1 : intersection / union;
 }
+
+// ============================================================================
+// PARAGRAPH-LEVEL AI DETECTION (Compilatio-style zone highlighting)
+// ============================================================================
+
+export interface ParagraphAIScore {
+  index: number;
+  text: string;
+  score: number;
+  risk: "high" | "medium" | "low";
+  details: {
+    perplexity: number;
+    burstiness: number;
+    homoglyphs: number;
+    connectors: number;
+    formality: number;
+    parallelism: number;
+  };
+}
+
+/**
+ * Score each paragraph individually so the frontend can highlight the
+ * highest-risk zones the way Compilatio surfaces matched excerpts.
+ */
+export function detectByParagraph(text: string, language: Language = "fr"): ParagraphAIScore[] {
+  const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
+  return paragraphs.map((p, index) => {
+    const detailed = detectAI(p, language);
+    const score = detailed.overall;
+    const risk = score >= 60 ? "high" : score >= 30 ? "medium" : "low";
+    return {
+      index,
+      text: p,
+      score,
+      risk,
+      details: {
+        perplexity: detailed.perplexity,
+        burstiness: detailed.burstiness,
+        homoglyphs: detailed.homoglyphs,
+        connectors: detailed.connectors,
+        formality: detailed.formality,
+        parallelism: detailed.parallelism,
+      },
+    };
+  });
+}
