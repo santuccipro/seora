@@ -150,7 +150,7 @@ export default function Home() {
                   </button>
                   {showTools && (
                     <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 z-50">
-                      <div className="rounded-2xl p-3 shadow-2xl shadow-black/10 border border-white/50 w-[520px] grid grid-cols-2 gap-1 bg-white/90 backdrop-blur-xl">
+                      <div className="rounded-2xl p-3 shadow-2xl shadow-black/10 border border-white/50 w-[520px] grid grid-cols-2 gap-1 bg-white">
                         {[
                           { href: "/app", icon: BarChart3, label: "Analyse CV", desc: "Score sur 6 critères", color: "text-indigo-600 bg-indigo-50" },
                           { href: "/cover-letter", icon: PenTool, label: "Lettre de motivation", desc: "Adaptée à l'offre", color: "text-blue-600 bg-blue-50" },
@@ -257,7 +257,7 @@ export default function Home() {
 
               {/* ── Card 1: Analyser mon CV (hero card) ── */}
               <div
-                className={`relative rounded-3xl bg-white/80 backdrop-blur-xl border-2 shadow-2xl shadow-indigo-500/[0.06] overflow-hidden transition-all duration-300 ${
+                className={`relative rounded-3xl bg-white border-2 shadow-2xl shadow-indigo-500/[0.06] overflow-hidden transition-[border-color,box-shadow] duration-300 ${
                   dragOver ? "border-indigo-500 bg-indigo-50/40 scale-[1.005]" : "border-indigo-200/60 hover:border-indigo-300"
                 }`}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -326,7 +326,7 @@ export default function Home() {
                 {/* Card 2: Créer mon CV */}
                 <button
                   onClick={() => { if (session) router.push("/cv-editor"); else openAuthModal(); }}
-                  className="group rounded-3xl bg-white/80 backdrop-blur-xl border border-gray-200/60 shadow-lg shadow-gray-900/[0.04] p-5 sm:p-6 text-left hover:border-emerald-300 hover:shadow-xl transition-all duration-300"
+                  className="group rounded-3xl bg-white border border-gray-200/60 shadow-lg shadow-gray-900/[0.04] p-5 sm:p-6 text-left hover:border-emerald-300 hover:shadow-xl transition-[border-color,box-shadow] duration-300"
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform">
@@ -349,7 +349,7 @@ export default function Home() {
                 </button>
 
                 {/* Card 3: Photo Pro */}
-                <div className="rounded-3xl bg-white/60 backdrop-blur-xl border border-gray-200/40 shadow-lg shadow-gray-900/[0.02] p-5 sm:p-6 opacity-60">
+                <div className="rounded-3xl bg-white/95 border border-gray-200/40 shadow-lg shadow-gray-900/[0.02] p-5 sm:p-6 opacity-60">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center shadow-md shadow-pink-500/20">
                       <Camera className="h-5 w-5 text-white" />
@@ -370,7 +370,7 @@ export default function Home() {
               </div>
 
               {/* ── Card 4: Lettre de motivation ── */}
-              <div className="rounded-3xl bg-white/80 backdrop-blur-xl border border-gray-200/60 shadow-lg shadow-gray-900/[0.04] overflow-hidden hover:border-blue-300 transition-all duration-300">
+              <div className="rounded-3xl bg-white border border-gray-200/60 shadow-lg shadow-gray-900/[0.04] overflow-hidden hover:border-blue-300 transition-[border-color] duration-300">
                 <div className="p-5 sm:p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20">
@@ -438,7 +438,7 @@ export default function Home() {
 
               {/* ── Card 5: Analyse mon mémoire / DPP (humanizer) ── */}
               <div
-                className="relative rounded-3xl bg-white/80 backdrop-blur-xl border-2 border-orange-200/60 shadow-2xl shadow-orange-500/[0.06] overflow-hidden transition-all duration-300 hover:border-orange-300"
+                className="relative rounded-3xl bg-white border-2 border-orange-200/60 shadow-2xl shadow-orange-500/[0.06] overflow-hidden transition-[border-color] duration-300 hover:border-orange-300"
                 onDragOver={(e) => { e.preventDefault(); }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -1222,7 +1222,7 @@ export default function Home() {
                     <span className="text-sm font-semibold text-gray-900 pr-4">{item.q}</span>
                     <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-300 ${openFaq === i ? "rotate-180" : ""}`} />
                   </button>
-                  <div className={`overflow-hidden transition-all duration-300 ${openFaq === i ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}>
+                  <div className={`overflow-hidden transition-[border-color,box-shadow] duration-300 ${openFaq === i ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}>
                     <div className="px-5 pb-4">
                       <p className="text-sm text-gray-500 leading-relaxed">{item.a}</p>
                     </div>
