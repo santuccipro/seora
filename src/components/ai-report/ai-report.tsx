@@ -162,13 +162,13 @@ export default function AiReport({
                     isActive ? "h-4 w-1 shadow-lg" : "h-2.5 w-0.5"
                   }`}
                   style={{ left: `${left}%` }}
-                  title={`Paragraphe ${p.index + 1} · ${p.score}%`}
+                  title={`Phrase ${p.index + 1} · ${p.score}%`}
                 />
               );
             })}
           </div>
           <div className="flex items-center justify-between text-[10px] mt-2 opacity-80">
-            <span>{paragraphs.length} paragraphes analysés</span>
+            <span>{paragraphs.length} phrases analysées</span>
             <span>{stats.zoneCount} zones suspectes</span>
           </div>
         </div>
@@ -247,7 +247,7 @@ export default function AiReport({
                   >
                     <div className="flex items-baseline justify-between mb-1.5">
                       <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
-                        Paragraphe {p.index + 1}
+                        Phrase {p.index + 1}
                         {isIgnored && <span className="ml-2 text-gray-400">(ignoré)</span>}
                       </p>
                       <div className="flex items-center gap-2">
@@ -414,7 +414,7 @@ export default function AiReport({
               <button
                 onClick={goPrev}
                 className="rounded-full p-2 hover:bg-gray-100 transition-colors"
-                aria-label="Zone précédente"
+                aria-label="Phrase précédente"
               >
                 <ChevronLeft className="h-5 w-5 text-gray-500" />
               </button>
@@ -424,7 +424,7 @@ export default function AiReport({
               <button
                 onClick={goNext}
                 className="rounded-full p-2 hover:bg-gray-100 transition-colors"
-                aria-label="Zone suivante"
+                aria-label="Phrase suivante"
               >
                 <ChevronRight className="h-5 w-5 text-gray-500" />
               </button>
