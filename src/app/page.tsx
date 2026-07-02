@@ -344,73 +344,6 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* === Analyse CV === */}
-                  {activeTab === "cv" && (
-                    <div
-                      className={`relative rounded-3xl bg-white border-2 shadow-2xl shadow-indigo-500/[0.06] overflow-hidden transition-[border-color] duration-300 ${
-                        dragOver ? "border-indigo-500" : "border-indigo-200/60 hover:border-indigo-300"
-                      }`}
-                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                      onDragLeave={() => setDragOver(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setDragOver(false);
-                        const file = e.dataTransfer.files[0];
-                        if (file && (file.type === "application/pdf" || file.type.startsWith("image/") || /\.(pdf|docx|jpe?g|png|heic|webp)$/i.test(file.name))) {
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            sessionStorage.setItem("seora_cv_file", reader.result as string);
-                            sessionStorage.setItem("seora_cv_filename", file.name);
-                            if (session) { router.push("/app"); } else { setResultPreviewType("cv"); setShowResultPreview(true); }
-                          };
-                          reader.readAsDataURL(file);
-                        } else { toast.error("Format accepté : PDF, DOCX ou Photo"); }
-                      }}
-                    >
-                      <input ref={fileInputRef} type="file" accept=".pdf,.docx,image/*" className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              sessionStorage.setItem("seora_cv_file", reader.result as string);
-                              sessionStorage.setItem("seora_cv_filename", file.name);
-                              if (session) { router.push("/app"); } else { setResultPreviewType("cv"); setShowResultPreview(true); }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                      <div className="p-5 sm:p-8">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-                            <BarChart3 className="h-5 w-5 text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Analyse ton CV</h3>
-                            <p className="text-xs text-gray-400">Score, points forts, axes d&apos;amélioration</p>
-                          </div>
-                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
-                        </div>
-                        <div
-                          className={`border-2 border-dashed rounded-2xl py-8 sm:py-14 px-4 flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 ${
-                            dragOver ? "border-indigo-500 bg-indigo-50/50" : "border-gray-200 hover:border-indigo-400"
-                          }`}
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mb-3 transition-colors ${dragOver ? "bg-indigo-100" : "bg-gray-100"}`}>
-                            <Upload className={`h-6 w-6 ${dragOver ? "text-indigo-600" : "text-gray-400"}`} />
-                          </div>
-                          <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
-                          <p className="text-xs text-gray-400 mb-4">PDF, DOCX ou Photo</p>
-                          <div className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold shadow-md shadow-indigo-500/25 hover:shadow-lg transition-shadow">
-                            Parcourir mes fichiers
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* === Mémoire / DPP === */}
                   {activeTab === "memoire" && (
                     <div
@@ -450,8 +383,8 @@ export default function Home() {
                             <Bot className="h-5 w-5 text-white" />
                           </div>
                           <div className="flex-1">
-                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Analyse mon mémoire / DPP</h3>
-                            <p className="text-xs text-gray-400">Score IA (Compilatio, GPTZero) + humanisation sous 15%</p>
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Analyse mon document</h3>
+                            <p className="text-xs text-gray-400">Score IA + zones à risque + humanisation sous 15%</p>
                           </div>
                           <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
                         </div>
@@ -462,7 +395,7 @@ export default function Home() {
                           <div className="h-12 w-12 rounded-2xl bg-orange-100 flex items-center justify-center mb-3">
                             <FileText className="h-6 w-6 text-orange-600" />
                           </div>
-                          <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">Glissez votre mémoire ou DPP ici</p>
+                          <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">Glissez votre document ici</p>
                           <p className="text-xs text-gray-400 mb-4">PDF, DOCX, DOC ou TXT · Confidentiel</p>
                           <div className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 text-white text-sm font-semibold shadow-md shadow-orange-500/25 hover:shadow-lg transition-shadow">
                             Analyser mon dossier
@@ -560,8 +493,8 @@ export default function Home() {
                             <Plus className="h-5 w-5 text-white" />
                           </div>
                           <div className="flex-1">
-                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Créer mon CV</h3>
-                            <p className="text-xs text-gray-400">Wizard guidé étape par étape</p>
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Création de CV par IA</h3>
+                            <p className="text-xs text-gray-400">Templates pro générés par IA · gratuit</p>
                           </div>
                           <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
                         </div>
@@ -575,7 +508,7 @@ export default function Home() {
                           onClick={() => { if (session) router.push("/cv-editor"); else openAuthModal(); }}
                           className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-500/20 hover:shadow-lg transition-shadow"
                         >
-                          <Sparkles className="h-4 w-4" /> Commencer mon CV
+                          <Sparkles className="h-4 w-4" /> Créer mon CV avec l&apos;IA
                           <ArrowRight className="h-4 w-4" />
                         </button>
                         <p className="text-center text-[11px] text-gray-400 mt-3">
@@ -625,7 +558,7 @@ export default function Home() {
                           </div>
                           <div className="flex-1">
                             <h3 className="text-base sm:text-lg font-bold text-gray-900">Photo Pro IA</h3>
-                            <p className="text-xs text-gray-400">Selfie → photo professionnelle en 15 secondes</p>
+                            <p className="text-xs text-gray-400">Selfie → photo professionnelle HD en 15 secondes</p>
                           </div>
                           <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
                         </div>
