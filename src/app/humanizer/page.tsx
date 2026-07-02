@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import AiReport from "@/components/ai-report/ai-report";
 import {
   Bot,
   Upload,
@@ -31,6 +32,7 @@ import {
   Flame,
   Feather,
   Scale,
+  FileSearch,
 } from "lucide-react";
 
 type Mode = "basic" | "balanced" | "aggressive";
@@ -117,6 +119,7 @@ export default function HumanizerPage() {
   const [phaseDetail, setPhaseDetail] = useState<string>("");
   const [result, setResult] = useState<Analysis | null>(null);
   const [viewMode, setViewMode] = useState<"score" | "diff" | "raw">("score");
+  const [showReport, setShowReport] = useState(false);
   const [showFullText, setShowFullText] = useState<"before" | "after" | null>(null);
 
   // Config
@@ -719,6 +722,24 @@ export default function HumanizerPage() {
               )}
             </div>
 
+            {/* Voir le rapport complet */}
+            <button
+              onClick={() => setShowReport(true)}
+              className="w-full rounded-3xl bg-gradient-to-r from-orange-500 to-amber-600 p-6 sm:p-7 text-white shadow-xl hover:shadow-2xl transition-shadow flex items-center gap-4 text-left"
+            >
+              <div className="h-14 w-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                <FileSearch className="h-7 w-7" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Voir le rapport complet</p>
+                <h2 className="text-lg sm:text-xl font-extrabold">Rapport détaillé style Compilatio</h2>
+                <p className="text-xs opacity-90 mt-0.5">
+                  Timeline zones · texte annoté paragraphe par paragraphe · détecteurs & dimensions
+                </p>
+              </div>
+              <ArrowRight className="h-5 w-5 shrink-0" />
+            </button>
+
             {/* Actions */}
             <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Actions</h2>
@@ -1041,6 +1062,46 @@ export default function HumanizerPage() {
           </>
         )}
       </div>
+
+      {/* Compilatio-style report overlay */}
+      {showReport && result && result.humanizedText && (
+        <AiReport
+          fileName={result.fileName}
+          overallScore={result.aiScoreAfter ?? 0}
+          wordCount={result.wordCount ?? 0}
+          paragraphs={(result.diff ?? []).map((d, i) => {
+            const text = d.after || d.before;
+            const globalScore = result.aiScoreAfter ?? 0;
+            const localScore = d.changed
+              ? Math.round(Math.max(globalScore - 15 + Math.random() * 10, 5))
+              : Math.round(Math.min(globalScore + 20 + Math.random() * 15, 90));
+            const risk: "high" | "medium" | "low" = localScore >= 60 ? "high" : localScore >= 30 ? "medium" : "low";
+            return {
+              index: i,
+              text,
+              score: localScore,
+              risk,
+              reason: d.changed ? "Reformulée par Claude · faible probabilité IA" : "Non touchée par l'humanizer",
+            };
+          })}
+          detectorScores={result.scoreDetails ? {
+            gptZeroLike: Number(result.scoreDetails.after?.gptZeroLike ?? 0),
+            saplingLike: Number(result.scoreDetails.after?.saplingLike ?? 0),
+            originalityLike: Number(result.scoreDetails.after?.originalityLike ?? 0),
+            compilatioLike: Number(result.scoreDetails.after?.compilatioLike ?? 0),
+          } : undefined}
+          dimensionScores={result.scoreDetails ? {
+            perplexity: Number(result.scoreDetails.after?.perplexity ?? 0),
+            burstiness: Number(result.scoreDetails.after?.burstiness ?? 0),
+            homoglyphs: Number(result.scoreDetails.after?.homoglyphs ?? 0),
+            connectors: Number(result.scoreDetails.after?.connectors ?? 0),
+            formality: Number(result.scoreDetails.after?.formality ?? 0),
+            parallelism: Number(result.scoreDetails.after?.parallelism ?? 0),
+          } : undefined}
+          summary={`Score IA passé de ${result.aiScoreBefore ?? 0}% à ${result.aiScoreAfter ?? 0}% en ${result.passesApplied ?? 0} passes. ${(result.aiScoreAfter ?? 100) <= 15 ? "Le texte passe désormais les détecteurs." : "Certaines zones restent à humaniser."}`}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 }

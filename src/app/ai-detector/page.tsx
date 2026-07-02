@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import AiReport from "@/components/ai-report/ai-report";
 import {
   ArrowLeft,
   Search,
@@ -18,6 +19,7 @@ import {
   Globe,
   Zap,
   Info,
+  FileSearch,
 } from "lucide-react";
 
 type Language = "fr" | "en" | "es";
@@ -77,6 +79,7 @@ export default function AiDetectorPage() {
   const [language, setLanguage] = useState<Language>("fr");
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -437,6 +440,24 @@ export default function AiDetectorPage() {
               </div>
             )}
 
+            {/* Voir le rapport complet — style Compilatio */}
+            <button
+              onClick={() => setShowReport(true)}
+              className="w-full rounded-3xl bg-gradient-to-r from-orange-500 to-amber-600 p-6 sm:p-7 text-white shadow-xl hover:shadow-2xl transition-shadow flex items-center gap-4 text-left"
+            >
+              <div className="h-14 w-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                <FileSearch className="h-7 w-7" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Voir le rapport complet</p>
+                <h2 className="text-lg sm:text-xl font-extrabold">Rapport détaillé style Compilatio</h2>
+                <p className="text-xs opacity-90 mt-0.5">
+                  Timeline des zones · texte annoté · navigation par paragraphe · détecteurs & dimensions
+                </p>
+              </div>
+              <ArrowLeft className="h-5 w-5 rotate-180 shrink-0" />
+            </button>
+
             {/* Reassurance / CTA */}
             <div className="rounded-3xl bg-gradient-to-br from-violet-500 to-fuchsia-600 p-6 sm:p-8 text-white shadow-xl">
               <div className="flex items-start gap-3 mb-4">
@@ -470,6 +491,39 @@ export default function AiDetectorPage() {
                 Analyser un autre texte
               </button>
             </div>
+
+            {/* Report overlay */}
+            {showReport && result && (
+              <AiReport
+                fileName="Texte analysé"
+                overallScore={result.overall.overall}
+                wordCount={result.wordCount}
+                paragraphs={result.paragraphs.map(p => ({
+                  index: p.index,
+                  text: p.text,
+                  score: p.score,
+                  risk: p.risk,
+                  reason: (p as unknown as { reason?: string }).reason,
+                }))}
+                detectorScores={{
+                  gptZeroLike: result.overall.gptZeroLike,
+                  saplingLike: result.overall.saplingLike,
+                  originalityLike: result.overall.originalityLike,
+                  compilatioLike: result.overall.compilatioLike,
+                }}
+                dimensionScores={{
+                  perplexity: result.overall.perplexity,
+                  burstiness: result.overall.burstiness,
+                  homoglyphs: result.overall.homoglyphs,
+                  connectors: result.overall.connectors,
+                  formality: result.overall.formality,
+                  parallelism: result.overall.parallelism,
+                }}
+                summary={(result as unknown as { summary?: string }).summary}
+                topRiskZones={result.topRiskZones}
+                onClose={() => setShowReport(false)}
+              />
+            )}
           </div>
         )}
       </div>
