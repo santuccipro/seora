@@ -261,7 +261,7 @@ export default function Home() {
                 { id: "memoire" as const, label: "Mémoire / DPP", icon: Bot, tokens: "3 tokens", tokenColor: "bg-orange-100 text-orange-600" },
                 { id: "letter" as const, label: "Lettre motiv.", icon: PenTool, tokens: "3 tokens", tokenColor: "bg-blue-100 text-blue-600" },
                 { id: "create" as const, label: "Créer CV", icon: Plus, tokens: "Gratuit", tokenColor: "bg-emerald-100 text-emerald-600" },
-                { id: "photo" as const, label: "Photo Pro", icon: Camera, tokens: "Bientôt", tokenColor: "bg-pink-100 text-pink-600", disabled: true },
+                { id: "photo" as const, label: "Photo Pro", icon: Camera, tokens: "1 token", tokenColor: "bg-pink-100 text-pink-600" },
               ];
               const active = TABS.find(t => t.id === activeTab) ?? TABS[0];
               const jobChars = landingJob.length;
@@ -269,32 +269,36 @@ export default function Home() {
 
               return (
                 <div>
-                  {/* Tab bar */}
-                  <div className="flex flex-wrap gap-2 justify-center mb-4 sm:mb-5">
-                    {TABS.map(tab => {
-                      const Icon = tab.icon;
-                      const isActive = activeTab === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => !tab.disabled && setActiveTab(tab.id)}
-                          disabled={tab.disabled}
-                          className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold transition-colors ${
-                            isActive
-                              ? "bg-gray-900 text-white border-gray-900"
-                              : tab.disabled
-                              ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
-                              : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
-                          }`}
-                        >
-                          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          <span>{tab.label}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-bold ${
-                            isActive ? "bg-white/15 text-white" : tab.tokenColor
-                          }`}>{tab.tokens}</span>
-                        </button>
-                      );
-                    })}
+                  {/* Segmented tab bar — ONE line, always horizontal, scroll if too tight on mobile */}
+                  <div className="mb-4 sm:mb-5">
+                    <div className="mx-auto overflow-x-auto no-scrollbar">
+                      <div className="mx-auto inline-flex items-center gap-1 rounded-2xl bg-gray-100 p-1 shadow-inner">
+                        {TABS.map(tab => {
+                          const Icon = tab.icon;
+                          const isActive = activeTab === tab.id;
+                          return (
+                            <button
+                              key={tab.id}
+                              onClick={() => setActiveTab(tab.id)}
+                              className={`group relative inline-flex items-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-sm font-semibold transition-all ${
+                                isActive
+                                  ? "bg-white text-gray-900 shadow-md shadow-gray-900/10"
+                                  : "text-gray-500 hover:text-gray-900"
+                              }`}
+                            >
+                              <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${isActive ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-700"}`} />
+                              <span>{tab.label}</span>
+                              <span className={`hidden sm:inline rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                                isActive ? tab.tokenColor : "bg-gray-200 text-gray-500"
+                              }`}>{tab.tokens}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <p className="text-center text-[10px] sm:text-[11px] text-gray-400 mt-2">
+                      Clique sur un onglet pour changer d&apos;outil · <span className="font-semibold text-gray-500">{active.tokens}</span>
+                    </p>
                   </div>
 
                   {/* === Analyse CV === */}
@@ -538,29 +542,67 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* === Photo Pro (disabled) === */}
+                  {/* === Photo Pro === */}
                   {activeTab === "photo" && (
-                    <div className="rounded-3xl bg-white border-2 border-pink-200/60 shadow-2xl shadow-pink-500/[0.06] overflow-hidden">
-                      <div className="p-5 sm:p-8 opacity-70">
+                    <div
+                      className="relative rounded-3xl bg-white border-2 border-pink-200/60 shadow-2xl shadow-pink-500/[0.06] overflow-hidden transition-[border-color] duration-300 hover:border-pink-300"
+                      onDragOver={(e) => { e.preventDefault(); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files[0];
+                        if (file && file.type.startsWith("image/")) {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            sessionStorage.setItem("seora_photo_file", reader.result as string);
+                            sessionStorage.setItem("seora_photo_filename", file.name);
+                            if (session) { router.push("/photo-pro"); } else { openAuthModal(() => { window.location.href = "/photo-pro"; }); }
+                          };
+                          reader.readAsDataURL(file);
+                        } else { toast.error("Format accepté : Photo (JPG, PNG, HEIC, WEBP)"); }
+                      }}
+                    >
+                      <input type="file" accept="image/*" className="hidden" id="photo-upload-hero"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              sessionStorage.setItem("seora_photo_file", reader.result as string);
+                              sessionStorage.setItem("seora_photo_filename", file.name);
+                              if (session) { router.push("/photo-pro"); } else { openAuthModal(() => { window.location.href = "/photo-pro"; }); }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <div className="p-5 sm:p-8">
                         <div className="flex items-center gap-3 mb-4">
                           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center shadow-md shadow-pink-500/20">
                             <Camera className="h-5 w-5 text-white" />
                           </div>
                           <div className="flex-1">
                             <h3 className="text-base sm:text-lg font-bold text-gray-900">Photo Pro IA</h3>
-                            <p className="text-xs text-gray-400">Selfie → photo professionnelle</p>
+                            <p className="text-xs text-gray-400">Selfie → photo professionnelle en 15 secondes</p>
                           </div>
                           <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
                         </div>
-                        <div className="border-2 border-dashed border-pink-200 rounded-2xl py-10 sm:py-14 px-4 flex flex-col items-center justify-center">
+                        <label
+                          htmlFor="photo-upload-hero"
+                          className="border-2 border-dashed rounded-2xl py-8 sm:py-14 px-4 flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 border-pink-200 hover:border-pink-400"
+                        >
                           <div className="h-12 w-12 rounded-2xl bg-pink-100 flex items-center justify-center mb-3">
                             <Camera className="h-6 w-6 text-pink-500" />
                           </div>
-                          <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">Disponible très prochainement</p>
-                          <p className="text-xs text-gray-400 mb-4">Fond neutre · Retouche IA · HD</p>
-                          <div className="px-4 py-1.5 rounded-full bg-pink-100 text-pink-600 text-xs font-semibold">
-                            Bientôt en beta
+                          <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">Glissez votre selfie ici</p>
+                          <p className="text-xs text-gray-400 mb-4">JPG, PNG, HEIC ou WEBP</p>
+                          <div className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-semibold shadow-md shadow-pink-500/25 hover:shadow-lg transition-shadow">
+                            Transformer en photo pro
                           </div>
+                        </label>
+                        <div className="mt-4 flex items-center justify-center gap-4 text-[11px] text-gray-500">
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-pink-500" /> Fond neutre</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-pink-500" /> Retouche IA</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-pink-500" /> Export HD</span>
                         </div>
                       </div>
                     </div>
