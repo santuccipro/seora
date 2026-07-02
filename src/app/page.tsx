@@ -257,11 +257,11 @@ export default function Home() {
             {/* ═══ TAB BAR + UNIFIED ACTION CARD ═══ */}
             {(() => {
               const TABS = [
-                { id: "cv" as const, label: "Analyse CV", icon: BarChart3, tokens: "1 token", tokenColor: "bg-indigo-100 text-indigo-600" },
-                { id: "memoire" as const, label: "Mémoire / DPP", icon: Bot, tokens: "3 tokens", tokenColor: "bg-orange-100 text-orange-600" },
-                { id: "letter" as const, label: "Lettre motiv.", icon: PenTool, tokens: "3 tokens", tokenColor: "bg-blue-100 text-blue-600" },
-                { id: "create" as const, label: "Créer CV", icon: Plus, tokens: "Gratuit", tokenColor: "bg-emerald-100 text-emerald-600" },
-                { id: "photo" as const, label: "Photo Pro", icon: Camera, tokens: "1 token", tokenColor: "bg-pink-100 text-pink-600" },
+                { id: "cv" as const, label: "Analyse CV", shortLabel: "CV", icon: BarChart3, tokens: "1 token", tokenColor: "bg-indigo-100 text-indigo-600" },
+                { id: "memoire" as const, label: "Mémoire / DPP", shortLabel: "Mémoire", icon: Bot, tokens: "3 tokens", tokenColor: "bg-orange-100 text-orange-600" },
+                { id: "letter" as const, label: "Lettre motiv.", shortLabel: "Lettre", icon: PenTool, tokens: "3 tokens", tokenColor: "bg-blue-100 text-blue-600" },
+                { id: "create" as const, label: "Créer CV", shortLabel: "Créer", icon: Plus, tokens: "Gratuit", tokenColor: "bg-emerald-100 text-emerald-600" },
+                { id: "photo" as const, label: "Photo Pro", shortLabel: "Photo", icon: Camera, tokens: "1 token", tokenColor: "bg-pink-100 text-pink-600" },
               ];
               const active = TABS.find(t => t.id === activeTab) ?? TABS[0];
               const jobChars = landingJob.length;
@@ -269,35 +269,36 @@ export default function Home() {
 
               return (
                 <div>
-                  {/* Segmented tab bar — ONE line, always horizontal, scroll if too tight on mobile */}
+                  {/* Segmented tab bar — ONE line, all 5 tabs visible without scroll */}
                   <div className="mb-4 sm:mb-5">
-                    <div className="mx-auto overflow-x-auto no-scrollbar">
-                      <div className="mx-auto inline-flex items-center gap-1 rounded-2xl bg-gray-100 p-1 shadow-inner">
-                        {TABS.map(tab => {
-                          const Icon = tab.icon;
-                          const isActive = activeTab === tab.id;
-                          return (
-                            <button
-                              key={tab.id}
-                              onClick={() => setActiveTab(tab.id)}
-                              className={`group relative inline-flex items-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-sm font-semibold transition-all ${
-                                isActive
-                                  ? "bg-white text-gray-900 shadow-md shadow-gray-900/10"
-                                  : "text-gray-500 hover:text-gray-900"
-                              }`}
-                            >
-                              <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${isActive ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-700"}`} />
-                              <span>{tab.label}</span>
-                              <span className={`hidden sm:inline rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
-                                isActive ? tab.tokenColor : "bg-gray-200 text-gray-500"
-                              }`}>{tab.tokens}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                    <div className="w-full flex items-stretch gap-0.5 sm:gap-1 rounded-2xl bg-gray-100 p-1 shadow-inner">
+                      {TABS.map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`group flex-1 min-w-0 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-xl px-1 py-2 sm:px-3 sm:py-2.5 text-[10px] sm:text-sm font-semibold transition-all ${
+                              isActive
+                                ? "bg-white text-gray-900 shadow-md shadow-gray-900/10"
+                                : "text-gray-500 hover:text-gray-900"
+                            }`}
+                          >
+                            <Icon className={`h-4 w-4 sm:h-4 sm:w-4 shrink-0 ${isActive ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-700"}`} />
+                            <span className="truncate max-w-full">
+                              <span className="sm:hidden">{tab.shortLabel}</span>
+                              <span className="hidden sm:inline">{tab.label}</span>
+                            </span>
+                            <span className={`hidden sm:inline rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                              isActive ? tab.tokenColor : "bg-gray-200 text-gray-500"
+                            }`}>{tab.tokens}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                     <p className="text-center text-[10px] sm:text-[11px] text-gray-400 mt-2">
-                      Clique sur un onglet pour changer d&apos;outil · <span className="font-semibold text-gray-500">{active.tokens}</span>
+                      Clique sur un onglet pour changer d&apos;outil · <span className={`font-semibold px-1.5 py-0.5 rounded-full ${active.tokenColor}`}>{active.tokens}</span>
                     </p>
                   </div>
 
