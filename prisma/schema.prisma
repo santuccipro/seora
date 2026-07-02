@@ -22,12 +22,13 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts       Account[]
-  sessions       Session[]
-  cvAnalyses     CVAnalysis[]
-  coverLetters   CoverLetterAnalysis[]
-  jobMatches     JobMatch[]
-  tokenPurchases TokenPurchase[]
+  accounts            Account[]
+  sessions            Session[]
+  cvAnalyses          CVAnalysis[]
+  coverLetters        CoverLetterAnalysis[]
+  jobMatches          JobMatch[]
+  tokenPurchases      TokenPurchase[]
+  humanizerAnalyses   HumanizerAnalysis[]
 }
 
 model Account {
@@ -79,6 +80,7 @@ model CVAnalysis {
   corrections     String?
   correctedCV     String?
   structuredCV    String?
+  originalImage   String?
   status          String   @default("pending")
   tokensUsed      Int      @default(0)
   shareToken      String?  @unique
@@ -138,4 +140,28 @@ model TokenPurchase {
   createdAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model HumanizerAnalysis {
+  id                String   @id @default(cuid())
+  userId            String
+  fileName          String
+  fileType          String   // "pdf" | "docx" | "doc" | "txt"
+  originalText      String   @db.Text  // Full extracted text
+  humanizedText     String?  @db.Text  // After humanization
+  aiScoreBefore     Int?     // 0-100 probability of AI generated content
+  aiScoreAfter      Int?     // 0-100
+  scoreDetails      String?  @db.Text  // JSON: perplexity, burstiness, homoglyphs, patterns
+  passesCount       Int      @default(0)  // Number of humanization passes applied
+  wordCount         Int?
+  status            String   @default("pending")  // pending | extracting | detecting | humanizing | done | failed
+  errorMessage      String?
+  tokensUsed        Int      @default(3)
+  shareToken        String?  @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

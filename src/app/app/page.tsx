@@ -30,7 +30,9 @@ import {
   Plus,
   Camera,
   ChevronRight,
+  ChevronDown,
   History,
+  Bot,
 } from "lucide-react";
 
 /* ───────── Types ───────── */
@@ -145,13 +147,11 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Lock body scroll while uploading
+  // Auto-scroll to loading animation when analysis starts
   useEffect(() => {
-    if (theatricalStep >= 0 && uploading) {
-      document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = ""; };
+    if (theatricalStep === 0 && uploading) {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-    document.body.style.overflow = "";
   }, [theatricalStep, uploading]);
 
   // Fetch dashboard data
@@ -209,10 +209,10 @@ export default function Home() {
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Erreur réseau";
         toast.error(message);
-        setTheatricalStep(-1);
         setActiveSection("dashboard");
       }
 
+      setTheatricalStep(-1);
       setUploading(false);
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -352,6 +352,7 @@ export default function Home() {
       case "cv": return <BarChart3 className="h-3.5 w-3.5" />;
       case "cover-letter": return <PenTool className="h-3.5 w-3.5" />;
       case "job-match": return <Target className="h-3.5 w-3.5" />;
+      case "humanizer": return <Bot className="h-3.5 w-3.5" />;
       default: return <FileText className="h-3.5 w-3.5" />;
     }
   };
@@ -361,6 +362,7 @@ export default function Home() {
       case "cv": return "bg-indigo-100 text-indigo-600";
       case "cover-letter": return "bg-blue-100 text-blue-600";
       case "job-match": return "bg-emerald-100 text-emerald-600";
+      case "humanizer": return "bg-orange-100 text-orange-600";
       default: return "bg-gray-100 text-gray-600";
     }
   };
@@ -370,7 +372,16 @@ export default function Home() {
       case "cv": return "Analyse CV";
       case "cover-letter": return "Lettre";
       case "job-match": return "Job Match";
+      case "humanizer": return "Mémoire humanisé";
       default: return type;
+    }
+  };
+
+  const activityHref = (type: string, id: string) => {
+    switch (type) {
+      case "cv": return `/analyse/${id}`;
+      case "humanizer": return `/humanizer?id=${id}`;
+      default: return "#";
     }
   };
 
@@ -490,7 +501,7 @@ export default function Home() {
                 className="group rounded-2xl sm:rounded-3xl glass-strong border border-gray-200/60 p-4 sm:p-5 hover:shadow-lg hover:border-indigo-200/60 hover:scale-[1.02] transition-all relative overflow-hidden"
               >
                 <div className="absolute -bottom-6 -right-6 h-20 w-20 rounded-full bg-indigo-500/[0.04]" />
-                <div className="absolute top-3 right-3 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-500">2 tokens</div>
+                <div className="absolute top-3 right-3 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-600">Gratuit</div>
                 <div className="relative">
                   <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                     <Plus className="h-4 w-4 text-indigo-600" />
@@ -532,6 +543,34 @@ export default function Home() {
               </div>
             </div>
 
+            {/* ─── Analyse mon mémoire / DPP (humanizer) ─── */}
+            <div className="mt-4">
+              <Link
+                href="/humanizer"
+                className="group block relative rounded-2xl sm:rounded-3xl p-5 sm:p-6 overflow-hidden bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 hover:scale-[1.005] transition-all"
+              >
+                <div className="absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-white/[0.07]" />
+                <div className="absolute top-16 -right-4 h-20 w-20 rounded-full bg-white/[0.05]" />
+                <div className="absolute top-3.5 right-3.5 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold text-white/90">3 tokens</div>
+
+                <div className="relative flex items-center gap-4 sm:gap-5">
+                  <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base sm:text-lg font-extrabold text-white leading-tight">Analyser mon mémoire / DPP</p>
+                    <p className="text-[11px] sm:text-xs text-white/70 mt-1">Score IA (Compilatio, GPTZero) + humanisation pour passer sous 15%</p>
+                    <div className="mt-2 flex items-center gap-3 text-[10px] sm:text-[11px] text-white/60">
+                      <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Score IA en 30s</span>
+                      <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Humanisation auto</span>
+                      <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Export PDF/DOCX</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-white/70 group-hover:translate-x-1 transition-transform shrink-0" />
+                </div>
+              </Link>
+            </div>
+
             {/* ─── Activity feed ─── */}
             <div className="mt-7">
               <div className="flex items-center justify-between mb-3">
@@ -550,10 +589,10 @@ export default function Home() {
                   {dashboard.recentActivity.map((item) => (
                     <Link
                       key={`${item.type}-${item.id}`}
-                      href={item.type === "cv" ? `/analyse/${item.id}` : "#"}
+                      href={activityHref(item.type, item.id)}
                       className="group flex items-center gap-3.5 rounded-2xl glass-strong border border-gray-200/60 px-4 py-3.5 hover:shadow-md hover:border-indigo-200/60 transition-all"
                     >
-                      <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                      <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${activityColor(item.type)}`}>
                         {activityIcon(item.type)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -712,31 +751,33 @@ export default function Home() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="rounded-2xl bg-emerald-50/60 border border-emerald-100 p-5">
+                      <div className="rounded-2xl bg-emerald-50/60 border border-emerald-100 p-4 sm:p-5">
                         <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-3">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                           Points forts
                         </h3>
-                        <ul className="space-y-2">
-                          {analysis.strengths.map((s, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                              <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />{s}
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="space-y-1.5">
+                          {analysis.strengths.map((s, i) => {
+                            const ci = s.indexOf(" : ");
+                            const title = ci > 0 ? s.slice(0, ci).replace(/\*\*/g, "") : s.split(/(?<=[.!?])\s/)[0].replace(/\*\*/g, "");
+                            const detail = ci > 0 ? s.slice(ci + 3).trim().replace(/\*\*/g, "") : s.slice(title.length).trim().replace(/\*\*/g, "");
+                            return <CollapsibleItem key={i} title={title} detail={detail} color="emerald" />;
+                          })}
+                        </div>
                       </div>
-                      <div className="rounded-2xl bg-amber-50/60 border border-amber-100 p-5">
+                      <div className="rounded-2xl bg-amber-50/60 border border-amber-100 p-4 sm:p-5">
                         <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-3">
                           <AlertTriangle className="h-4 w-4 text-amber-600" />
                           À améliorer
                         </h3>
-                        <ul className="space-y-2">
-                          {analysis.weaknesses.map((w, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                              <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />{w}
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="space-y-1.5">
+                          {analysis.weaknesses.map((w, i) => {
+                            const ci = w.indexOf(" : ");
+                            const title = ci > 0 ? w.slice(0, ci).replace(/\*\*/g, "") : w.split(/(?<=[.!?])\s/)[0].replace(/\*\*/g, "");
+                            const detail = ci > 0 ? w.slice(ci + 3).trim().replace(/\*\*/g, "") : w.slice(title.length).trim().replace(/\*\*/g, "");
+                            return <CollapsibleItem key={i} title={title} detail={detail} color="amber" />;
+                          })}
+                        </div>
                       </div>
                     </div>
 
@@ -1012,6 +1053,25 @@ export default function Home() {
 }
 
 /* ═══════ COMPONENTS ═══════ */
+
+function CollapsibleItem({ title, detail, color }: { title: string; detail: string; color: "emerald" | "amber" }) {
+  const [open, setOpen] = useState(false);
+  const dot = color === "emerald" ? "bg-emerald-400" : "bg-amber-400";
+  return (
+    <div className="rounded-lg border border-gray-100/60 bg-white/50">
+      <button onClick={() => detail && setOpen(!open)} className="w-full flex items-start gap-2 p-2.5 text-left">
+        <div className={`mt-1.5 h-2 w-2 rounded-full ${dot} shrink-0`} />
+        <span className="flex-1 text-sm font-medium text-gray-800 leading-snug">{title}</span>
+        {detail && <ChevronDown className={`h-3.5 w-3.5 text-gray-300 shrink-0 mt-0.5 transition-transform ${open ? "rotate-180" : ""}`} />}
+      </button>
+      {open && detail && (
+        <div className="px-2.5 pb-2.5 pl-7">
+          <p className="text-xs text-gray-500 leading-relaxed">{detail}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   useEffect(() => {

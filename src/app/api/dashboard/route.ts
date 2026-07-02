@@ -19,7 +19,7 @@ export async function GET() {
     }
 
     // Fetch all data in parallel
-    const [analyses, coverLetters, jobMatches, purchases] = await Promise.all([
+    const [analyses, coverLetters, jobMatches, humanizerAnalyses, purchases] = await Promise.all([
       prisma.cVAnalysis.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: "desc" },
@@ -56,6 +56,19 @@ export async function GET() {
           tokensUsed: true,
         },
       }),
+      prisma.humanizerAnalysis.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          fileName: true,
+          aiScoreBefore: true,
+          aiScoreAfter: true,
+          status: true,
+          createdAt: true,
+          tokensUsed: true,
+        },
+      }),
       prisma.tokenPurchase.findMany({
         where: { userId: user.id, status: "completed" },
         orderBy: { createdAt: "desc" },
@@ -73,6 +86,7 @@ export async function GET() {
     const totalAnalyses = analyses.length;
     const totalCoverLetters = coverLetters.length;
     const totalJobMatches = jobMatches.length;
+    const totalHumanizerAnalyses = humanizerAnalyses.length;
     const avgScore = totalAnalyses > 0
       ? Math.round(analyses.reduce((sum, a) => sum + (a.score || 0), 0) / totalAnalyses)
       : 0;
@@ -83,6 +97,7 @@ export async function GET() {
       ...analyses.map(a => a.tokensUsed || 0),
       ...coverLetters.map(c => c.tokensUsed || 0),
       ...jobMatches.map(j => j.tokensUsed || 0),
+      ...humanizerAnalyses.map(h => h.tokensUsed || 0),
     ].reduce((sum, t) => sum + t, 0);
 
     // Build recent activity (last 10 items, mixed)
@@ -108,6 +123,13 @@ export async function GET() {
         score: j.matchScore,
         date: j.createdAt,
       })),
+      ...humanizerAnalyses.slice(0, 5).map(h => ({
+        id: h.id,
+        type: "humanizer" as const,
+        title: h.fileName || "Mémoire / DPP",
+        score: h.aiScoreAfter,
+        date: h.createdAt,
+      })),
     ]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
@@ -125,6 +147,7 @@ export async function GET() {
         totalAnalyses,
         totalCoverLetters,
         totalJobMatches,
+        totalHumanizerAnalyses,
         avgScore,
         bestScore,
         totalTokensSpent,
