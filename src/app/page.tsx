@@ -85,17 +85,12 @@ export default function Home() {
 
 
 
-  // Auto-cycle demo tabs
+  // Auto-cycle the all-in-one demo across the 5 tools
   useEffect(() => {
     if (!autoCycleDemo) return;
-    const durations: Record<number, number> = { 0: 12000, 2: 10000, 3: 14000 };
-    const order = [0, 2];
-    const currentDuration = durations[activeDemo] || 12000;
     const timer = setTimeout(() => {
-      const currentIndex = order.indexOf(activeDemo);
-      const nextIndex = (currentIndex + 1) % order.length;
-      setActiveDemo(order[nextIndex]);
-    }, currentDuration);
+      setActiveDemo((prev) => (prev + 1) % 5);
+    }, 4200);
     return () => clearTimeout(timer);
   }, [activeDemo, autoCycleDemo]);
 
@@ -651,366 +646,182 @@ export default function Home() {
           </div>
         </section>
 
-
         {/* ══════════════════════════════════════ */}
-        {/*  4. DEMO — 3 separate animated cards   */}
+        {/*  4. DEMO — Single unified all-in-one   */}
         {/* ══════════════════════════════════════ */}
         <section className="py-10 sm:py-14">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6">
             <div className="text-center mb-8">
-              {/* Play icon visual */}
               <div className="relative inline-flex items-center justify-center mb-5">
                 <div className="absolute inset-0 rounded-full bg-indigo-500/20 animate-ping" style={{ animationDuration: "2s" }} />
-                <div className="absolute -inset-3 rounded-full bg-indigo-400/10 blur-md animate-pulse" />
                 <div className="relative flex h-14 w-14 items-center justify-center rounded-full brand-gradient shadow-lg shadow-indigo-500/30">
-                  <ChevronDown className="h-6 w-6 text-white" />
+                  <Sparkles className="h-6 w-6 text-white" />
                 </div>
               </div>
               <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl mb-2">
-                Comment ça marche ?
+                Tout ce que tu peux faire avec Seora
               </h2>
-              <p className="text-sm text-gray-400">Regarde la démo en direct — aucune inscription requise</p>
+              <p className="text-sm text-gray-500 max-w-lg mx-auto">
+                Un seul compte, 5 outils, zéro friction. Regarde le tour du produit en direct.
+              </p>
             </div>
 
-            {/* Tab selector */}
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2 mb-8">
-              {[
-                { icon: BarChart3, label: "Analyse CV", idx: 0 },
-                { icon: PenTool, label: "Lettre", idx: 2 },
-              ].map((tab) => (
-                <button
-                  key={tab.idx}
-                  onClick={() => { setActiveDemo(tab.idx); setAutoCycleDemo(false); setTimeout(() => setAutoCycleDemo(true), 20000); }}
-                  className={`flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 sm:px-4 py-2.5 text-xs font-semibold transition-all ${
-                    activeDemo === tab.idx
-                      ? "brand-gradient text-white shadow-lg shadow-indigo-500/20"
-                      : "glass-card text-gray-500 hover:text-gray-900"
-                  }`}
-                >
-                  <tab.icon className="h-3.5 w-3.5" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {(() => {
+              const DEMOS = [
+                {
+                  key: "cv",
+                  label: "Analyse CV",
+                  icon: BarChart3,
+                  accent: "from-indigo-500 to-purple-600",
+                  chipBg: "bg-indigo-100 text-indigo-700",
+                  scenario: {
+                    title: "Analyse ton CV",
+                    input: "CV_marie_martin.pdf",
+                    steps: ["Extraction", "6 critères notés", "Score final"],
+                    output: { label: "Score global", value: "78 / 100", sub: "+12 vs. la moyenne" },
+                  },
+                },
+                {
+                  key: "memoire",
+                  label: "Mémoire / DPP",
+                  icon: Bot,
+                  accent: "from-orange-500 to-amber-600",
+                  chipBg: "bg-orange-100 text-orange-700",
+                  scenario: {
+                    title: "Humanise ton mémoire",
+                    input: "DPP_Financia.docx",
+                    steps: ["Scan IA", "Reformulation", "Score après"],
+                    output: { label: "Score IA", value: "40% → 8%", sub: "Passe Compilatio" },
+                  },
+                },
+                {
+                  key: "letter",
+                  label: "Lettre motiv.",
+                  icon: PenTool,
+                  accent: "from-blue-500 to-indigo-600",
+                  chipBg: "bg-blue-100 text-blue-700",
+                  scenario: {
+                    title: "Génère ta lettre",
+                    input: "Data Analyst · Doctolib",
+                    steps: ["Recherche entreprise", "Adaptation à l'offre", "Rédaction"],
+                    output: { label: "Prêt en", value: "22 sec", sub: "Adaptée à l'offre" },
+                  },
+                },
+                {
+                  key: "create",
+                  label: "Créer CV",
+                  icon: Plus,
+                  accent: "from-emerald-500 to-teal-600",
+                  chipBg: "bg-emerald-100 text-emerald-700",
+                  scenario: {
+                    title: "Construis ton CV",
+                    input: "Wizard guidé · 10 min",
+                    steps: ["Infos perso", "Expériences", "Template pro"],
+                    output: { label: "Export", value: "PDF HD", sub: "6 templates, prêt à envoyer" },
+                  },
+                },
+                {
+                  key: "photo",
+                  label: "Photo Pro",
+                  icon: Camera,
+                  accent: "from-pink-500 to-rose-500",
+                  chipBg: "bg-pink-100 text-pink-700",
+                  scenario: {
+                    title: "Retouche ton selfie",
+                    input: "selfie_iphone.jpg",
+                    steps: ["Détourage IA", "Fond neutre", "Amélioration HD"],
+                    output: { label: "Photo pro", value: "800×800", sub: "3 fonds au choix" },
+                  },
+                },
+              ];
+              const current = DEMOS[activeDemo % DEMOS.length];
+              const ActiveIcon = current.icon;
 
-            {/* Single card at a time */}
-            <div className="mx-auto max-w-lg">
+              return (
+                <div className="mx-auto max-w-xl">
+                  {/* Mini tab strip — mirrors the hero tab bar so the "all-in-one" is instantly readable */}
+                  <div className="flex items-stretch gap-0.5 sm:gap-1 rounded-2xl bg-gray-100 p-1 shadow-inner mb-4">
+                    {DEMOS.map((d, i) => {
+                      const Icon = d.icon;
+                      const isActive = i === activeDemo % DEMOS.length;
+                      return (
+                        <button
+                          key={d.key}
+                          onClick={() => { setActiveDemo(i); setAutoCycleDemo(false); setTimeout(() => setAutoCycleDemo(true), 20000); }}
+                          className={`flex-1 min-w-0 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-xl px-1 py-2 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-semibold transition-all ${
+                            isActive ? "bg-white text-gray-900 shadow-md shadow-gray-900/10" : "text-gray-500 hover:text-gray-900"
+                          }`}
+                        >
+                          <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-indigo-600" : "text-gray-400"}`} />
+                          <span className="truncate">
+                            <span className="sm:hidden">{d.label.split(" ")[0]}</span>
+                            <span className="hidden sm:inline">{d.label}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-              {/* ─── Demo 1: Analyse CV ─── */}
-              {activeDemo === 0 && (
-                <div className="glass-card rounded-3xl overflow-hidden animate-fade-up" style={{ animationDuration: "0.3s" }}>
-                  <div className="flex items-center gap-2.5 px-6 py-4 border-b border-gray-200/60">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100">
-                      <BarChart3 className="h-4.5 w-4.5 text-indigo-600" />
+                  {/* Card that morphs in place — mocks the tool result in 3 tiny steps */}
+                  <div key={current.key} className="rounded-3xl bg-white border border-gray-200/60 shadow-2xl shadow-indigo-500/[0.06] overflow-hidden animate-fade-up" style={{ animationDuration: "0.35s" }}>
+                    {/* Card header */}
+                    <div className="flex items-center gap-3 px-5 sm:px-6 py-4 border-b border-gray-100">
+                      <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${current.accent} flex items-center justify-center shadow-md`}>
+                        <ActiveIcon className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{current.scenario.title}</p>
+                        <p className="text-[11px] text-gray-500 truncate">{current.scenario.input}</p>
+                      </div>
+                      <span className={`hidden sm:inline rounded-full px-2 py-0.5 text-[10px] font-bold ${current.chipBg}`}>en cours</span>
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-900">Analyse CV</p>
-                      <p className="text-[11px] text-gray-400">Score détaillé sur 6 critères en 30 secondes</p>
+
+                    {/* 3-step pipeline */}
+                    <div className="px-5 sm:px-6 py-5 grid grid-cols-3 gap-2">
+                      {current.scenario.steps.map((step, i) => (
+                        <div key={i} className="flex flex-col items-center text-center gap-1.5">
+                          <div className={`h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white bg-gradient-to-br ${current.accent} shadow`}>
+                            {i + 1}
+                          </div>
+                          <p className="text-[10px] sm:text-[11px] font-semibold text-gray-700 leading-tight">{step}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Output block */}
+                    <div className="px-5 sm:px-6 py-5 border-t border-gray-100 bg-gray-50/60">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${current.chipBg}`}>
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">{current.scenario.output.label}</p>
+                          <p className="text-lg sm:text-xl font-extrabold text-gray-900 truncate">{current.scenario.output.value}</p>
+                          <p className="text-[11px] text-gray-500 truncate">{current.scenario.output.sub}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar (auto-cycle) */}
+                    <div className="h-1 bg-gray-100">
+                      <div className={`h-full bg-gradient-to-r ${current.accent}`} style={{ width: "100%", animation: "seora-demo-progress 4.2s linear infinite", transformOrigin: "left" }} />
                     </div>
                   </div>
-                  {/* Timeline */}
-                  <div className="flex items-center justify-center gap-0 px-4 sm:px-6 py-3 border-b border-gray-100">
-                    {[
-                      { n: 1, label: "Upload", cls: "tl-a-step1" },
-                      { n: 2, label: "Analyse", cls: "tl-a-step2" },
-                      { n: 3, label: "Score", cls: "tl-a-step3" },
-                      { n: 4, label: "Optimisation", cls: "tl-a-step4" },
-                      { n: 5, label: "Résultat", cls: "tl-a-step5" },
-                    ].map((s, i) => (
-                      <div key={s.n} className="flex items-center">
-                        <div className="flex flex-col items-center">
-                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold transition-all ${s.cls}`}>{s.n}</div>
-                          <span className="mt-1 text-[8px] text-gray-400 font-medium">{s.label}</span>
-                        </div>
-                        {i < 4 && <div className="h-px w-4 sm:w-6 bg-gray-200 mt-[-10px]" />}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="relative h-[340px] overflow-hidden">
-                    {/* Phase 1: Upload */}
-                    <div className="anim-phase anim-a-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="anim-a-file w-24 h-32 rounded-xl bg-white border-2 border-dashed border-indigo-300 flex flex-col items-center justify-center shadow-lg shadow-indigo-100/50">
-                        <FileText className="h-8 w-8 text-indigo-400 mb-2" />
-                        <span className="text-[9px] font-bold text-indigo-500">mon-cv.pdf</span>
-                        <span className="text-[8px] text-gray-400 mt-0.5">245 Ko</span>
-                      </div>
-                      <div className="mt-5 w-52 h-12 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center gap-2 anim-a-zone">
-                        <Upload className="h-3.5 w-3.5 text-gray-400" />
-                        <span className="text-[10px] text-gray-400 font-medium">Déposez votre CV ici</span>
-                      </div>
-                    </div>
-                    {/* Phase 2: Scanning */}
-                    <div className="anim-phase anim-a-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="w-full max-w-xs">
-                        <div className="rounded-xl bg-white border border-gray-200/80 p-5 shadow-sm space-y-3 relative overflow-hidden">
-                          <div className="anim-a-scanline absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-                          <div className="space-y-2">
-                            <div className="h-3 w-28 rounded bg-gray-800/80" />
-                            <div className="h-2 w-40 rounded bg-gray-300" />
-                          </div>
-                          <div className="border-t border-gray-100 pt-3 space-y-2">
-                            <div className="h-2 w-full rounded bg-gray-200" />
-                            <div className="h-2 w-5/6 rounded bg-gray-200" />
-                            <div className="h-2 w-4/6 rounded bg-gray-200" />
-                          </div>
-                        </div>
-                        <div className="mt-4 space-y-2">
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="font-semibold text-gray-600 flex items-center gap-1.5">
-                              <Loader2 className="h-3 w-3 animate-spin text-indigo-500" />
-                              Analyse en cours...
-                            </span>
-                          </div>
-                          <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
-                            <div className="anim-a-progress h-full rounded-full brand-gradient" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Phase 3: Bad Score (red) */}
-                    <div className="anim-phase anim-a-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="anim-a-score-pop">
-                        <svg width="120" height="120" viewBox="0 0 120 120">
-                          <circle cx="60" cy="60" r="50" fill="none" stroke="#E5E7EB" strokeWidth="8" />
-                          <circle cx="60" cy="60" r="50" fill="none" stroke="#EF4444" strokeWidth="8"
-                            strokeDasharray="314" className="anim-a-ring-bad"
-                            strokeLinecap="round" style={{ transform: "rotate(-90deg)", transformOrigin: "center" }} />
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="text-3xl font-extrabold text-red-500">32</span>
-                          <span className="text-[10px] text-gray-400 -mt-0.5">/100</span>
-                        </div>
-                      </div>
-                      <div className="mt-5 w-full max-w-[220px] space-y-2 anim-a-bars">
-                        {[
-                          { l: "Structure", p: 25, c: "bg-red-400" },
-                          { l: "Expérience", p: 40, c: "bg-orange-400" },
-                          { l: "Compétences", p: 30, c: "bg-red-400" },
-                          { l: "Impact", p: 20, c: "bg-red-500" },
-                          { l: "ATS", p: 45, c: "bg-orange-400" },
-                        ].map((b) => (
-                          <div key={b.l} className="flex items-center gap-2">
-                            <span className="text-[9px] text-gray-400 w-16 text-right">{b.l}</span>
-                            <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                              <div className={`anim-a-bar h-full rounded-full ${b.c}`} style={{ ["--bw" as string]: `${b.p}%` }} />
-                            </div>
-                            <span className="text-[9px] font-bold text-red-500 w-7">{b.p}%</span>
-                          </div>
-                        ))}
-                      </div>
-                      <span className="mt-3 rounded-full bg-red-50 border border-red-200/60 px-3 py-1 text-[10px] font-semibold text-red-500 anim-a-badge flex items-center gap-1">
-                        <XCircle className="h-3 w-3" /> CV non optimisé
-                      </span>
-                    </div>
-                    {/* Phase 4: Magic Seora fix */}
-                    <div className="anim-phase anim-a-phase4 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="relative">
-                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 anim-a-magic-glow">
-                          <Sparkles className="h-8 w-8 text-white" />
-                        </div>
-                        <div className="absolute -inset-3 rounded-3xl border-2 border-indigo-300/40 anim-a-magic-spin" style={{ borderStyle: "dashed" }} />
-                      </div>
-                      <p className="mt-4 text-sm font-bold text-gray-900">Seora optimise ton CV...</p>
-                      <p className="text-[11px] text-gray-400 mt-1">Réécriture et corrections en cours</p>
-                      <div className="mt-5 w-full max-w-[220px] space-y-2.5">
-                        {[
-                          { t: "Structure réorganisée", d: 1 },
-                          { t: "Mots-clés ATS ajoutés", d: 2 },
-                          { t: "Impact quantifié", d: 3 },
-                          { t: "Compétences enrichies", d: 4 },
-                        ].map((item) => (
-                          <div key={item.t} className={`flex items-center gap-2 anim-a-magic-line anim-a-magic-line-${item.d}`}>
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                            <span className="text-[10px] text-gray-600">{item.t}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {/* Phase 5: Good Score (green) */}
-                    <div className="anim-phase anim-a-phase5 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="anim-a-score-pop">
-                        <svg width="120" height="120" viewBox="0 0 120 120">
-                          <circle cx="60" cy="60" r="50" fill="none" stroke="#E5E7EB" strokeWidth="8" />
-                          <circle cx="60" cy="60" r="50" fill="none" stroke="url(#sg2)" strokeWidth="8"
-                            strokeDasharray="314" className="anim-a-ring"
-                            strokeLinecap="round" style={{ transform: "rotate(-90deg)", transformOrigin: "center" }} />
-                          <defs><linearGradient id="sg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#059669" /><stop offset="100%" stopColor="#10B981" /></linearGradient></defs>
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="text-3xl font-extrabold text-emerald-600">92</span>
-                          <span className="text-[10px] text-gray-400 -mt-0.5">/100</span>
-                        </div>
-                      </div>
-                      <div className="mt-5 w-full max-w-[220px] space-y-2 anim-a-bars">
-                        {[
-                          { l: "Structure", p: 95, c: "bg-emerald-500" },
-                          { l: "Expérience", p: 88, c: "bg-emerald-500" },
-                          { l: "Compétences", p: 90, c: "bg-emerald-500" },
-                          { l: "Impact", p: 85, c: "bg-emerald-400" },
-                          { l: "ATS", p: 96, c: "bg-emerald-600" },
-                        ].map((b) => (
-                          <div key={b.l} className="flex items-center gap-2">
-                            <span className="text-[9px] text-gray-400 w-16 text-right">{b.l}</span>
-                            <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                              <div className={`anim-a-bar h-full rounded-full ${b.c}`} style={{ ["--bw" as string]: `${b.p}%` }} />
-                            </div>
-                            <span className="text-[9px] font-bold text-emerald-600 w-7">{b.p}%</span>
-                          </div>
-                        ))}
-                      </div>
-                      <span className="mt-3 rounded-full bg-emerald-50 border border-emerald-200/60 px-3 py-1 text-[10px] font-semibold text-emerald-600 anim-a-badge flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> Prêt à envoyer
-                      </span>
-                    </div>
-                  </div>
+
+                  <p className="text-center text-[11px] text-gray-400 mt-3">
+                    Auto-play · l&apos;outil change toutes les 4 secondes · <button onClick={() => setAutoCycleDemo(!autoCycleDemo)} className="underline hover:text-gray-700 transition-colors">{autoCycleDemo ? "mettre en pause" : "reprendre"}</button>
+                  </p>
                 </div>
-              )}
+              );
+            })()}
 
-              {/* ─── Demo 2: Lettre de motivation ─── */}
-              {activeDemo === 2 && (
-                <div className="glass-card rounded-3xl overflow-hidden animate-fade-up" style={{ animationDuration: "0.3s" }}>
-                  <div className="flex items-center gap-2.5 px-6 py-4 border-b border-gray-200/60">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100">
-                      <PenTool className="h-4.5 w-4.5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-900">Lettre de motivation</p>
-                      <p className="text-[11px] text-gray-400">Générée par l&apos;IA, adaptée à l&apos;entreprise</p>
-                    </div>
-                  </div>
-                  {/* Timeline */}
-                  <div className="flex items-center justify-center gap-0 px-4 sm:px-6 py-3 border-b border-gray-100">
-                    {[
-                      { n: 1, label: "Secteur", cls: "tl-c-step1" },
-                      { n: 2, label: "Entreprise", cls: "tl-c-step2" },
-                      { n: 3, label: "Génération", cls: "tl-c-step3" },
-                      { n: 4, label: "Résultat", cls: "tl-c-step4" },
-                    ].map((s, i) => (
-                      <div key={s.n} className="flex items-center">
-                        <div className="flex flex-col items-center">
-                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold transition-all ${s.cls}`}>{s.n}</div>
-                          <span className="mt-1 text-[8px] text-gray-400 font-medium">{s.label}</span>
-                        </div>
-                        {i < 3 && <div className="h-px w-6 sm:w-10 bg-gray-200 mt-[-10px]" />}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="relative h-[380px] overflow-hidden">
-                    {/* Phase 1: Choix du secteur */}
-                    <div className="anim-phase anim-c-phase1 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <p className="text-[10px] font-semibold text-gray-600 mb-3">Choisis ton secteur</p>
-                      <div className="w-full max-w-xs space-y-2">
-                        {[
-                          { label: "Marketing & Communication", icon: TrendingUp },
-                          { label: "Tech & Développement", icon: Zap },
-                          { label: "Finance & Audit", icon: Briefcase },
-                        ].map((item, i) => (
-                          <div key={i} className={`anim-c-select anim-c-select-${i+1} rounded-xl border p-3 flex items-center gap-3 ${i === 0 ? "border-indigo-300 bg-indigo-50/50 shadow-sm" : "border-gray-200 bg-white"}`}>
-                            <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${i === 0 ? "bg-indigo-100" : "bg-gray-100"}`}>
-                              <item.icon className={`h-3.5 w-3.5 ${i === 0 ? "text-indigo-600" : "text-gray-400"}`} />
-                            </div>
-                            <span className={`text-xs font-medium ${i === 0 ? "text-indigo-700" : "text-gray-500"}`}>{item.label}</span>
-                            {i === 0 && <CheckCircle2 className="h-4 w-4 text-indigo-500 ml-auto" />}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {/* Phase 2: Saisie entreprise */}
-                    <div className="anim-phase anim-c-phase2 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="w-full max-w-xs space-y-4">
-                        <div>
-                          <p className="text-[10px] font-semibold text-gray-500 mb-1.5">Secteur</p>
-                          <div className="rounded-lg border border-indigo-200 bg-indigo-50/30 px-3 py-2 flex items-center gap-2">
-                            <TrendingUp className="h-3.5 w-3.5 text-indigo-500" />
-                            <span className="text-xs text-indigo-700 font-medium">Marketing & Communication</span>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-semibold text-gray-500 mb-1.5">Entreprise</p>
-                          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 flex items-center">
-                            <span className="text-xs text-gray-800 font-medium anim-c-typing-text">L&apos;Oréal Paris</span>
-                            <span className="anim-c-cursor text-indigo-500 text-xs ml-0.5 font-light">|</span>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-semibold text-gray-500 mb-1.5">Poste visé</p>
-                          <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 flex items-center">
-                            <span className="text-xs text-gray-800 font-medium anim-c-typing-text" style={{ animationDelay: "0.8s" }}>Stage Marketing Digital</span>
-                            <span className="anim-c-cursor text-indigo-500 text-xs ml-0.5 font-light">|</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Phase 3: Génération */}
-                    <div className="anim-phase anim-c-phase3 absolute inset-0 flex flex-col items-center justify-center p-6">
-                      <div className="relative">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 anim-a-magic-glow">
-                          <PenTool className="h-7 w-7 text-white" />
-                        </div>
-                        <div className="absolute -inset-3 rounded-3xl border-2 border-blue-300/40 anim-a-magic-spin" style={{ borderStyle: "dashed" }} />
-                      </div>
-                      <p className="mt-4 text-sm font-bold text-gray-900">Rédaction en cours...</p>
-                      <p className="text-[11px] text-gray-400 mt-1">L&apos;IA adapte ta lettre pour L&apos;Oréal</p>
-                      <div className="mt-5 w-full max-w-[220px] space-y-2.5">
-                        {[
-                          { t: "Analyse de l'offre", d: 1 },
-                          { t: "Adaptation au secteur", d: 2 },
-                          { t: "Mots-clés intégrés", d: 3 },
-                          { t: "Ton personnalisé", d: 4 },
-                        ].map((item) => (
-                          <div key={item.t} className={`flex items-center gap-2 anim-a-magic-line anim-a-magic-line-${item.d}`}>
-                            <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                            <span className="text-[10px] text-gray-600">{item.t}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {/* Phase 4: Lettre générée */}
-                    <div className="anim-phase anim-c-phase4 absolute inset-0 flex flex-col p-5 overflow-hidden">
-                      <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 mb-3 flex items-center justify-between">
-                        <div>
-                          <p className="text-[9px] text-blue-500 font-semibold">L&apos;Oréal Paris — Marketing Digital</p>
-                        </div>
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[8px] font-bold text-blue-600">Personnalisée</span>
-                      </div>
-                      <div className="rounded-xl bg-white border border-gray-200/80 p-4 shadow-sm space-y-2 flex-1">
-                        <p className="text-[9px] text-gray-400 uppercase tracking-wider">Objet</p>
-                        <p className="text-xs text-indigo-600 font-semibold anim-c-line anim-c-line-1">Candidature — Stage Marketing Digital</p>
-                        <div className="border-t border-gray-100 pt-2 space-y-2">
-                          <p className="text-[11px] text-gray-600 anim-c-line anim-c-line-2">Madame, Monsieur,</p>
-                          <p className="text-[11px] text-gray-500 leading-relaxed anim-c-line anim-c-line-3">
-                            Passionnée par le marketing digital, je souhaite intégrer L&apos;Oréal Paris pour contribuer à vos campagnes...
-                          </p>
-                          <p className="text-[11px] text-gray-500 leading-relaxed anim-c-line anim-c-line-4">
-                            Mon expérience en stratégie social media m&apos;a permis de générer +45% d&apos;engagement...
-                          </p>
-                          <p className="text-[11px] text-gray-500 leading-relaxed anim-c-line anim-c-line-5">
-                            Je serais ravie d&apos;échanger sur la valeur ajoutée que je pourrais apporter à votre équipe.
-                          </p>
-                          <p className="text-[11px] text-gray-600 anim-c-line anim-c-line-6">Cordialement,</p>
-                          <p className="text-[11px] text-indigo-600 font-semibold anim-c-line anim-c-line-7">Marie Dupont</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-center mt-2 anim-c-line anim-c-line-8">
-                        <span className="rounded-full bg-emerald-50 border border-emerald-200/60 px-3 py-1 text-[10px] font-semibold text-emerald-600 flex items-center gap-1.5">
-                          <CheckCircle2 className="h-3 w-3" /> Prête à envoyer
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-            </div>
-
-            {/* CTA under demos */}
-            <div className="mt-10 text-center">
+            {/* Bottom CTA */}
+            <div className="text-center mt-10">
               <button
                 onClick={() => document.getElementById('hero-upload')?.scrollIntoView({ behavior: 'smooth' })}
                 className="inline-flex items-center gap-2 brand-gradient animate-cta-pulse rounded-2xl px-8 py-4 text-sm font-bold text-white hover:scale-[1.03] transition-transform"
               >
-                Analyser mon CV
+                Essayer maintenant
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>

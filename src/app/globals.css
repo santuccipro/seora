@@ -71,6 +71,11 @@ body {
   to { width: 100%; }
 }
 
+@keyframes seora-demo-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
