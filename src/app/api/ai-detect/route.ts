@@ -3,24 +3,95 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { detectAI, detectByParagraph, Language } from "@/lib/humanize-engine";
+import { callClaudeJSON } from "@/lib/claude-client";
+import { Language } from "@/lib/humanize-engine";
 
 const TOKEN_COST = 1;
 const MAX_CHARS = 10000;
 
-/**
- * POST /api/ai-detect
- *
- * Body JSON: { text: string, language?: "fr"|"en"|"es" }
- * Response:
- *   {
- *     overall: DetectorScore,
- *     paragraphs: ParagraphAIScore[],
- *     wordCount: number,
- *     charCount: number,
- *     topRiskZones: string[]
- *   }
- */
+interface Detail {
+  perplexity: number;
+  burstiness: number;
+  homoglyphs: number;
+  connectors: number;
+  formality: number;
+  parallelism: number;
+}
+
+interface ParagraphScore {
+  index: number;
+  text: string;
+  score: number;
+  risk: "high" | "medium" | "low";
+  details: Detail;
+  reason: string;
+}
+
+interface ClaudeAnalysis {
+  overall: {
+    overall: number;
+    gptZeroLike: number;
+    saplingLike: number;
+    originalityLike: number;
+    compilatioLike: number;
+    perplexity: number;
+    burstiness: number;
+    homoglyphs: number;
+    connectors: number;
+    formality: number;
+    parallelism: number;
+  };
+  paragraphs: ParagraphScore[];
+  topRiskZones: string[];
+  summary: string;
+}
+
+const SYSTEM_PROMPT = `Tu es un expert en détection de textes générés par IA (GPT, Claude, Gemini). Tu analyses des textes académiques en français, anglais ou espagnol.
+
+Ta mission : produire un rapport ULTRA COMPLET style Compilatio qui identifie précisément quelles zones sont probablement générées par IA, avec ta propre réflexion et ton propre raisonnement (pas juste un algorithme statistique).
+
+Format JSON STRICT en sortie (rien avant, rien après, pas de backticks) :
+{
+  "overall": {
+    "overall": <0-100 probabilité globale IA>,
+    "gptZeroLike": <0-100 en pondérant perplexité + burstiness>,
+    "saplingLike": <0-100 en pondérant connecteurs + formalité>,
+    "originalityLike": <0-100 en pondérant homoglyphes + burstiness>,
+    "compilatioLike": <0-100 en pondérant homoglyphes + connecteurs + parallélisme>,
+    "perplexity": <0-100, à quel point le vocab est prévisible>,
+    "burstiness": <0-100, à quel point les phrases sont monotones>,
+    "homoglyphs": <0-100, présence de caractères cyrilliques cachés>,
+    "connectors": <0-100, densité de connecteurs académiques>,
+    "formality": <0-100, sophistication du vocabulaire>,
+    "parallelism": <0-100, structures parallèles typées IA>
+  },
+  "paragraphs": [
+    {
+      "index": 0,
+      "text": "<paragraphe original complet>",
+      "score": <0-100>,
+      "risk": "high" | "medium" | "low",
+      "details": { ... les 6 dimensions ... },
+      "reason": "<1 phrase pourquoi ce paragraphe est flag>"
+    },
+    ...
+  ],
+  "topRiskZones": [
+    "<extrait 200 chars max du passage le plus flag>",
+    ... (jusqu'à 5)
+  ],
+  "summary": "<1 phrase résumant l'analyse globale>"
+}
+
+Règles :
+- Score 0-15% = probablement humain
+- Score 15-40% = zone de doute
+- Score 40+ % = probablement IA
+- risk: "high" si score >= 60, "medium" si 30-60, "low" si < 30
+- Analyse CHAQUE paragraphe séparément (pas de moyenne globale sur les paragraphes individuels)
+- topRiskZones : trie du plus risqué au moins risqué
+- Sois précis et honnête, n'invente pas`;
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -49,7 +120,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Langue non supportée" }, { status: 400 });
     }
 
-    // Deduct 1 token
     const deductResult = await prisma.user.updateMany({
       where: { id: user.id, tokens: { gte: TOKEN_COST } },
       data: { tokens: { decrement: TOKEN_COST } },
@@ -62,38 +132,43 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const overall = detectAI(text, language);
-      const paragraphs = detectByParagraph(text, language);
-      const highRisk = paragraphs.filter(p => p.risk === "high").length;
-      const mediumRisk = paragraphs.filter(p => p.risk === "medium").length;
-      const lowRisk = paragraphs.filter(p => p.risk === "low").length;
+      const languageLabel = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";
+      const prompt = `LANGUE DU TEXTE : ${languageLabel}\n\nTEXTE À ANALYSER (${text.length} caractères) :\n\n${text}`;
 
-      const topRiskZones = paragraphs
-        .filter(p => p.risk === "high")
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 5)
-        .map(p => p.text.slice(0, 200) + (p.text.length > 200 ? "…" : ""));
+      const analysis = await callClaudeJSON<ClaudeAnalysis>(prompt, {
+        system: SYSTEM_PROMPT,
+        model: "claude-sonnet-4-6",
+        timeoutMs: 80_000,
+      });
+
+      const highRisk = analysis.paragraphs.filter(p => p.risk === "high").length;
+      const mediumRisk = analysis.paragraphs.filter(p => p.risk === "medium").length;
+      const lowRisk = analysis.paragraphs.filter(p => p.risk === "low").length;
 
       return NextResponse.json({
-        overall,
-        paragraphs,
+        overall: analysis.overall,
+        paragraphs: analysis.paragraphs,
         wordCount: text.trim().split(/\s+/).length,
         charCount: text.length,
         stats: {
-          totalParagraphs: paragraphs.length,
+          totalParagraphs: analysis.paragraphs.length,
           highRisk,
           mediumRisk,
           lowRisk,
         },
-        topRiskZones,
+        topRiskZones: analysis.topRiskZones,
+        summary: analysis.summary,
       });
     } catch (err) {
-      // Refund tokens on internal failure
       await prisma.user.update({
         where: { id: user.id },
         data: { tokens: { increment: TOKEN_COST } },
       });
-      throw err;
+      console.error("[api/ai-detect] Claude failed:", err);
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Erreur analyse Claude" },
+        { status: 500 }
+      );
     }
   } catch (err) {
     console.error("[api/ai-detect] Fatal:", err);

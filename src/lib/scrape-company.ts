@@ -1,6 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+import { callClaudeJSON } from "./claude-client";
 
 export interface CompanyInfo {
   name: string;
@@ -83,16 +81,15 @@ export async function researchCompany(
     }
   }
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `Fais une recherche sur l'entreprise "${companyName}".
+  return await callClaudeJSON<CompanyInfo>(
+    `Fais une recherche sur l'entreprise "${companyName}".
 ${
   webContent
     ? `\nVoici du contenu de leur site web:\n${webContent.slice(0, 3000)}`
     : "\nJe n'ai pas pu accéder à leur site web."
 }
 
-Réponds avec un JSON au format:
+Réponds avec un JSON strict au format:
 {
   "name": "${companyName}",
   "description": "<description de l'entreprise en 2-3 phrases>",
@@ -105,13 +102,6 @@ Réponds avec un JSON au format:
 }
 
 Utilise tes connaissances sur cette entreprise si elle est connue. Si tu ne la connais pas et que le contenu web est insuffisant, fais de ton mieux avec ce que tu as et indique clairement les incertitudes.`,
-    config: {
-      maxOutputTokens: 1500,
-      responseMimeType: "application/json",
-      thinkingConfig: { thinkingBudget: 0 },
-    },
-  });
-
-  const text = response.text ?? "";
-  return JSON.parse(text);
+    { system: "Retourne uniquement l'objet JSON demandé, sans texte avant ou après.", model: "claude-sonnet-4-6" }
+  );
 }

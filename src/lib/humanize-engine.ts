@@ -14,9 +14,7 @@
  *                 (real API pluggable via env)
  */
 
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+import { callClaude, ClaudeModel } from "./claude-client";
 
 // ============================================================================
 // TYPES
@@ -549,10 +547,10 @@ const VOICE_INSTRUCTION: Record<Language, string> = {
   es: "Eres un estudiante francés de 23 años en un Máster, haciendo prácticas en un banco. Estilo directo, conversacional, marcas personales (\"en la práctica\", \"honestamente\", \"desde mi punto de vista\"), frases cortas mezcladas con largas.",
 };
 
-const MODE_CONFIG: Record<HumanizeMode, { model: string; temperature: number; maxPasses: number; overlap: number }> = {
-  basic: { model: "gemini-2.5-flash", temperature: 0.7, maxPasses: 1, overlap: 200 },
-  balanced: { model: "gemini-2.5-flash", temperature: 0.9, maxPasses: 2, overlap: 300 },
-  aggressive: { model: "gemini-2.5-flash", temperature: 1.0, maxPasses: 4, overlap: 400 },
+const MODE_CONFIG: Record<HumanizeMode, { model: ClaudeModel; temperature: number; maxPasses: number; overlap: number }> = {
+  basic: { model: "claude-haiku-4-5", temperature: 0.7, maxPasses: 1, overlap: 200 },
+  balanced: { model: "claude-sonnet-4-6", temperature: 0.9, maxPasses: 2, overlap: 300 },
+  aggressive: { model: "claude-opus-4-7", temperature: 1.0, maxPasses: 4, overlap: 400 },
 };
 
 function buildPrompt(text: string, language: Language, mode: HumanizeMode): string {
@@ -623,16 +621,10 @@ export async function llmRewrite(
   for (const chunk of chunks) {
     const chunkText = chunk.join("\n\n");
     try {
-      const response = await ai.models.generateContent({
+      const out = (await callClaude(buildPrompt(chunkText, language, mode), {
         model: config.model,
-        contents: buildPrompt(chunkText, language, mode),
-        config: {
-          maxOutputTokens: 8000,
-          temperature: config.temperature,
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      });
-      const out = (response.text ?? "").trim();
+        system: "Tu es un assistant qui réécrit du texte académique pour le rendre indétectable par les outils anti-IA (Compilatio, GPTZero). Retourne UNIQUEMENT le texte réécrit, sans commentaire.",
+      })).trim();
       rewritten.push(out.length > 0 ? out : chunkText);
     } catch (err) {
       console.error("[humanize-engine] llmRewrite chunk failed:", err);

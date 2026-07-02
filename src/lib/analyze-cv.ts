@@ -1,18 +1,13 @@
-import { GoogleGenAI } from "@google/genai";
+import { callClaude } from "./claude-client";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
-async function generateJSON(prompt: string, maxTokens: number = 4000): Promise<string> {
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: {
-      maxOutputTokens: maxTokens,
-      responseMimeType: "application/json",
-      thinkingConfig: { thinkingBudget: 0 },
-    },
+async function generateJSON(prompt: string, _maxTokens: number = 4000): Promise<string> {
+  const text = await callClaude(prompt, {
+    system: "Tu es un expert français dans le domaine décrit par le prompt. RÉPONDS UNIQUEMENT AVEC UN OBJET JSON VALIDE, sans commentaire, sans backticks, sans texte avant ou après.",
+    model: "claude-sonnet-4-6",
   });
-  return response.text ?? "";
+  // Extract first JSON block from the response
+  const match = text.match(/\{[\s\S]*\}/);
+  return match ? match[0] : text;
 }
 
 export interface ScoreBreakdown {
