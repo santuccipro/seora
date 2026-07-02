@@ -57,6 +57,7 @@ export default function Home() {
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
   const [liveCount, setLiveCount] = useState(847);
+  const [activeTab, setActiveTab] = useState<"cv" | "memoire" | "letter" | "create" | "photo">("cv");
 
   const topCompanies = [
     "L'Oréal", "LVMH", "TotalEnergies", "Sanofi", "BNP Paribas", "Airbus", "Danone", "Société Générale",
@@ -253,263 +254,320 @@ export default function Home() {
               <p className="text-xs sm:text-sm font-semibold uppercase tracking-widest text-indigo-500 mb-1">Que veux-tu faire ?</p>
             </div>
 
-            <div className="space-y-4 sm:space-y-5">
+            {/* ═══ TAB BAR + UNIFIED ACTION CARD ═══ */}
+            {(() => {
+              const TABS = [
+                { id: "cv" as const, label: "Analyse CV", icon: BarChart3, tokens: "1 token", tokenColor: "bg-indigo-100 text-indigo-600" },
+                { id: "memoire" as const, label: "Mémoire / DPP", icon: Bot, tokens: "3 tokens", tokenColor: "bg-orange-100 text-orange-600" },
+                { id: "letter" as const, label: "Lettre motiv.", icon: PenTool, tokens: "3 tokens", tokenColor: "bg-blue-100 text-blue-600" },
+                { id: "create" as const, label: "Créer CV", icon: Plus, tokens: "Gratuit", tokenColor: "bg-emerald-100 text-emerald-600" },
+                { id: "photo" as const, label: "Photo Pro", icon: Camera, tokens: "Bientôt", tokenColor: "bg-pink-100 text-pink-600", disabled: true },
+              ];
+              const active = TABS.find(t => t.id === activeTab) ?? TABS[0];
+              const jobChars = landingJob.length;
+              const MAX_CHARS = 10000;
 
-              {/* ── Card 1: Analyser mon CV (hero card) ── */}
-              <div
-                className={`relative rounded-3xl bg-white border-2 shadow-2xl shadow-indigo-500/[0.06] overflow-hidden transition-[border-color,box-shadow] duration-300 ${
-                  dragOver ? "border-indigo-500 bg-indigo-50/40 scale-[1.005]" : "border-indigo-200/60 hover:border-indigo-300"
-                }`}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  const file = e.dataTransfer.files[0];
-                  if (file && (file.type === "application/pdf" || file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/heic" || file.type === "image/webp" || file.name.endsWith(".pdf") || file.name.endsWith(".docx") || file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") || file.name.endsWith(".png") || file.name.endsWith(".heic") || file.name.endsWith(".webp"))) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      sessionStorage.setItem("seora_cv_file", reader.result as string);
-                      sessionStorage.setItem("seora_cv_filename", file.name);
-                      if (session) { router.push("/app"); } else { setResultPreviewType("cv"); setShowResultPreview(true); }
-                    };
-                    reader.readAsDataURL(file);
-                  } else { toast.error("Format accepté : PDF, DOCX ou Photo"); }
-                }}
-              >
-                <input ref={fileInputRef} type="file" accept=".pdf,.docx,image/*" className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        sessionStorage.setItem("seora_cv_file", reader.result as string);
-                        sessionStorage.setItem("seora_cv_filename", file.name);
-                        if (session) { router.push("/app"); } else { setResultPreviewType("cv"); setShowResultPreview(true); }
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-                <div className="p-5 sm:p-8">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-                      <BarChart3 className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-base sm:text-lg font-bold text-gray-900">Analyse ton CV</h3>
-                      <p className="text-xs text-gray-400">Score, points forts, axes d&apos;amélioration</p>
-                    </div>
-                    <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-semibold text-indigo-600">1 token</span>
-                  </div>
-                  <div
-                    className={`border-2 border-dashed rounded-2xl py-8 sm:py-14 px-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${
-                      dragOver ? "border-indigo-500 bg-indigo-50/50" : "border-gray-200 hover:border-indigo-400 hover:bg-gray-50/50"
-                    }`}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mb-3 transition-colors ${dragOver ? "bg-indigo-100" : "bg-gray-100"}`}>
-                      <Upload className={`h-6 w-6 ${dragOver ? "text-indigo-600" : "text-gray-400"}`} />
-                    </div>
-                    <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
-                    <p className="text-xs text-gray-400 mb-4">PDF, DOCX ou Photo</p>
-                    <div className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold shadow-md shadow-indigo-500/25 hover:shadow-lg transition-all">
-                      Parcourir mes fichiers
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Row: Créer + Photo Pro ── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-
-                {/* Card 2: Créer mon CV */}
-                <button
-                  onClick={() => { if (session) router.push("/cv-editor"); else openAuthModal(); }}
-                  className="group rounded-3xl bg-white border border-gray-200/60 shadow-lg shadow-gray-900/[0.04] p-5 sm:p-6 text-left hover:border-emerald-300 hover:shadow-xl transition-[border-color,box-shadow] duration-300"
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform">
-                      <Plus className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm sm:text-base font-bold text-gray-900">Créer mon CV</h3>
-                      <p className="text-[11px] text-gray-400">Wizard guidé étape par étape</p>
-                    </div>
-                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-600">Gratuit</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-medium text-gray-500">6 templates</span>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-medium text-gray-500">Export PDF</span>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-medium text-gray-500">Guidé</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold group-hover:gap-2.5 transition-all">
-                    Commencer <ArrowRight className="h-3.5 w-3.5" />
-                  </div>
-                </button>
-
-                {/* Card 3: Photo Pro */}
-                <div className="rounded-3xl bg-white/95 border border-gray-200/40 shadow-lg shadow-gray-900/[0.02] p-5 sm:p-6 opacity-60">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center shadow-md shadow-pink-500/20">
-                      <Camera className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm sm:text-base font-bold text-gray-900">Photo Pro IA</h3>
-                      <p className="text-[11px] text-gray-400">Selfie → photo professionnelle</p>
-                    </div>
-                    <span className="rounded-full bg-pink-100 px-2.5 py-0.5 text-[10px] font-semibold text-pink-600">Bientôt</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-medium text-gray-500">Fond neutre</span>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-medium text-gray-500">Retouche IA</span>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-medium text-gray-500">HD</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400">Disponible très prochainement</p>
-                </div>
-              </div>
-
-              {/* ── Card 4: Lettre de motivation ── */}
-              <div className="rounded-3xl bg-white border border-gray-200/60 shadow-lg shadow-gray-900/[0.04] overflow-hidden hover:border-blue-300 transition-[border-color] duration-300">
-                <div className="p-5 sm:p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20">
-                      <PenTool className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm sm:text-base font-bold text-gray-900">Lettre de motivation</h3>
-                      <p className="text-[11px] text-gray-400">Générée par IA et adaptée à l&apos;offre</p>
-                    </div>
-                    <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600">3 tokens</span>
+              return (
+                <div>
+                  {/* Tab bar */}
+                  <div className="flex flex-wrap gap-2 justify-center mb-4 sm:mb-5">
+                    {TABS.map(tab => {
+                      const Icon = tab.icon;
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => !tab.disabled && setActiveTab(tab.id)}
+                          disabled={tab.disabled}
+                          className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold transition-colors ${
+                            isActive
+                              ? "bg-gray-900 text-white border-gray-900"
+                              : tab.disabled
+                              ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
+                              : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <span>{tab.label}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-bold ${
+                            isActive ? "bg-white/15 text-white" : tab.tokenColor
+                          }`}>{tab.tokens}</span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <textarea
-                        value={landingJob}
-                        onChange={(e) => setLandingJob(e.target.value)}
-                        placeholder="Collez l'offre d'emploi ou décrivez le poste visé..."
-                        rows={3}
-                        className="w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none transition-all"
-                      />
-                    </div>
-                    <div className="relative">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={landingCompany}
-                        onChange={(e) => handleCompanyInput(e.target.value)}
-                        onFocus={() => { if (companySuggestions.length > 0) setShowCompanySuggestions(true); }}
-                        onBlur={() => setTimeout(() => setShowCompanySuggestions(false), 200)}
-                        placeholder="Entreprise visée..."
-                        className="w-full rounded-xl border border-gray-200 bg-white/80 px-4 py-3 pl-10 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
-                      />
-                      {showCompanySuggestions && companySuggestions.length > 0 && (
-                        <div className="absolute z-20 w-full mt-1 rounded-xl bg-white border border-gray-200 shadow-xl shadow-gray-900/10 overflow-hidden">
-                          {companySuggestions.map((company, i) => (
-                            <button
-                              key={i}
-                              onMouseDown={() => { setLandingCompany(company); setShowCompanySuggestions(false); }}
-                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-3 border-b border-gray-100 last:border-0"
-                            >
-                              <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-xs font-bold text-indigo-600 shrink-0">
-                                {company.charAt(0).toUpperCase()}
-                              </div>
-                              <span className="font-medium">{company}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (!landingCompany.trim() || !landingJob.trim()) { toast.error("Remplis l'entreprise et l'offre"); return; }
-                        sessionStorage.setItem("seora_cl_company", landingCompany);
-                        sessionStorage.setItem("seora_cl_job", landingJob);
-                        if (session) { router.push("/cover-letter"); } else { setResultPreviewType("letter"); setShowResultPreview(true); }
+                  {/* === Analyse CV === */}
+                  {activeTab === "cv" && (
+                    <div
+                      className={`relative rounded-3xl bg-white border-2 shadow-2xl shadow-indigo-500/[0.06] overflow-hidden transition-[border-color] duration-300 ${
+                        dragOver ? "border-indigo-500" : "border-indigo-200/60 hover:border-indigo-300"
+                      }`}
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                        const file = e.dataTransfer.files[0];
+                        if (file && (file.type === "application/pdf" || file.type.startsWith("image/") || /\.(pdf|docx|jpe?g|png|heic|webp)$/i.test(file.name))) {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            sessionStorage.setItem("seora_cv_file", reader.result as string);
+                            sessionStorage.setItem("seora_cv_filename", file.name);
+                            if (session) { router.push("/app"); } else { setResultPreviewType("cv"); setShowResultPreview(true); }
+                          };
+                          reader.readAsDataURL(file);
+                        } else { toast.error("Format accepté : PDF, DOCX ou Photo"); }
                       }}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:shadow-lg transition-all"
                     >
-                      <Sparkles className="h-4 w-4" /> Générer ma lettre
-                    </button>
-                  </div>
+                      <input ref={fileInputRef} type="file" accept=".pdf,.docx,image/*" className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              sessionStorage.setItem("seora_cv_file", reader.result as string);
+                              sessionStorage.setItem("seora_cv_filename", file.name);
+                              if (session) { router.push("/app"); } else { setResultPreviewType("cv"); setShowResultPreview(true); }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <div className="p-5 sm:p-8">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+                            <BarChart3 className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Analyse ton CV</h3>
+                            <p className="text-xs text-gray-400">Score, points forts, axes d&apos;amélioration</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
+                        </div>
+                        <div
+                          className={`border-2 border-dashed rounded-2xl py-8 sm:py-14 px-4 flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 ${
+                            dragOver ? "border-indigo-500 bg-indigo-50/50" : "border-gray-200 hover:border-indigo-400"
+                          }`}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <div className={`h-12 w-12 rounded-2xl flex items-center justify-center mb-3 transition-colors ${dragOver ? "bg-indigo-100" : "bg-gray-100"}`}>
+                            <Upload className={`h-6 w-6 ${dragOver ? "text-indigo-600" : "text-gray-400"}`} />
+                          </div>
+                          <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">{dragOver ? "Lâchez votre fichier ici" : "Glissez votre CV ici"}</p>
+                          <p className="text-xs text-gray-400 mb-4">PDF, DOCX ou Photo</p>
+                          <div className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold shadow-md shadow-indigo-500/25 hover:shadow-lg transition-shadow">
+                            Parcourir mes fichiers
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* === Mémoire / DPP === */}
+                  {activeTab === "memoire" && (
+                    <div
+                      className="relative rounded-3xl bg-white border-2 border-orange-200/60 shadow-2xl shadow-orange-500/[0.06] overflow-hidden transition-[border-color] duration-300 hover:border-orange-300"
+                      onDragOver={(e) => { e.preventDefault(); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files[0];
+                        if (file && (file.type === "application/pdf" || /\.(pdf|docx?|txt)$/i.test(file.name))) {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            sessionStorage.setItem("seora_memoire_file", reader.result as string);
+                            sessionStorage.setItem("seora_memoire_filename", file.name);
+                            if (session) { router.push("/humanizer"); } else { setResultPreviewType("humanizer"); setShowResultPreview(true); }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    >
+                      <input type="file" accept=".pdf,.docx,.doc,.txt" className="hidden" id="memoire-upload-hero"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              sessionStorage.setItem("seora_memoire_file", reader.result as string);
+                              sessionStorage.setItem("seora_memoire_filename", file.name);
+                              if (session) { router.push("/humanizer"); } else { setResultPreviewType("humanizer"); setShowResultPreview(true); }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <div className="p-5 sm:p-8">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-md shadow-orange-500/20">
+                            <Bot className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Analyse mon mémoire / DPP</h3>
+                            <p className="text-xs text-gray-400">Score IA (Compilatio, GPTZero) + humanisation sous 15%</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
+                        </div>
+                        <label
+                          htmlFor="memoire-upload-hero"
+                          className="border-2 border-dashed rounded-2xl py-8 sm:py-14 px-4 flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 border-orange-200 hover:border-orange-400"
+                        >
+                          <div className="h-12 w-12 rounded-2xl bg-orange-100 flex items-center justify-center mb-3">
+                            <FileText className="h-6 w-6 text-orange-600" />
+                          </div>
+                          <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">Glissez votre mémoire ou DPP ici</p>
+                          <p className="text-xs text-gray-400 mb-4">PDF, DOCX, DOC ou TXT · Confidentiel</p>
+                          <div className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 text-white text-sm font-semibold shadow-md shadow-orange-500/25 hover:shadow-lg transition-shadow">
+                            Analyser mon dossier
+                          </div>
+                        </label>
+                        <div className="mt-4 flex items-center justify-center gap-4 text-[11px] text-gray-500">
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-orange-500" /> Score IA en 30s</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-orange-500" /> Humanisation auto</span>
+                          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-orange-500" /> Export PDF/DOCX</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* === Lettre de motivation === */}
+                  {activeTab === "letter" && (
+                    <div className="rounded-3xl bg-white border-2 border-blue-200/60 shadow-2xl shadow-blue-500/[0.06] overflow-hidden transition-[border-color] duration-300 hover:border-blue-300">
+                      <div className="p-5 sm:p-8">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20">
+                            <PenTool className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Lettre de motivation</h3>
+                            <p className="text-xs text-gray-400">Générée par IA et adaptée à l&apos;offre</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
+                        </div>
+                        <div className="space-y-3">
+                          <div>
+                            <textarea
+                              value={landingJob}
+                              onChange={(e) => setLandingJob(e.target.value.slice(0, MAX_CHARS))}
+                              placeholder="Collez l'offre d'emploi ou décrivez le poste visé..."
+                              rows={4}
+                              maxLength={MAX_CHARS}
+                              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 resize-none transition-colors"
+                            />
+                            <div className="flex justify-end mt-1">
+                              <span className={`text-[10px] font-medium ${jobChars > MAX_CHARS * 0.9 ? "text-red-500" : "text-gray-400"}`}>
+                                {jobChars.toLocaleString("fr-FR")} / {MAX_CHARS.toLocaleString("fr-FR")} caractères
+                              </span>
+                            </div>
+                          </div>
+                          <div className="relative">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={landingCompany}
+                              onChange={(e) => handleCompanyInput(e.target.value)}
+                              onFocus={() => { if (companySuggestions.length > 0) setShowCompanySuggestions(true); }}
+                              onBlur={() => setTimeout(() => setShowCompanySuggestions(false), 200)}
+                              placeholder="Entreprise visée..."
+                              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pl-10 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors"
+                            />
+                            {showCompanySuggestions && companySuggestions.length > 0 && (
+                              <div className="absolute z-20 w-full mt-1 rounded-xl bg-white border border-gray-200 shadow-xl overflow-hidden">
+                                {companySuggestions.map((company, i) => (
+                                  <button
+                                    key={i}
+                                    onMouseDown={() => { setLandingCompany(company); setShowCompanySuggestions(false); }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-3 border-b border-gray-100 last:border-0"
+                                  >
+                                    <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-xs font-bold text-blue-600 shrink-0">
+                                      {company.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="font-medium">{company}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (!landingCompany.trim() || !landingJob.trim()) { toast.error("Remplis l'entreprise et l'offre"); return; }
+                              sessionStorage.setItem("seora_cl_company", landingCompany);
+                              sessionStorage.setItem("seora_cl_job", landingJob);
+                              if (session) { router.push("/cover-letter"); } else { setResultPreviewType("letter"); setShowResultPreview(true); }
+                            }}
+                            className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:shadow-lg transition-shadow"
+                          >
+                            <Sparkles className="h-4 w-4" /> Générer ma lettre
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* === Créer mon CV === */}
+                  {activeTab === "create" && (
+                    <div className="rounded-3xl bg-white border-2 border-emerald-200/60 shadow-2xl shadow-emerald-500/[0.06] overflow-hidden transition-[border-color] duration-300 hover:border-emerald-300">
+                      <div className="p-5 sm:p-8">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                            <Plus className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Créer mon CV</h3>
+                            <p className="text-xs text-gray-400">Wizard guidé étape par étape</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mb-5">
+                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">6 templates pros</span>
+                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">Export PDF</span>
+                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">100% guidé</span>
+                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">10 min</span>
+                        </div>
+                        <button
+                          onClick={() => { if (session) router.push("/cv-editor"); else openAuthModal(); }}
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-500/20 hover:shadow-lg transition-shadow"
+                        >
+                          <Sparkles className="h-4 w-4" /> Commencer mon CV
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                        <p className="text-center text-[11px] text-gray-400 mt-3">
+                          Aucun paiement requis — CV téléchargeable en PDF
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* === Photo Pro (disabled) === */}
+                  {activeTab === "photo" && (
+                    <div className="rounded-3xl bg-white border-2 border-pink-200/60 shadow-2xl shadow-pink-500/[0.06] overflow-hidden">
+                      <div className="p-5 sm:p-8 opacity-70">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center shadow-md shadow-pink-500/20">
+                            <Camera className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Photo Pro IA</h3>
+                            <p className="text-xs text-gray-400">Selfie → photo professionnelle</p>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
+                        </div>
+                        <div className="border-2 border-dashed border-pink-200 rounded-2xl py-10 sm:py-14 px-4 flex flex-col items-center justify-center">
+                          <div className="h-12 w-12 rounded-2xl bg-pink-100 flex items-center justify-center mb-3">
+                            <Camera className="h-6 w-6 text-pink-500" />
+                          </div>
+                          <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">Disponible très prochainement</p>
+                          <p className="text-xs text-gray-400 mb-4">Fond neutre · Retouche IA · HD</p>
+                          <div className="px-4 py-1.5 rounded-full bg-pink-100 text-pink-600 text-xs font-semibold">
+                            Bientôt en beta
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              {/* ── Card 5: Analyse mon mémoire / DPP (humanizer) ── */}
-              <div
-                className="relative rounded-3xl bg-white border-2 border-orange-200/60 shadow-2xl shadow-orange-500/[0.06] overflow-hidden transition-[border-color] duration-300 hover:border-orange-300"
-                onDragOver={(e) => { e.preventDefault(); }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const file = e.dataTransfer.files[0];
-                  if (file && (file.type === "application/pdf" || file.name.endsWith(".pdf") || file.name.endsWith(".docx") || file.name.endsWith(".doc") || file.name.endsWith(".txt"))) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      sessionStorage.setItem("seora_memoire_file", reader.result as string);
-                      sessionStorage.setItem("seora_memoire_filename", file.name);
-                      if (session) { router.push("/humanizer"); } else { setResultPreviewType("humanizer"); setShowResultPreview(true); }
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }}
-              >
-                <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-br from-orange-500/10 to-amber-500/10 rounded-full blur-2xl -translate-y-6 translate-x-6" />
-
-                <input
-                  type="file"
-                  accept=".pdf,.docx,.doc,.txt"
-                  className="hidden"
-                  id="memoire-upload-hero"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        sessionStorage.setItem("seora_memoire_file", reader.result as string);
-                        sessionStorage.setItem("seora_memoire_filename", file.name);
-                        if (session) { router.push("/humanizer"); } else { setResultPreviewType("humanizer"); setShowResultPreview(true); }
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-
-                <div className="p-5 sm:p-8">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-md shadow-orange-500/20">
-                      <Bot className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-base sm:text-lg font-bold text-gray-900">Analyse mon mémoire / DPP</h3>
-                      <p className="text-xs text-gray-400">Score IA (Compilatio, GPTZero) + humanisation pour passer sous 15%</p>
-                    </div>
-                    <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-[10px] font-semibold text-orange-600">3 tokens</span>
-                  </div>
-
-                  <label
-                    htmlFor="memoire-upload-hero"
-                    className="border-2 border-dashed rounded-2xl py-8 sm:py-14 px-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 border-orange-200 hover:border-orange-400 hover:bg-orange-50/50"
-                  >
-                    <div className="h-12 w-12 rounded-2xl bg-orange-100 flex items-center justify-center mb-3">
-                      <FileText className="h-6 w-6 text-orange-600" />
-                    </div>
-                    <p className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">Glissez votre mémoire ou DPP ici</p>
-                    <p className="text-xs text-gray-400 mb-4">PDF, DOCX, DOC ou TXT · Confidentiel</p>
-                    <div className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 text-white text-sm font-semibold shadow-md shadow-orange-500/25 hover:shadow-lg transition-all">
-                      Analyser mon dossier
-                    </div>
-                  </label>
-
-                  <div className="mt-4 flex items-center justify-center gap-4 text-[11px] text-gray-500">
-                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-orange-500" /> Score IA en 30s</span>
-                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-orange-500" /> Humanisation auto</span>
-                    <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-orange-500" /> Export PDF/DOCX</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
+              );
+            })()}
 
             {/* School logos — moved here from trust bar */}
             <div className="mt-8 sm:mt-10 overflow-hidden">
