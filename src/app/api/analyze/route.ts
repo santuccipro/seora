@@ -66,27 +66,42 @@ export async function POST(req: NextRequest) {
       const isImage = file.type.startsWith("image/");
 
       if (isImage) {
-        // Use Gemini Vision to OCR the image
-        const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-        const base64 = buffer.toString("base64");
-        const ocrResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { inlineData: { mimeType: file.type, data: base64 } },
-                { text: "Extrais tout le texte de cette image de CV. Retourne uniquement le texte brut, sans commentaire ni mise en forme markdown." },
-              ],
-            },
-          ],
-          config: {
-            maxOutputTokens: 4000,
-            thinkingConfig: { thinkingBudget: 0 },
-          },
+        // OCR image → Cloudinary (upload with ocr:adv_ocr, read text_annotations)
+        const { v2: cloudinary } = await import("cloudinary");
+        cloudinary.config({
+          cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+          api_key: process.env.CLOUDINARY_API_KEY,
+          api_secret: process.env.CLOUDINARY_API_SECRET,
         });
-        cvText = ocrResponse.text ?? "";
+        const dataUri = `data:${file.type};base64,${buffer.toString("base64")}`;
+        const upload = await cloudinary.uploader.upload(dataUri, {
+          folder: `seora/cv-ocr/${user.id}`,
+          ocr: "adv_ocr",
+          resource_type: "image",
+        });
+        type OcrAnnotation = { description?: string };
+        type OcrInfo = {
+          adv_ocr?: {
+            data?: Array<{ textAnnotations?: OcrAnnotation[] }>;
+          };
+        };
+        const info = (upload as unknown as { info?: OcrInfo }).info ?? {};
+        const annotations = info.adv_ocr?.data?.[0]?.textAnnotations ?? [];
+        // First annotation contains the full text block; fallbacks join tokens
+        cvText = annotations[0]?.description
+          ?? annotations.slice(1).map((a) => a.description ?? "").join(" ")
+          ?? "";
+        if (!cvText || cvText.trim().length < 20) {
+          // Refund token on OCR failure
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { tokens: { increment: 1 } },
+          });
+          return NextResponse.json(
+            { error: "Impossible d'extraire le texte de cette image. Essaie un PDF ou DOCX." },
+            { status: 422 }
+          );
+        }
       } else if (file.type === "application/pdf") {
         // Parse PDF by spawning a Node subprocess (avoids Turbopack worker bundling issues)
         const { writeFileSync, unlinkSync, readFileSync } = await import("fs");
@@ -133,11 +148,15 @@ export async function POST(req: NextRequest) {
 
       const analysis = await analyzeCV(cvText);
 
+      // Store original image as base64 data URL for later photo extraction
+      const originalImage = isImage ? `data:${file.type};base64,${buffer.toString("base64")}` : null;
+
       const cvAnalysis = await prisma.cVAnalysis.create({
         data: {
           userId: user.id,
           fileName: file.name,
           fileContent: cvText,
+          originalImage,
           score: analysis.score,
           scoreBreakdown: JSON.stringify(analysis.scoreBreakdown),
           summary: analysis.summary,
