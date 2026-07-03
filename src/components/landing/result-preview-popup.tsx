@@ -27,28 +27,30 @@ type HumanizerScores = {
  * uploads it to /api/ai-preview and returns REAL detector scores. Free,
  * no auth needed.
  */
-async function fetchRealHumanizerScores(): Promise<HumanizerScores> {
+async function fetchRealHumanizerScores(): Promise<HumanizerScores | { error: string }> {
   if (typeof window === "undefined") return null;
   const dataUrl = sessionStorage.getItem("seora_memoire_file");
   const fileName = sessionStorage.getItem("seora_memoire_filename");
-  if (!dataUrl || !fileName) return null;
+  if (!dataUrl || !fileName) return { error: "Aucun fichier à analyser" };
   try {
-    const fileType = dataUrl.slice(5, dataUrl.indexOf(";"));
-    const res = await fetch("/api/ai-preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileBase64: dataUrl, fileName, fileType }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
+    // Rehydrate the data URL into a Blob (avoids base64 bloat in the JSON body)
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], fileName, { type: blob.type || "application/octet-stream" });
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/ai-preview", { method: "POST", body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      return { error: (data && data.error) || `Erreur ${res.status}` };
+    }
     return {
       scoreBefore: data.scoreBefore,
       scoreAfter: data.scoreAfter,
       wordCount: data.wordCount,
       detectors: data.detectors,
     };
-  } catch {
-    return null;
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Erreur réseau" };
   }
 }
 
@@ -308,8 +310,10 @@ export function ResultPreviewPopup({
     (async () => {
       const real = await fetchRealHumanizerScores();
       if (cancelled) return;
-      if (real) {
+      if (real && "scoreBefore" in real) {
         setHumanizerScores(real);
+      } else if (real && "error" in real) {
+        setHumanizerError(real.error);
       } else {
         setHumanizerError("Impossible d'analyser ce fichier. Réessaie ou dépose un autre document.");
       }
