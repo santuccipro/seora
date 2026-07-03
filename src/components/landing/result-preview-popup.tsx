@@ -12,7 +12,45 @@ import {
   Loader2,
   ArrowRight,
   TrendingUp,
+  AlertCircle,
 } from "lucide-react";
+
+type HumanizerScores = {
+  scoreBefore: number;
+  scoreAfter: number;
+  wordCount: number;
+  detectors?: { gptZero: number; sapling: number; originality: number; compilatio: number };
+} | null;
+
+/**
+ * Reads the file the user dropped on the landing page from sessionStorage,
+ * uploads it to /api/ai-preview and returns REAL detector scores. Free,
+ * no auth needed.
+ */
+async function fetchRealHumanizerScores(): Promise<HumanizerScores> {
+  if (typeof window === "undefined") return null;
+  const dataUrl = sessionStorage.getItem("seora_memoire_file");
+  const fileName = sessionStorage.getItem("seora_memoire_filename");
+  if (!dataUrl || !fileName) return null;
+  try {
+    const fileType = dataUrl.slice(5, dataUrl.indexOf(";"));
+    const res = await fetch("/api/ai-preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileBase64: dataUrl, fileName, fileType }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      scoreBefore: data.scoreBefore,
+      scoreAfter: data.scoreAfter,
+      wordCount: data.wordCount,
+      detectors: data.detectors,
+    };
+  } catch {
+    return null;
+  }
+}
 
 type PreviewType = "cv" | "letter" | "humanizer";
 
@@ -247,6 +285,8 @@ export function ResultPreviewPopup({
   onUnlock,
 }: ResultPreviewPopupProps) {
   const [phase, setPhase] = useState<"analyzing" | "result">("analyzing");
+  const [humanizerScores, setHumanizerScores] = useState<HumanizerScores>(null);
+  const [humanizerError, setHumanizerError] = useState<string | null>(null);
 
   // Generate scores once per popup open — different each time
   const scores = useMemo(() => {
@@ -258,6 +298,24 @@ export function ResultPreviewPopup({
   useEffect(() => {
     if (isOpen) setPhase("analyzing");
   }, [isOpen]);
+
+  // For humanizer flow: compute REAL detector scores on the user's actual file
+  useEffect(() => {
+    if (!isOpen || type !== "humanizer") return;
+    let cancelled = false;
+    setHumanizerScores(null);
+    setHumanizerError(null);
+    (async () => {
+      const real = await fetchRealHumanizerScores();
+      if (cancelled) return;
+      if (real) {
+        setHumanizerScores(real);
+      } else {
+        setHumanizerError("Impossible d'analyser ce fichier. Réessaie ou dépose un autre document.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, type]);
 
   if (!isOpen) return null;
 
@@ -456,45 +514,110 @@ export function ResultPreviewPopup({
             {type === "humanizer" && (
               <div className="p-6">
                 <div className="text-center mb-4">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50">
-                    <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                  <div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ${humanizerError ? "bg-red-50" : "bg-emerald-50"}`}>
+                    {humanizerError ? (
+                      <AlertCircle className="h-6 w-6 text-red-500" />
+                    ) : (
+                      <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                    )}
                   </div>
                   <h3 className="mt-3 text-lg font-bold text-gray-900">
-                    Texte humanisé !
+                    {humanizerError
+                      ? "Analyse impossible"
+                      : humanizerScores
+                        ? "Analyse terminée"
+                        : "Analyse en cours…"}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Ton texte est maintenant indétectable
+                    {humanizerError
+                      ? humanizerError
+                      : humanizerScores
+                        ? `${humanizerScores.wordCount.toLocaleString("fr-FR")} mots analysés — score honnête basé sur ton texte`
+                        : "On calcule ton score IA réel en local"}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-center gap-6 mb-4">
-                  <div className="text-center">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">
-                      Avant
-                    </p>
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50 border-2 border-red-200">
-                      <span className="text-lg font-extrabold text-red-600">
-                        87%
-                      </span>
+                {!humanizerError && (
+                  <div className="flex items-center justify-center gap-6 mb-4">
+                    <div className="text-center">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">
+                        Avant
+                      </p>
+                      <div
+                        className={`flex h-16 w-16 items-center justify-center rounded-full border-2 ${
+                          humanizerScores
+                            ? humanizerScores.scoreBefore >= 60
+                              ? "bg-red-50 border-red-200"
+                              : humanizerScores.scoreBefore >= 30
+                                ? "bg-amber-50 border-amber-200"
+                                : "bg-emerald-50 border-emerald-200"
+                            : "bg-gray-50 border-gray-200 animate-pulse"
+                        }`}
+                      >
+                        {humanizerScores ? (
+                          <span
+                            className={`text-lg font-extrabold ${
+                              humanizerScores.scoreBefore >= 60
+                                ? "text-red-600"
+                                : humanizerScores.scoreBefore >= 30
+                                  ? "text-amber-600"
+                                  : "text-emerald-600"
+                            }`}
+                          >
+                            {humanizerScores.scoreBefore}%
+                          </span>
+                        ) : (
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                        )}
+                      </div>
+                      <p className={`mt-1 text-[10px] ${humanizerScores && humanizerScores.scoreBefore >= 60 ? "text-red-500" : "text-gray-400"}`}>
+                        {humanizerScores && humanizerScores.scoreBefore < 30 ? "Texte déjà humain" : "IA détecté"}
+                      </p>
                     </div>
-                    <p className="mt-1 text-[10px] text-red-500">IA détecté</p>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <Sparkles className="h-5 w-5 text-indigo-400" />
-                    <ArrowRight className="h-4 w-4 text-gray-300 mt-1" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">
-                      Après
-                    </p>
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 border-2 border-emerald-200">
-                      <span className="text-lg font-extrabold text-emerald-600">
-                        4%
-                      </span>
+                    <div className="flex flex-col items-center">
+                      <Sparkles className="h-5 w-5 text-indigo-400" />
+                      <ArrowRight className="h-4 w-4 text-gray-300 mt-1" />
                     </div>
-                    <p className="mt-1 text-[10px] text-emerald-500">Humain</p>
+                    <div className="text-center">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">
+                        Après
+                      </p>
+                      <div
+                        className={`flex h-16 w-16 items-center justify-center rounded-full border-2 ${
+                          humanizerScores ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200 animate-pulse"
+                        }`}
+                      >
+                        {humanizerScores ? (
+                          <span className="text-lg font-extrabold text-emerald-600">
+                            {humanizerScores.scoreAfter}%
+                          </span>
+                        ) : (
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                        )}
+                      </div>
+                      <p className="mt-1 text-[10px] text-emerald-500">Humain</p>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {humanizerScores?.detectors && (
+                  <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50/60 p-3">
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-2">Détail par détecteur (avant)</p>
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      {[
+                        { k: "GPTZero", v: humanizerScores.detectors.gptZero },
+                        { k: "Sapling", v: humanizerScores.detectors.sapling },
+                        { k: "Originality", v: humanizerScores.detectors.originality },
+                        { k: "Compilatio", v: humanizerScores.detectors.compilatio },
+                      ].map((d) => (
+                        <div key={d.k}>
+                          <p className={`text-sm font-black ${d.v >= 60 ? "text-red-600" : d.v >= 30 ? "text-amber-600" : "text-emerald-600"}`}>{d.v}%</p>
+                          <p className="text-[9px] text-gray-500">{d.k}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="relative rounded-xl border border-gray-200 bg-gray-50/50 p-3 mb-4">
                   <div className="filter blur-[5px] pointer-events-none select-none">
