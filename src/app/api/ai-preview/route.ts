@@ -40,63 +40,32 @@ Tu analyses des textes académiques français ENTIERS. Tu produis un score 0-100
 
 Tu réponds UNIQUEMENT par un objet JSON strict, sans backticks, sans commentaire, sans texte avant/après.`;
 
-const PROMPT_TEMPLATE = (text: string, wordCount: number) => `Analyse le texte suivant (${wordCount.toLocaleString("fr-FR")} mots) et retourne un score COMPILATIO-GRADE de détection IA.
+const PROMPT_TEMPLATE = (text: string, wordCount: number) => `Score Compilatio-grade IA (0-100) sur ce texte français (${wordCount} mots).
 
-━━━━━━━━━━━━━━━━━━━━━━━
-BARÈME COMPILATIO (calibré sur rapports réels 2026) :
-- 0-15 : très humain — passe sans souci
-- 15-30 : mixte, quelques passages IA
-- 30-50 : moitié IA — Compilatio flag et l'école demande justification
-- 50-75 : majoritairement IA — gros risque de rejet
-- 75-100 : quasi 100% IA
-━━━━━━━━━━━━━━━━━━━━━━━
+BARÈME :
+0-15 humain · 15-30 mixte · 30-50 moitié IA (flag) · 50-75 majoritairement IA · 75+ quasi 100% IA.
 
-SIGNAUX FORTS QUE COMPILATIO REPÈRE (à activement chercher) :
-- Cascades énumératives : "Premièrement... Deuxièmement... Troisièmement..."
-- Antithèses balancées : "X n'est pas Y, c'est Z", "loin d'être X, c'est Y"
-- Nominalizations abstraites : "l'identification des opportunités", "la formalisation des objectifs"
-- Groupes ternaires calibrés : "trois effets convergents / concomitants"
-- Métaphores conceptuelles : "un socle de X", "un actif stratégique"
-- Signatures ChatGPT : "Il est important de noter", "Il convient de", "En somme", "Explorons"
-- Registre soutenu uniforme sans variation
-- Absence totale de marqueurs personnels ("franchement", "concrètement", "à mon niveau")
-- Absence de phrases courtes (<8 mots)
-- Absence de digressions humaines ("Bon,", "Bref,", "Voilà,")
-- Absence de micro-imperfections grammaticales
-- Absence d'ancrages temporels/spatiaux ("dans mon quotidien", "l'autre jour")
-- Cohérence sémantique trop lisse — pas de "gué" dans l'argumentation
+SIGNAUX IA (+) : cascades "Premièrement/Deuxièmement/Troisièmement", antithèses "n'est pas X, c'est Y", "trois effets convergents", "un socle de X", "Il est important de noter", "En somme", nominalizations "l'identification des", "la pérennisation de", registre uniforme, zéro burstiness.
 
-SIGNAUX HUMAINS QUI FONT BAISSER LE SCORE :
-- Marqueurs personnels : "franchement", "concrètement", "à mon niveau", "c'est du vécu"
-- Métaphores accessibles : "ceinture de sécurité", "tour de contrôle"
-- Registre variable — passe du soutenu à l'oral et retour
-- Phrases très courtes intercalées ("C'est du vécu.", "Bon, l'intranet.")
-- Digressions naturelles
-- Micro-imperfections : accord raté, apostrophe manquante, typo isolée
-- Formulations orales : "mais le truc c'est que", "on prend le pli"
-- Anecdotes personnelles vécues avec détails concrets
+SIGNAUX HUMAINS (-) : "franchement,", "concrètement,", "à mon niveau", "c'est du vécu", "bon,", métaphores accessibles ("ceinture de sécurité"), phrases <8 mots, registre variable, micro-imperfections, anecdotes concrètes.
 
-CONSIGNE : Tu dois LIRE le texte en entier et évaluer la DENSITÉ des signaux IA vs humains. Un texte long avec quelques patterns IA au milieu d'un océan de style humain = score bas. Un texte court entièrement écrit dans un registre uniforme et abstrait = score haut.
+Lis TOUT le texte, évalue la DENSITÉ signaux IA vs humains. Sois honnête.
 
-Sois HONNÊTE. Si le texte est manifestement humain, score bas. Si manifestement IA, score haut. Zéro complaisance dans les deux sens.
-
-━━━━━━━━━━━━━━━━━━━━━━━
-TEXTE À ANALYSER :
+TEXTE :
 """
 ${text}
 """
-━━━━━━━━━━━━━━━━━━━━━━━
 
-RÉPONDS UNIQUEMENT par ce JSON strict :
+JSON strict UNIQUEMENT :
 {
-  "overall": <int 0-100, ton estimation Compilatio-grade>,
-  "reasoning": "<2-3 phrases synthétiques justifiant ton score>",
-  "topOffenders": ["<extrait 100-200 chars du passage le plus flag>", "<autre extrait>", "<autre>"],
+  "overall": <int 0-100>,
+  "reasoning": "<2 phrases>",
+  "topOffenders": ["<extrait 100-200 chars>", "<extrait>", "<extrait>"],
   "perDetector": {
-    "gptZero": <int 0-100, focus perplexité + burstiness>,
-    "sapling": <int 0-100, focus connecteurs + formalité>,
-    "originality": <int 0-100, focus vocab + structure>,
-    "compilatio": <int 0-100, focus patterns académiques>
+    "gptZero": <int>,
+    "sapling": <int>,
+    "originality": <int>,
+    "compilatio": <int>
   }
 }`;
 
@@ -132,16 +101,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Sonnet 4.6 handles ~200K token context. We send up to ~40K chars to keep
-  // latency reasonable — that's ~10-13K words, plenty for a DPP.
-  const sample = text.slice(0, 40_000);
+  // Cloudflare Quick Tunnels enforce ~100 s edge timeout. To stay well under it
+  // we send a strategic sample (start + middle) rather than the full 13 k mots,
+  // and cap the timeout at 85 s. That still gives Sonnet a rich, representative
+  // slice of the document.
+  const sample = buildRepresentativeSample(text, 15_000);
   const wordCount = sample.split(/\s+/).filter(Boolean).length;
 
   try {
     const raw = await callClaude(PROMPT_TEMPLATE(sample, wordCount), {
       system: SYSTEM,
       model: "claude-sonnet-4-6",
-      timeoutMs: 110_000,
+      timeoutMs: 85_000,
     });
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) {
@@ -182,6 +153,22 @@ export async function POST(req: NextRequest) {
 function clamp(value: number | undefined, fallback: number): number {
   if (typeof value !== "number" || Number.isNaN(value)) return fallback;
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+/**
+ * Build a representative sample by concatenating three slices —
+ * start / middle / end — separated by a marker. This lets Sonnet see
+ * intro, body and conclusion patterns even on very long documents,
+ * while keeping total size well below the tunnel timeout budget.
+ */
+function buildRepresentativeSample(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const slice = Math.floor(maxChars / 3);
+  const start = text.slice(0, slice);
+  const midStart = Math.floor(text.length / 2) - Math.floor(slice / 2);
+  const middle = text.slice(midStart, midStart + slice);
+  const end = text.slice(text.length - slice);
+  return `${start}\n\n[…]\n\n${middle}\n\n[…]\n\n${end}`;
 }
 
 /**
