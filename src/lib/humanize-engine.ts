@@ -555,8 +555,8 @@ const MODE_CONFIG: Record<HumanizeMode, { model: ClaudeModel; temperature: numbe
   basic: { model: "claude-haiku-4-5", temperature: 0.7, maxPasses: 1, overlap: 200 },
   balanced: { model: "claude-sonnet-4-6", temperature: 0.9, maxPasses: 2, overlap: 300 },
   aggressive: { model: "claude-opus-4-7", temperature: 1.0, maxPasses: 4, overlap: 400 },
-  // compilatio-proof = agressif + boucle sur score Claude jusqu'à <15%, 5 passes max
-  "compilatio-proof": { model: "claude-opus-4-7", temperature: 1.0, maxPasses: 5, overlap: 400 },
+  // compilatio-proof = Opus 4.8 + boucle sur score Compilatio-emulator (Opus 4.8) jusqu'à <15%, 5 passes max
+  "compilatio-proof": { model: "claude-opus-4-8", temperature: 1.0, maxPasses: 5, overlap: 400 },
 };
 
 /**
@@ -614,6 +614,20 @@ export async function claudeScoreText(
 ): Promise<{ overall: number; reasoning: string; topOffenders: string[] }> {
   if (!text || text.length < 200) {
     return { overall: 0, reasoning: "Texte trop court pour analyse fiable.", topOffenders: [] };
+  }
+  // Prefer the full Compilatio emulator (5 perspectives ensemble via Opus 4.8)
+  // for the scoring truth, but keep the older single-call path as fallback
+  // when the emulator can't be loaded (avoids circular init at boot).
+  try {
+    const { emulateCompilatio } = await import("./compilatio-emulator");
+    const verdict = await emulateCompilatio(text, language);
+    return {
+      overall: verdict.overall,
+      reasoning: verdict.summary || verdict.reasoning,
+      topOffenders: verdict.topRiskZones,
+    };
+  } catch {
+    // fall through to single-call fallback
   }
   const sample = text.slice(0, 12_000);
   const langHint = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";

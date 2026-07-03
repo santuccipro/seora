@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { callClaudeJSON } from "@/lib/claude-client";
-import { Language } from "@/lib/humanize-engine";
+import { Language, detectAI } from "@/lib/humanize-engine";
+import { emulateCompilatio, COMPILATIO_PATTERNS } from "@/lib/compilatio-emulator";
 
 const TOKEN_COST = 1;
 const MAX_CHARS = 10000;
@@ -133,32 +133,56 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const languageLabel = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";
-      const prompt = `LANGUE DU TEXTE : ${languageLabel}\n\nTEXTE À ANALYSER (${text.length} caractères) :\n\n${text}`;
+      // Compilatio emulator — 5 Claude Opus 4.8 perspectives + sentence tagger
+      const verdict = await emulateCompilatio(text, language);
+      const heuristic = detectAI(text, language);
 
-      const analysis = await callClaudeJSON<ClaudeAnalysis>(prompt, {
-        system: SYSTEM_PROMPT,
-        model: "claude-sonnet-4-6",
-        timeoutMs: 80_000,
-      });
+      const paragraphs = verdict.sentences.map((s) => ({
+        index: s.index,
+        text: s.text,
+        score: s.score,
+        risk: s.risk,
+        patterns: s.patterns,
+        patternLabels: s.patterns.map((k) => COMPILATIO_PATTERNS[k]?.label ?? k),
+        reason: s.reason,
+        details: heuristic, // heuristic reference retained for legacy consumers
+      }));
 
-      const highRisk = analysis.paragraphs.filter(p => p.risk === "high").length;
-      const mediumRisk = analysis.paragraphs.filter(p => p.risk === "medium").length;
-      const lowRisk = analysis.paragraphs.filter(p => p.risk === "low").length;
+      const highRisk = paragraphs.filter((p) => p.risk === "high").length;
+      const mediumRisk = paragraphs.filter((p) => p.risk === "medium").length;
+      const lowRisk = paragraphs.filter((p) => p.risk === "low").length;
 
       return NextResponse.json({
-        overall: analysis.overall,
-        paragraphs: analysis.paragraphs,
+        // Aggregated ensemble score
+        overall: {
+          overall: verdict.overall,
+          confidence: verdict.confidence,
+          // Legacy heuristic fields for existing UI
+          gptZeroLike: heuristic.gptZeroLike,
+          saplingLike: heuristic.saplingLike,
+          originalityLike: heuristic.originalityLike,
+          compilatioLike: verdict.overall, // use the emulator score as "compilatio" number
+          perplexity: heuristic.perplexity,
+          burstiness: heuristic.burstiness,
+          homoglyphs: heuristic.homoglyphs,
+          connectors: heuristic.connectors,
+          formality: heuristic.formality,
+          parallelism: heuristic.parallelism,
+        },
+        perspectives: verdict.perspectives,
+        patternsFound: verdict.patternsFound,
+        paragraphs,
         wordCount: text.trim().split(/\s+/).length,
         charCount: text.length,
         stats: {
-          totalParagraphs: analysis.paragraphs.length,
+          totalParagraphs: paragraphs.length,
           highRisk,
           mediumRisk,
           lowRisk,
         },
-        topRiskZones: analysis.topRiskZones,
-        summary: analysis.summary,
+        topRiskZones: verdict.topRiskZones,
+        summary: verdict.summary,
+        reasoning: verdict.reasoning,
       });
     } catch (err) {
       await prisma.user.update({

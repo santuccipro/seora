@@ -143,7 +143,7 @@ export default function HumanizerPage() {
       perplexity: number; burstiness: number; homoglyphs: number;
       connectors: number; formality: number; parallelism: number;
     };
-    paragraphs: Array<{ index: number; text: string; score: number; risk: "high" | "medium" | "low"; reason?: string }>;
+    paragraphs: Array<{ index: number; text: string; score: number; risk: "high" | "medium" | "low"; reason?: string; patternLabels?: string[] }>;
     topRiskZones?: string[];
     summary?: string;
   } | null>(null);

@@ -39,6 +39,9 @@ type ParagraphScore = {
   score: number;
   risk: "high" | "medium" | "low";
   details: Detail;
+  patterns?: string[];
+  patternLabels?: string[];
+  reason?: string;
 };
 
 type Overall = {
@@ -503,7 +506,8 @@ export default function AiDetectorPage() {
                   text: p.text,
                   score: p.score,
                   risk: p.risk,
-                  reason: (p as unknown as { reason?: string }).reason,
+                  reason: p.reason,
+                  patternLabels: p.patternLabels,
                 }))}
                 detectorScores={{
                   gptZeroLike: result.overall.gptZeroLike,

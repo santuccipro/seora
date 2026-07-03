@@ -23,6 +23,7 @@ export interface ReportParagraph {
   score: number;                  // 0-100
   risk: "high" | "medium" | "low";
   reason?: string;
+  patternLabels?: string[]; // Compilatio pattern names triggered
 }
 
 export interface AiReportProps {
@@ -273,6 +274,18 @@ export default function AiReport({
                       </div>
                     </div>
                     <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{p.text}</p>
+                    {p.patternLabels && p.patternLabels.length > 0 && !isIgnored && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {p.patternLabels.map((lab, k) => (
+                          <span
+                            key={k}
+                            className="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-0.5"
+                          >
+                            ⚑ {lab}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {p.reason && !isIgnored && (
                       <p className="mt-2 text-[11px] text-gray-500 italic">↳ {p.reason}</p>
                     )}
