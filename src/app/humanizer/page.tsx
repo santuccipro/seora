@@ -213,7 +213,10 @@ export default function HumanizerPage() {
     })();
   }, [existingId]);
 
-  // Load from sessionStorage
+  // Load from sessionStorage — sets an "autolaunch" flag if the file came
+  // from the landing so the humanizer skips the config screen and goes
+  // straight to work.
+  const [autoLaunch, setAutoLaunch] = useState(false);
   useEffect(() => {
     const savedData = sessionStorage.getItem("seora_memoire_file");
     const savedName = sessionStorage.getItem("seora_memoire_filename");
@@ -227,6 +230,9 @@ export default function HumanizerPage() {
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         const file = new File([bytes], savedName, { type: mime });
         setUploaded({ name: savedName, file });
+        // Landing flow → auto-launch in Compilatio-proof mode without asking
+        setAutoLaunch(true);
+        setMode("compilatio-proof");
       } catch (e) {
         console.error(e);
       }
@@ -329,6 +335,16 @@ export default function HumanizerPage() {
       toast.error(err instanceof Error ? err.message : "Erreur lors de l'analyse");
     }
   }, [uploaded, mode, language, targetScore, preservationList]);
+
+  // Auto-launch when the user landed here from the landing popup — the file
+  // is already loaded and they've already seen a preview score, no need to
+  // ask for mode / config again.
+  useEffect(() => {
+    if (autoLaunch && uploaded && !analyzing && !result && mode === "compilatio-proof") {
+      setAutoLaunch(false);
+      startAnalysis();
+    }
+  }, [autoLaunch, uploaded, analyzing, result, mode, startAnalysis]);
 
   const regenerate = async (bumpMode: Mode = "aggressive") => {
     if (!result?.id) return;
