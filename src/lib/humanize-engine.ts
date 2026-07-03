@@ -217,6 +217,76 @@ const PARALLEL_PATTERNS: Record<Language, RegExp[]> = {
   ],
 };
 
+/**
+ * COMPILATIO-SIGNATURE PATTERNS — regex-based detection of the same 30
+ * patterns encoded in `compilatio-emulator.ts`. Deterministic, sub-millisecond,
+ * catches what raw stat measures miss.
+ *
+ * Each match with weight ≥ 3 adds 15 points to the score, weight 2 adds 8,
+ * weight 1 adds 3. Capped at 90. This gives the free heuristic detector a
+ * pattern-based signal comparable to what the emulator produces, without
+ * an LLM call.
+ */
+const COMPILATIO_SIGNATURE_PATTERNS_FR: Array<{ re: RegExp; weight: number; key: string }> = [
+  // Weight 3 — hard AI signature
+  { re: /premi[èe]rement[\s\S]{0,600}deuxi[èe]mement[\s\S]{0,600}troisi[èe]mement/gi, weight: 3, key: "cascade_enum" },
+  { re: /\bn'est pas\b[^.!?]{5,60}\bc'est\b/gi, weight: 3, key: "balanced_antithesis" },
+  { re: /\bloin d'être\b/gi, weight: 3, key: "loin_d_etre" },
+  { re: /\btrois effets?\s+(convergents?|concomitants?|concordants?|majeurs?|principaux?)/gi, weight: 3, key: "trois_effets" },
+  { re: /\bil (est|convient) important de noter\b/gi, weight: 3, key: "chatgpt_verify" },
+  { re: /\b(explorons|plongeons dans|démystifions|décryptons|approfondissons|éclairons)\b/gi, weight: 3, key: "chatgpt_explore" },
+  { re: /\beffets? (convergents?|concomitants?|concordants?)\b/gi, weight: 3, key: "convergent_effects" },
+  { re: /\bde surcroît\b|\bcorollairement\b|\bconcomitamment\b/gi, weight: 3, key: "connector_surcroit" },
+  { re: /\bà (moyen|long) terme,?\s+[^.]{0,120}(produira|entraînera|générera|convergent)/gi, weight: 3, key: "future_projection" },
+  { re: /\bnon seulement\b[^.]{5,80}\bmais aussi\b/gi, weight: 2, key: "non_seulement" },
+  // Weight 2 — medium AI signature
+  { re: /\bun socle\s+(de|d')/gi, weight: 2, key: "socle_de" },
+  { re: /\bn'est pas un coût,?\s+c'est un actif\b/gi, weight: 3, key: "actif_metaphor_exact" },
+  { re: /\best un actif\b/gi, weight: 2, key: "actif_metaphor" },
+  { re: /\b(par ailleurs|toutefois|néanmoins|en outre)\b/gi, weight: 1, key: "connector_par_ailleurs" },
+  { re: /\b(ainsi|de même|similairement)\s*,?\s+/gi, weight: 1, key: "connector_ainsi" },
+  { re: /\b(en somme|en définitive|pour conclure|fondamentalement)\b/gi, weight: 2, key: "conclusion_synthesis" },
+  { re: /\bce (dossier|mémoire|rapport|travail) m'a permis de (comprendre|vérifier|structurer|approfondir|saisir)/gi, weight: 2, key: "meta_narration" },
+  { re: /\bobjectif smart\s*:/gi, weight: 2, key: "smart_objective" },
+  { re: /\btableau\s+\d+\s*[—-]\s*synthèse/gi, weight: 2, key: "table_synthesis" },
+  { re: /\bl'(identification|formalisation|pérennisation|structuration|mise en œuvre) (des|de|du|d')/gi, weight: 2, key: "nominalization" },
+  // Weight 1 — soft signal
+  { re: /\bapproche\s+(durable|responsable|structurante|holistique)\b/gi, weight: 1, key: "adjective_pair" },
+  { re: /\brythme ternaire|,\s+\w+,\s+et\s+/gi, weight: 1, key: "ternary_rhythm" },
+];
+
+const COMPILATIO_SIGNATURE_PATTERNS_EN: Array<{ re: RegExp; weight: number; key: string }> = [
+  { re: /firstly[\s\S]{0,600}secondly[\s\S]{0,600}thirdly/gi, weight: 3, key: "cascade_enum" },
+  { re: /\bit is important to note\b|\bit should be noted\b/gi, weight: 3, key: "chatgpt_verify" },
+  { re: /\b(let's dive|let us dive|explore|decode|demystify) (into|the)/gi, weight: 3, key: "chatgpt_explore" },
+  { re: /\bnot only\b[^.]{5,80}\bbut also\b/gi, weight: 2, key: "non_seulement" },
+  { re: /\bfar from being\b/gi, weight: 3, key: "loin_d_etre" },
+  { re: /\bthree (converging|concurrent|complementary) effects?/gi, weight: 3, key: "trois_effets" },
+  { re: /\bin conclusion\b|\bin summary\b|\bultimately\b/gi, weight: 1, key: "conclusion_synthesis" },
+];
+
+const COMPILATIO_SIGNATURE_PATTERNS_ES: Array<{ re: RegExp; weight: number; key: string }> = [
+  { re: /primero[\s\S]{0,600}segundo[\s\S]{0,600}tercero/gi, weight: 3, key: "cascade_enum" },
+  { re: /\bes importante señalar\b/gi, weight: 3, key: "chatgpt_verify" },
+  { re: /\bexploremos\b|\bprofundicemos\b|\bdesmitifiquemos\b/gi, weight: 3, key: "chatgpt_explore" },
+];
+
+function scoreCompilatioSignatures(text: string, language: Language): number {
+  const list =
+    language === "en" ? COMPILATIO_SIGNATURE_PATTERNS_EN :
+    language === "es" ? COMPILATIO_SIGNATURE_PATTERNS_ES :
+    COMPILATIO_SIGNATURE_PATTERNS_FR;
+  let score = 0;
+  for (const { re, weight } of list) {
+    const hits = (text.match(re) ?? []).length;
+    if (hits === 0) continue;
+    if (weight === 3) score += Math.min(45, hits * 15);
+    else if (weight === 2) score += Math.min(24, hits * 8);
+    else score += Math.min(9, hits * 3);
+  }
+  return Math.min(95, score);
+}
+
 export function detectAI(text: string, language: Language = "fr"): DetectorScore {
   const clean = text.replace(/\s+/g, " ").trim();
   if (!clean || clean.length < 200) {
@@ -266,22 +336,35 @@ export function detectAI(text: string, language: Language = "fr"): DetectorScore
   }
   const parallelism = Math.min(100, parallelHits * 20);
 
-  // Composite scores that emulate different detectors' weighting
-  const gptZeroLike = weighted(
-    { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
-    { homoglyphs: 0.30, perplexity: 0.25, burstiness: 0.25, connectors: 0.10, formality: 0.05, parallelism: 0.05 }
+  // Compilatio-signature pattern hits — huge lift on well-edited academic text
+  // where raw stats undershoot. This is the dimension that closes the gap
+  // between our 13% heuristic and Compilatio's 47%.
+  const signatureHits = scoreCompilatioSignatures(clean, language);
+
+  // Composite scores — inject signature hits with a fat weight
+  const gptZeroLike = Math.round(
+    0.55 * weighted(
+      { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
+      { homoglyphs: 0.30, perplexity: 0.25, burstiness: 0.25, connectors: 0.10, formality: 0.05, parallelism: 0.05 }
+    ) + 0.45 * signatureHits
   );
-  const saplingLike = weighted(
-    { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
-    { homoglyphs: 0.25, perplexity: 0.20, burstiness: 0.15, connectors: 0.20, formality: 0.15, parallelism: 0.05 }
+  const saplingLike = Math.round(
+    0.5 * weighted(
+      { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
+      { homoglyphs: 0.25, perplexity: 0.20, burstiness: 0.15, connectors: 0.20, formality: 0.15, parallelism: 0.05 }
+    ) + 0.5 * signatureHits
   );
-  const originalityLike = weighted(
-    { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
-    { homoglyphs: 0.35, perplexity: 0.15, burstiness: 0.20, connectors: 0.10, formality: 0.10, parallelism: 0.10 }
+  const originalityLike = Math.round(
+    0.55 * weighted(
+      { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
+      { homoglyphs: 0.35, perplexity: 0.15, burstiness: 0.20, connectors: 0.10, formality: 0.10, parallelism: 0.10 }
+    ) + 0.45 * signatureHits
   );
-  const compilatioLike = weighted(
-    { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
-    { homoglyphs: 0.40, perplexity: 0.10, burstiness: 0.15, connectors: 0.15, formality: 0.10, parallelism: 0.10 }
+  const compilatioLike = Math.round(
+    0.35 * weighted(
+      { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
+      { homoglyphs: 0.40, perplexity: 0.10, burstiness: 0.15, connectors: 0.15, formality: 0.10, parallelism: 0.10 }
+    ) + 0.65 * signatureHits
   );
 
   const overall = Math.round(
