@@ -54,11 +54,10 @@ export async function POST(req: NextRequest) {
       let letterText: string;
 
       if (file.type === "application/pdf") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pdfModule = (await import("pdf-parse")) as any;
-        const pdf = pdfModule.default || pdfModule;
-        const pdfData = await pdf(buffer);
-        letterText = pdfData.text;
+        const { extractText, getDocumentProxy } = await import("unpdf");
+        const doc = await getDocumentProxy(new Uint8Array(buffer));
+        const { text } = await extractText(doc, { mergePages: true });
+        letterText = Array.isArray(text) ? text.join("\n") : (text as string);
       } else {
         letterText = buffer.toString("utf-8");
       }

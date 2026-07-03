@@ -99,23 +99,12 @@ export async function extractTextFromFile(
 }
 
 async function extractPDF(buffer: Buffer): Promise<string> {
-  const { writeFileSync, unlinkSync, readFileSync } = await import("fs");
-  const { execSync } = await import("child_process");
-  const { join } = await import("path");
-  const { tmpdir } = await import("os");
-  const tmpPdf = join(tmpdir(), `seora_hum_${Date.now()}.pdf`);
-  const tmpOut = join(tmpdir(), `seora_hum_${Date.now()}.txt`);
-  writeFileSync(tmpPdf, buffer);
-  try {
-    execSync(
-      `node -e "const pdfParse = require('pdf-parse'); const fs = require('fs'); pdfParse(fs.readFileSync('${tmpPdf}')).then(d => fs.writeFileSync('${tmpOut}', d.text || ''));"`,
-      { cwd: process.cwd(), timeout: 30000 }
-    );
-    return readFileSync(tmpOut, "utf-8");
-  } finally {
-    try { unlinkSync(tmpPdf); } catch {}
-    try { unlinkSync(tmpOut); } catch {}
-  }
+  // `unpdf` bundles a serverless-friendly pdfjs build — no subprocess, no
+  // DOMMatrix polyfill, works on Vercel Node runtime.
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const doc = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(doc, { mergePages: true });
+  return Array.isArray(text) ? text.join("\n") : (text as string);
 }
 
 async function extractDOCX(buffer: Buffer): Promise<string> {
