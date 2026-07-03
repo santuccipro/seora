@@ -536,8 +536,8 @@ export function ResultPreviewPopup({
                     {humanizerError
                       ? humanizerError
                       : humanizerScores
-                        ? `${humanizerScores.wordCount.toLocaleString("fr-FR")} mots analysés — score honnête basé sur ton texte`
-                        : "On calcule ton score IA réel en local"}
+                        ? `${humanizerScores.wordCount.toLocaleString("fr-FR")} mots analysés — % de détection IA (émule Compilatio)`
+                        : "On calcule ton % de détection IA en local"}
                   </p>
                 </div>
 
@@ -574,8 +574,14 @@ export function ResultPreviewPopup({
                           <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                         )}
                       </div>
-                      <p className={`mt-1 text-[10px] ${humanizerScores && humanizerScores.scoreBefore >= 60 ? "text-red-500" : "text-gray-400"}`}>
-                        {humanizerScores && humanizerScores.scoreBefore < 30 ? "Texte déjà humain" : "IA détecté"}
+                      <p className={`mt-1 text-[10px] font-semibold ${
+                        humanizerScores && humanizerScores.scoreBefore >= 60
+                          ? "text-red-500"
+                          : humanizerScores && humanizerScores.scoreBefore >= 30
+                            ? "text-amber-600"
+                            : "text-emerald-600"
+                      }`}>
+                        IA détectée
                       </p>
                     </div>
                     <div className="flex flex-col items-center">
@@ -599,7 +605,7 @@ export function ResultPreviewPopup({
                           <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                         )}
                       </div>
-                      <p className="mt-1 text-[10px] text-emerald-500">Humain</p>
+                      <p className="mt-1 text-[10px] font-semibold text-emerald-600">IA détectée</p>
                     </div>
                   </div>
                 )}
