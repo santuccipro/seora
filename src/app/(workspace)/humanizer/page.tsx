@@ -1024,26 +1024,88 @@ export default function HumanizerPage() {
           </div>
         )}
 
-        {/* Config + Upload */}
+        {/* Upload + config */}
         {!analyzing && !result && (
           <>
-            {/* Mode selector */}
-            <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8 mb-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-gray-900">Configuration</h2>
+            {/* Big drop zone at the top */}
+            <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8 mb-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc,.txt"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                }}
+              />
+
+              {uploaded ? (
+                <div className="flex items-center gap-4 rounded-2xl bg-orange-50 border border-orange-200 p-4">
+                  <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
+                    <FileText className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{uploaded.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {(uploaded.file.size / 1024).toFixed(1)} Ko · Prêt à analyser
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setUploaded(null)}
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                    Changer
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    const f = e.dataTransfer.files[0];
+                    if (f) handleFile(f);
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`rounded-2xl border-2 border-dashed cursor-pointer transition-all p-8 sm:p-12 text-center ${
+                    dragOver
+                      ? "border-orange-500 bg-orange-50/60"
+                      : "border-orange-200 hover:border-orange-400 bg-orange-50/20"
+                  }`}
+                >
+                  <div className="mx-auto h-14 w-14 rounded-2xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/25 mb-4">
+                    <Upload className="h-6 w-6 text-white" />
+                  </div>
+                  <p className="text-base font-bold text-gray-900 mb-1">
+                    Glisse ton document ici
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    PDF, DOCX ou TXT · jusqu&apos;à 15 Mo
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Compact horizontal mode bandeau */}
+            <div className="rounded-2xl bg-white shadow-sm border border-orange-100 p-3 sm:p-4 mb-4">
+              <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">
+                  Intensité d&apos;humanisation
+                </p>
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1"
+                  className="text-[10px] font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1"
                 >
-                  <Settings2 className="h-3.5 w-3.5" />
+                  <Settings2 className="h-3 w-3" />
                   {showAdvanced ? "Cacher" : "Avancé"}
                 </button>
               </div>
-
-              <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
-                Intensité
-              </p>
-              <div className="grid grid-cols-3 gap-2 mb-5">
+              <div className="flex flex-wrap gap-2">
                 {(Object.keys(MODE_META) as Mode[]).map((m) => {
                   const meta = MODE_META[m];
                   const Icon = meta.icon;
@@ -1052,25 +1114,41 @@ export default function HumanizerPage() {
                     <button
                       key={m}
                       onClick={() => setMode(m)}
-                      className={`text-left rounded-2xl p-3 border-2 transition-all ${
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
                         active
-                          ? "border-orange-500 bg-orange-50 shadow-md"
-                          : "border-gray-200 hover:border-gray-300"
+                          ? "border-orange-500 bg-orange-500 text-white shadow-sm"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
                       }`}
                     >
-                      <Icon className={`h-4 w-4 mb-2 ${active ? "text-orange-600" : "text-gray-400"}`} />
-                      <p className={`text-xs font-bold ${active ? "text-orange-900" : "text-gray-900"}`}>
-                        {meta.label}
-                      </p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{meta.desc}</p>
-                      <p className="text-[10px] text-orange-600 font-semibold mt-1">
-                        {meta.tokens} tokens
-                      </p>
+                      <Icon className="h-3.5 w-3.5" />
+                      {meta.label}
+                      <span className={`rounded-full px-1.5 text-[9px] font-bold ${active ? "bg-white/25" : "bg-orange-100 text-orange-700"}`}>
+                        {meta.tokens}t
+                      </span>
                     </button>
                   );
                 })}
               </div>
+              <p className="text-[10px] text-gray-400 mt-2">
+                Quelle que soit l&apos;intensité, Claude va analyser CHAQUE aspect (structure, ton, patterns) et humaniser en profondeur.
+              </p>
+            </div>
 
+            {/* Big single-CTA */}
+            <button
+              onClick={startAnalysis}
+              disabled={!uploaded}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed mb-4"
+            >
+              <Sparkles className="h-4 w-4" />
+              {uploaded
+                ? `Analyser + Humaniser (${MODE_META[mode].tokens} tokens)`
+                : "Dépose un document pour commencer"}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+
+            {/* Advanced settings */}
+            <div className={showAdvanced ? "rounded-3xl bg-white shadow-sm border border-orange-100 p-6 mb-4" : "hidden"}>
               {showAdvanced && (
                 <>
                   <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
@@ -1150,88 +1228,6 @@ export default function HumanizerPage() {
                     </div>
                   )}
                 </>
-              )}
-            </div>
-
-            {/* Upload */}
-            <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,.doc,.txt"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFile(f);
-                }}
-              />
-
-              {uploaded ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4 rounded-2xl bg-orange-50 border border-orange-200 p-4">
-                    <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
-                      <FileText className="h-5 w-5 text-orange-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900 truncate">{uploaded.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {(uploaded.file.size / 1024).toFixed(1)} Ko · Prêt à analyser
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setUploaded(null)}
-                      className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors"
-                    >
-                      Changer
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={startAnalysis}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-orange-500/25 hover:shadow-xl transition-all"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    Lancer l'analyse en {MODE_META[mode].label}
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-
-                  <p className="text-center text-[11px] text-gray-400">
-                    {MODE_META[mode].tokens} tokens · Progress en temps réel
-                  </p>
-                </div>
-              ) : (
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOver(false);
-                    const f = e.dataTransfer.files[0];
-                    if (f) handleFile(f);
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl py-14 sm:py-20 px-4 flex flex-col items-center justify-center cursor-pointer transition-all ${
-                    dragOver
-                      ? "border-orange-500 bg-orange-50/60 scale-[1.005]"
-                      : "border-orange-200 hover:border-orange-400 hover:bg-orange-50/40"
-                  }`}
-                >
-                  <div className="h-14 w-14 rounded-2xl bg-orange-100 flex items-center justify-center mb-4">
-                    <Upload className="h-6 w-6 text-orange-600" />
-                  </div>
-                  <p className="text-base sm:text-lg font-bold text-gray-900 mb-1">
-                    {dragOver ? "Lâchez votre fichier ici" : "Glissez votre mémoire ou DPP ici"}
-                  </p>
-                  <p className="text-xs text-gray-500 mb-5">
-                    PDF, DOCX, DOC ou TXT · Max 15 Mo
-                  </p>
-                  <div className="px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 text-white text-sm font-semibold shadow-md shadow-orange-500/25 hover:shadow-lg transition-all">
-                    Parcourir mes fichiers
-                  </div>
-                </div>
               )}
             </div>
 
