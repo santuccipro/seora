@@ -20,6 +20,8 @@ type HumanizerScores = {
   scoreAfter: number;
   wordCount: number;
   detectors?: { gptZero: number; sapling: number; originality: number; compilatio: number };
+  reasoning?: string;
+  topOffenders?: string[];
 } | null;
 
 /**
@@ -48,6 +50,8 @@ async function fetchRealHumanizerScores(): Promise<HumanizerScores | { error: st
       scoreAfter: data.scoreAfter,
       wordCount: data.wordCount,
       detectors: data.detectors,
+      reasoning: data.reasoning,
+      topOffenders: data.topOffenders,
     };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur réseau" };
@@ -536,8 +540,8 @@ export function ResultPreviewPopup({
                     {humanizerError
                       ? humanizerError
                       : humanizerScores
-                        ? `${humanizerScores.wordCount.toLocaleString("fr-FR")} mots analysés — % de détection IA (émule Compilatio)`
-                        : "On calcule ton % de détection IA en local"}
+                        ? `${humanizerScores.wordCount.toLocaleString("fr-FR")} mots analysés par Claude Sonnet 4.6 — score Compilatio-grade`
+                        : "Claude Sonnet 4.6 analyse ton document entier… (30-60s)"}
                   </p>
                 </div>
 
@@ -606,6 +610,26 @@ export function ResultPreviewPopup({
                         )}
                       </div>
                       <p className="mt-1 text-[10px] font-semibold text-emerald-600">IA détectée</p>
+                    </div>
+                  </div>
+                )}
+
+                {humanizerScores?.reasoning && (
+                  <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+                    <p className="text-[10px] uppercase tracking-widest text-indigo-600 font-bold mb-1">Analyse Claude Sonnet 4.6</p>
+                    <p className="text-xs text-gray-800 leading-relaxed italic">« {humanizerScores.reasoning} »</p>
+                  </div>
+                )}
+
+                {humanizerScores?.topOffenders && humanizerScores.topOffenders.length > 0 && (
+                  <div className="mb-3 rounded-xl border border-red-100 bg-red-50/60 p-3">
+                    <p className="text-[10px] uppercase tracking-widest text-red-600 font-bold mb-1.5">Zones à risque détectées</p>
+                    <div className="space-y-1.5">
+                      {humanizerScores.topOffenders.slice(0, 3).map((zone, i) => (
+                        <p key={i} className="text-[11px] text-gray-700 leading-relaxed border-l-2 border-red-300 pl-2">
+                          « {zone} »
+                        </p>
+                      ))}
                     </div>
                   </div>
                 )}
