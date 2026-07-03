@@ -285,15 +285,13 @@ export default function Home() {
                               <span className="sm:hidden">{tab.shortLabel}</span>
                               <span className="hidden sm:inline">{tab.label}</span>
                             </span>
-                            <span className={`hidden sm:inline rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
-                              isActive ? tab.tokenColor : "bg-gray-200 text-gray-500"
-                            }`}>{tab.tokens}</span>
+
                           </button>
                         );
                       })}
                     </div>
                     <p className="text-center text-[10px] sm:text-[11px] text-gray-400 mt-2">
-                      Clique sur un onglet pour changer d&apos;outil · <span className={`font-semibold px-1.5 py-0.5 rounded-full ${active.tokenColor}`}>{active.tokens}</span>
+                      Clique sur un onglet pour choisir un outil
                     </p>
                   </div>
 
