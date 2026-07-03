@@ -878,20 +878,89 @@ export async function claudeScoreText(
   if (!text || text.length < 200) {
     return { overall: 0, reasoning: "Texte trop court pour analyse fiable.", topOffenders: [] };
   }
-  // Prefer the full Compilatio emulator (5 perspectives ensemble via Opus 4.8)
-  // for the scoring truth, but keep the older single-call path as fallback
-  // when the emulator can't be loaded (avoids circular init at boot).
-  try {
-    const { emulateCompilatio } = await import("./compilatio-emulator");
-    const verdict = await emulateCompilatio(text, language);
+
+  // 3-slice parallel Sonnet 4.6 scoring — fast, resilient to the CF tunnel
+  // 100 s timeout, and gives a robust median. Avoids the 6-Opus emulator
+  // which times out on 12k-word documents.
+  const slices = sliceForScoring(text, 4_500);
+  const langHint = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";
+  const heuristicFallback = detectAI(text, language).overall;
+
+  const slicePrompt = (slice: string) => `Score Compilatio-grade IA (0-100) sur ce texte ${langHint} (${slice.split(/\s+/).length} mots).
+
+BARÈME : 0-15 humain · 15-30 mixte · 30-50 moitié IA · 50-75 majoritairement IA · 75+ quasi 100% IA.
+
+SIGNAUX IA (+) : "Premièrement/Deuxièmement/Troisièmement", "n'est pas X c'est Y", "trois effets convergents", "un socle de X", "Il est important de noter", "En somme", nominalizations "l'identification des", registre uniforme, zéro burstiness.
+
+SIGNAUX HUMAINS (-) : "franchement,", "concrètement,", "à mon niveau", "c'est du vécu", "bon,", métaphores accessibles, phrases <8 mots, registre variable, micro-imperfections.
+
+Sois honnête. Réponds STRICTEMENT ce JSON :
+{"overall": <int 0-100>, "reasoning": "<1 phrase>", "topOffenders": ["<extrait>", "<extrait>"]}
+
+TEXTE :
+"""
+${slice}
+"""`;
+
+  const results = await Promise.all(
+    slices.map((slice) =>
+      callClaude(slicePrompt(slice), {
+        system: "Détecteur IA Compilatio-grade. Réponds uniquement JSON valide.",
+        model: "claude-sonnet-4-6",
+        timeoutMs: 75_000,
+      })
+        .then((raw) => {
+          const m = raw.match(/\{[\s\S]*\}/);
+          if (!m) return null;
+          return JSON.parse(m[0]) as { overall: number; reasoning?: string; topOffenders?: string[] };
+        })
+        .catch(() => null)
+    )
+  );
+  const valid = results.filter(Boolean) as Array<{ overall: number; reasoning?: string; topOffenders?: string[] }>;
+
+  if (valid.length === 0) {
+    // All slices failed — fall back to heuristic so the loop still runs
     return {
-      overall: verdict.overall,
-      reasoning: verdict.summary || verdict.reasoning,
-      topOffenders: verdict.topRiskZones,
+      overall: heuristicFallback,
+      reasoning: "Score Claude indisponible — bascule vers heuristique.",
+      topOffenders: [],
     };
-  } catch {
-    // fall through to single-call fallback
   }
+
+  // Median score across slices (robust to outliers)
+  const scores = valid.map((v) => Math.max(0, Math.min(100, Math.round(v.overall ?? 0)))).sort((a, b) => a - b);
+  const mid = Math.floor(scores.length / 2);
+  const median = scores.length % 2 === 0
+    ? Math.round((scores[mid - 1] + scores[mid]) / 2)
+    : scores[mid];
+
+  // Extra safety: if Claude returned an implausibly low score but the
+  // heuristic (which is now pattern-aware) says >40, trust the heuristic.
+  const overall = median < 15 && heuristicFallback > 40 ? heuristicFallback : median;
+
+  return {
+    overall,
+    reasoning: valid.map((v) => v.reasoning).filter(Boolean).join(" · "),
+    topOffenders: valid.flatMap((v) => v.topOffenders ?? []).slice(0, 5),
+  };
+}
+
+/** Build up to 3 slices (start / middle / end) capped at sliceChars. */
+function sliceForScoring(text: string, sliceChars: number): string[] {
+  if (text.length <= sliceChars) return [text];
+  if (text.length <= sliceChars * 2) {
+    return [text.slice(0, sliceChars), text.slice(text.length - sliceChars)];
+  }
+  const start = text.slice(0, sliceChars);
+  const midStart = Math.floor(text.length / 2) - Math.floor(sliceChars / 2);
+  const middle = text.slice(midStart, midStart + sliceChars);
+  const end = text.slice(text.length - sliceChars);
+  return [start, middle, end];
+}
+
+// Legacy single-call scorer kept for future use — currently unused.
+async function _legacyScoreText(text: string, language: Language): Promise<{ overall: number; reasoning: string; topOffenders: string[] }> {
   const sample = text.slice(0, 12_000);
   const langHint = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";
   const prompt = `Tu es un détecteur d'IA calibré pour émuler Compilatio Studium (le détecteur de référence en France pour les universités et écoles supérieures).

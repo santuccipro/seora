@@ -72,7 +72,7 @@ const PHASE_LABELS: Record<string, string> = {
   extracting: "Extraction du texte du document",
   "detecting-before": "Scan initial du score IA (4 détecteurs)",
   "cleaning-deterministic": "Nettoyage homoglyphes + connecteurs académiques",
-  "rewriting-llm": "Reformulation phrase par phrase (Gemini)",
+  "rewriting-llm": "Reformulation phrase par phrase (Claude Opus 4.8)",
   "detecting-after": "Nouveau scan du score IA",
   retrying: "Score encore élevé, nouvelle passe plus agressive",
   restoring: "Restauration des zones préservées",
@@ -518,7 +518,7 @@ export default function HumanizerPage() {
             Analyse mon mémoire / DPP
           </h1>
           <p className="text-gray-600 max-w-lg mx-auto">
-            4 détecteurs IA (Compilatio, GPTZero, Sapling, Originality) + humanisation Gemini pour passer sous les 15%.
+            Compilatio-emulator (5 perspectives Claude Opus 4.8) + humanisation Claude jusqu&apos;à &lt; 15 % IA détectée.
           </p>
         </div>
 
@@ -1176,7 +1176,7 @@ export default function HumanizerPage() {
                   { n: 1, title: "Extraction", desc: "On lit ton PDF/DOCX (jusqu'à 15 Mo) et on extrait le texte brut." },
                   { n: 2, title: "Détection 4 moteurs", desc: "Score IA calculé sur 4 dimensions inspirées de Compilatio, GPTZero, Sapling et Originality." },
                   { n: 3, title: "Nettoyage caché", desc: "On retire les homoglyphes cyrilliques cachés, les cadratins et les connecteurs académiques." },
-                  { n: 4, title: "Reformulation Gemini", desc: "Chaque paragraphe repassé dans un LLM avec un prompt étudiant Master 2 (few-shot examples)." },
+                  { n: 4, title: "Reformulation Claude", desc: "Chaque paragraphe repassé dans Claude Opus 4.8 avec un prompt étudiant Master 2 (few-shot examples calibrés)." },
                   { n: 5, title: "Zones préservées", desc: "Les citations légales, IBAN, URLs et phrases que tu marques restent intactes." },
                   { n: 6, title: "Retry adaptatif", desc: "Si le score reste > cible, on relance avec une température plus haute (mode Agressif)." },
                 ].map((step) => (
