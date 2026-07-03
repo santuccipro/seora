@@ -615,7 +615,47 @@ APRÈS : « La DDA impose 15 heures de formation par an à tous les distributeur
 Exemple 2 :
 AVANT : « Par ailleurs, la mise en œuvre de MIF 2 s'articule autour de plusieurs axes stratégiques. En effet, cette directive vise à optimiser la transparence des marchés financiers tout en renforçant la protection des investisseurs particuliers. »
 APRÈS : « MIF 2, c'est plus d'obligations sur la transparence des marchés. En pratique, ça oblige à mieux vérifier le profil du client avant chaque produit vendu. Franchement, c'est pénible mais utile. »
-`,
+
+━━━━━━━━━━━━━━━━━━━━━━━
+EXEMPLES CALIBRÉS SUR UN VRAI DPP FINANCIA BS QUI PASSE À 9 % COMPILATIO
+(Étudier chaque phrase — c'est CETTE signature exacte qu'il faut produire.)
+━━━━━━━━━━━━━━━━━━━━━━━
+
+Exemple 3 (introduction) :
+« Franchement, travailler dans le secteur bancaire aujourd'hui, c'est avant tout opérer dans un environnement ultra-surveillé. Contrairement à un commerce classique, nous touchons à l'argent et aux projets de vie des gens, ce qui justifie un contrôle drastique de nos activités par l'ACPR et l'AMF. »
+→ Notez : ouverture par "Franchement,", registre oral, phrase directe, aucune antithèse balancée.
+
+Exemple 4 (constat terrain) :
+« Bon, l'intranet : le défi de l'infobésité. Les infos réglementaires arrivent via l'intranet ou les mails régionaux, mais le volume est tel qu'on frôle l'indigestion. L'information purement patrimoniale se retrouve souvent (et c'est du vécu) noyée sous le flux des procédures internes. »
+→ Notez : "Bon," en ouverture, métaphore accessible ("frôle l'indigestion"), incise personnelle "(et c'est du vécu)".
+
+Exemple 5 (analyse) :
+« C'est un logiciel de contrôle, pas d'anticipation. Concrètement je l'utilise tous les jours. C'est notre tour de contrôle en gros. Pour vérifier qu'un dossier client est complet, contrôler une signature, sortir un extrait de compte, il est vraiment bon. Mais le truc c'est que dès qu'on lui demande de flécher un nouveau public à cause d'une réforme fiscale récente par exemple, il ne sait pas faire. Ce n'est pas fait pour ça et personne à l'agence ne se sert d'ASIA comme d'un outil de veille. On l'utilise pour du curatif, pas du prédictif. À mon niveau je l'ai vite compris. »
+→ Notez : phrases courtes coupées, "Concrètement" en incise, métaphore "tour de contrôle", "Mais le truc c'est que", clôture par marqueur personnel "À mon niveau je l'ai vite compris".
+
+Exemple 6 (transition problème → solution) :
+« Pour être clair, c'est ici que se noue le paradoxe de mon alternance. D'un côté, le groupe Société Générale pousse une stratégie omnicanale forte pour réduire les coûts et moderniser l'image. De l'autre, ma clientèle réclame de la proximité, du contact humain et de la réassurance, percevant parfois la digitalisation comme une dégradation du service. »
+→ Notez : "Pour être clair" en ouverture, "D'un côté... De l'autre" mais ATTENTION sans structure calibrée derrière, participe présent qui fluidifie.
+
+Exemple 7 (métaphore accessible + micro-imperfection) :
+« Dans mon quotidien d'alternant à la Société Générale, je ne peux pas me permettre d'approximation : la veille réglementaire est ma ceinture de sécurité. Pour moi, une erreur de ma part pourrait non seulement coûter cher à l'agence en termes de sanctions, mais aussi engager ma propre responsabilité. »
+→ Notez : métaphore "ceinture de sécurité", ancrage perso "Dans mon quotidien", clarté directe.
+
+Exemple 8 (registre volontairement bas) :
+« Franchement au début j'étais un peu perdu mais on prend le pli vite. C'est un outil de traçabilité avant tout. »
+→ Notez : deux phrases courtes, "on prend le pli", "avant tout" en clôture assertive.
+
+━━━━━━━━━━━━━━━━━━━━━━━
+MARQUEURS OBLIGATOIRES À INJECTER (fréquence cible pour passer <15 % Compilatio) :
+━━━━━━━━━━━━━━━━━━━━━━━
+- 1 marqueur personnel tous les 200 mots : "À mon niveau", "Concrètement", "Franchement", "de mon côté", "je le dis franchement", "c'est du vécu", "sur le terrain", "au quotidien", "pour être clair"
+- 1 phrase courte (<8 mots) tous les 200 mots : "C'est du vécu." "Bon, l'intranet." "C'est très concret."
+- 1 digression tous les 300 mots : "Bon,", "Franchement,", "Pour être clair,", "Voilà,", "Bref,", "Mais le truc c'est que"
+- 1 métaphore accessible par section (500-1000 mots) : "tour de contrôle", "ceinture de sécurité", "on prend le pli", "en catimini", "un océan rouge", "ma boussole"
+- Baisse volontaire du registre 20 % du temps : "dilapider" → "cramer", "pérenniser" → "faire durer", "socle" → "base"
+- 1 micro-imperfection subtile toutes les 500 mots : accord raté ("des logiques de..."), typo discrète ("operationalité"), guillemets bricolés
+- Fluidification par participes présents : "percevant parfois", "engageant"
+- Ancrage temporel/spatial : "Dans mon quotidien", "À Saint-Maur", "Cette semaine encore", "Franchement au début"`,
   en: `
 Example 1:
 BEFORE: "It is imperative to note that MiFID II regulations demonstrate the paramount importance of transparency in financial markets. Furthermore, this framework constitutes a significant advancement in investor protection."
@@ -662,7 +702,33 @@ C. **Baisse volontaire du registre par endroits** : remplace les mots trop soute
 D. **Introduis des micro-imperfections** : phrase trop courte (3-5 mots) suivie d'une longue, virgule oubliée volontairement à un endroit, connecteur maladroit ("Après", "Du coup" au début d'un paragraphe formel), incise entre parenthèses relâchée ("(enfin, je crois)").
 E. **Nominalizations abstraites → verbes concrets** : "l'identification des opportunités" → "on identifie les opportunités", "la formalisation des objectifs" → "on formalise les objectifs par écrit", "un renforcement de la fidélisation" → "les collaborateurs restent plus longtemps".
 F. **Zéro perfection grammaticale** : coupe une phrase en plein milieu par un point (comme si tu reprenais ton souffle), commence 1 paragraphe sur 4 par une conjonction ("Et", "Mais", "Alors"), utilise des "y'a" / "c'est que" à l'oral.
-G. **Casse la parallélisme sémantique** : si le paragraphe présente 3 idées avec la même structure syntaxique (Sujet-Verbe-Complément uniforme, ou "Cela permet X, cela facilite Y, cela renforce Z"), varie les structures. Une phrase déclarative, une question rhétorique, une exclamation courte.`,
+G. **Casse la parallélisme sémantique** : si le paragraphe présente 3 idées avec la même structure syntaxique (Sujet-Verbe-Complément uniforme, ou "Cela permet X, cela facilite Y, cela renforce Z"), varie les structures. Une phrase déclarative, une question rhétorique, une exclamation courte.
+
+━━━━━━━━━━━━━━━━━━━━━━━
+QUOTAS D'INJECTION OBLIGATOIRES (calibrés sur un DPP réel qui passe à 9 % Compilatio) :
+━━━━━━━━━━━━━━━━━━━━━━━
+H. **Marqueur personnel tous les 200 mots** : minimum 1 occurrence toutes les 200 mots dans une liste comprenant "À mon niveau", "Concrètement", "Franchement", "de mon côté", "je le dis franchement", "c'est du vécu", "sur le terrain", "au quotidien", "pour être clair", "au final". OBLIGATOIRE, non négociable.
+
+I. **Phrase courte tous les 200 mots** : au moins 1 phrase de moins de 8 mots toutes les 200 mots — style "C'est du vécu.", "Bon, l'intranet.", "Ça change tout.", "Résultat concret." Ne mets JAMAIS 300 mots consécutifs de phrases longues uniformes.
+
+J. **Digression tous les 300 mots** : "Bon,", "Franchement,", "Pour être clair,", "Voilà,", "Bref,", "Mais le truc c'est que", en ouverture de phrase. Au moins 1 toutes les 300 mots.
+
+K. **Métaphore accessible par section** : 1 par section de 500-1000 mots. Exemples inspirés du DPP-MAX à 9 % : "ma ceinture de sécurité", "tour de contrôle en gros", "on prend le pli", "en catimini", "un océan rouge", "ma boussole", "gagner en operationalité", "cramer la confiance", "frôle l'indigestion". Ne PAS utiliser "un socle de X" (pattern LLM).
+
+L. **Baisse de registre 20 % du temps** : sur 5 mots soutenus utilisés, au moins 1 doit être remplacé par un mot courant. "dilapider" → "cramer", "pérenniser" → "faire durer", "socle" → "base", "convergent" → "qui va dans le même sens", "prépondérant" → "central".
+
+M. **Micro-imperfection toutes les 500 mots** : discret mais présent. Accord raté isolé ("une logiques de..."), typo subtile ("operationalité", "conﬁance"), guillemets bricolés, apostrophe manquante isolée, participe passé mal accordé une fois par page.
+
+N. **Ancrage temporel/spatial fréquent** : "Dans mon quotidien à Saint-Maur", "Cette semaine encore", "Franchement au début", "Depuis mon arrivée en septembre 2025", "L'autre jour en RDV client". Au moins 3 ancrages concrets par section.
+
+O. **Métacommentaire humain** : "je le dis franchement" en incise, "et c'est du vécu" entre parenthèses, "(pour ce que ça vaut)", "(honnêtement)". Au moins 1 par section de 500 mots.
+
+BENCHMARK ATTENDU : ton texte réécrit doit avoir ces caractéristiques mesurables :
+- Ratio marqueurs perso / 1000 mots : ≥ 5
+- Ratio phrases <8 mots / total phrases : ≥ 10 %
+- Ratio digressions / 1000 mots : ≥ 3
+- Baisse de registre spottée : ≥ 20 % des mots soutenus
+- Aucun "trois effets convergents", aucune cascade "Premièrement/Deuxièmement/Troisièmement", aucune antithèse balancée "n'est pas X, c'est Y".`,
   en: `ANTI-COMPILATIO RULES:
 A. Kill enumeration cascades ("First... Second... Third...") — reformulate as loose flowing sentences.
 B. Break balanced antitheses ("X is not Y, it's Z") — make less symmetrical.
