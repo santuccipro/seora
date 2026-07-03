@@ -1021,35 +1021,63 @@ function buildPrompt(text: string, language: Language, mode: HumanizeMode): stri
     mode === "aggressive" ? "AGGRESSIVE" :
     mode === "balanced" ? "ÉQUILIBRÉ" :
     "BASIQUE";
-  // Anti-Compilatio rules now apply from BALANCED and up — the previous
-  // restriction to aggressive+ meant balanced runs delivered only a ~10 pt
-  // drop on real DPPs, which is worthless.
   const isHard = mode === "balanced" || mode === "aggressive" || mode === "compilatio-proof";
   return `${VOICE_INSTRUCTION[language]}
 
-MISSION : réécrire le texte académique dans TON style personnel, mode ${intensity}. Garde le sens exact et le fond réglementaire/technique. NE change PAS les faits, chiffres, noms propres, références légales.
+━━━━━━━━━━━━━━━━━━━━━━━
+🚨 MISSION CRITIQUE — LIS EN ENTIER 🚨
+━━━━━━━━━━━━━━━━━━━━━━━
 
-CONTRAINTES STRICTES :
-1. Casse les structures parallèles ("D'un côté... de l'autre" → "D'abord X. Ensuite Y")
-2. Élimine les connecteurs académiques (Par ailleurs, Toutefois, Néanmoins)
-3. Vocabulaire courant (fondamental → clé, crucial → central, optimiser → améliorer)
-4. Alterne phrases courtes (3-8 mots) et longues (25+ mots)
-5. Au moins 1 marque d'énonciation par paragraphe long
-6. Digressions naturelles ("Bref,", "Voilà,", "Franchement,", "Bon,")
-7. Aucun cadratin (—) ni tiret d'écriture (–), tirets simples (-)
-8. Ponctuation légèrement imparfaite : virgules oubliées, phrases abruptes
-9. Zéro caractère cyrillique/grec caché
-10. Les zones marquées ${PLACEHOLDER_PREFIX}...${PLACEHOLDER_SUFFIX} sont DES PLACEHOLDERS À CONSERVER TELS QUELS.
+Tu vas transformer un texte académique en un texte étudiant ORAL, PERSO, IMPARFAIT. Mode ${intensity}.
 
-${isHard ? ANTI_COMPILATIO_RULES[language] + "\n\n" : ""}${FEWSHOT_EXAMPLES[language]}
+**RÈGLE D'OR :** Ton texte de sortie doit être **RADICALEMENT DIFFÉRENT** du texte d'entrée. Si tu ne changes que 5 mots par paragraphe, tu **ÉCHOUES**. Chaque paragraphe doit être **RESTRUCTURED** (pas juste retouché).
 
-===
-TEXTE À RÉÉCRIRE :
+**PROTECTION du fond** (les SEULES choses que tu ne changes pas) :
+- Faits chiffrés (montants, dates, pourcentages)
+- Noms propres (personnes, entreprises)
+- Références légales (AMF, ACPR, RGPD, MIF 2, DDA, articles de loi)
+- Termes techniques spécifiques (LCB-FT, KYC, ESG, etc.)
+- Zones marquées ${PLACEHOLDER_PREFIX}...${PLACEHOLDER_SUFFIX}
+
+**TOUT LE RESTE change** : formulations, structure des phrases, connecteurs, transitions, tournures, rythme, registre.
+
+━━━━━━━━━━━━━━━━━━━━━━━
+🎯 CHECKLIST OBLIGATOIRE (à respecter à la lettre)
+━━━━━━━━━━━━━━━━━━━━━━━
+
+Sur chaque paragraphe tu DOIS :
+
+1. **Réécrire au moins 60% des phrases entièrement** (pas juste changer des mots)
+2. **Injecter 1 marqueur perso** ("franchement", "concrètement", "à mon niveau", "bon,", "pour être clair", "au final") toutes les 100-150 mots
+3. **Insérer 1 phrase courte (<8 mots)** toutes les 100-150 mots — style "C'est du vécu.", "Bref, ouais.", "Ça change tout."
+4. **Casser TOUTES les cascades** "Premièrement/Deuxièmement/Troisièmement" → reformuler en flux naturel sans annonce
+5. **Casser TOUTES les antithèses balancées** "X n'est pas Y, c'est Z" → reformuler asymétrique
+6. **Supprimer TOUTES les "trois effets convergents", "un socle de", "Il est important de noter"** — c'est signature IA garantie
+7. **Baisser le registre** 1 mot soutenu sur 3 : dilapider→cramer, socle→base, pérenniser→faire durer, convergent→qui va dans le sens, prépondérant→gros
+8. **Introduire des micro-imperfections** : virgule oubliée, guillemet bricolé, "au final" mal placé, participe raté (1-2 par paragraphe)
+9. **Fluidifier avec participes présents** au lieu de subordonnées
+10. **Ancrer temporellement** : "Dans mon quotidien", "L'autre jour en RDV", "Depuis septembre", "Cette semaine encore"
+
+Zéro cadratin (—), zéro tiret d'écriture (–), tirets simples (-) uniquement.
+
+${isHard ? ANTI_COMPILATIO_RULES[language] + "\n\n" : ""}
+━━━━━━━━━━━━━━━━━━━━━━━
+📖 EXEMPLES À RÉPLIQUER (calibrés sur DPP réel à 9% Compilatio)
+━━━━━━━━━━━━━━━━━━━━━━━
+
+${FEWSHOT_EXAMPLES[language]}
+
+━━━━━━━━━━━━━━━━━━━━━━━
+✍️ TEXTE À TRANSFORMER
+━━━━━━━━━━━━━━━━━━━━━━━
 
 ${text}
-===
 
-Texte réécrit dans MON style perso :`;
+━━━━━━━━━━━━━━━━━━━━━━━
+
+Retourne UNIQUEMENT le texte transformé (aucun commentaire, aucun préambule, aucune balise). Le texte doit paraître écrit par un étudiant fatigué en Master 2 qui a bâclé son rendu à 3h du matin — pas par un LLM.
+
+TEXTE TRANSFORMÉ :`;
 }
 
 export async function llmRewrite(
