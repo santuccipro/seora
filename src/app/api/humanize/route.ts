@@ -136,13 +136,16 @@ export async function POST(req: NextRequest) {
             controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
           };
           try {
+            // Ping analysisId in the first frame so the client can call
+            // /cleanup if the stream dies mid-flight.
+            send("progress", { phase: "extracting", pass: 0, totalPasses: 0, analysisId: analysis.id });
             const result = await runFullHumanize(
               buffer,
               file.name,
               file.type,
               { mode, language, targetScore, preservationList, preservationPatterns },
               async (phase, pass, totalPasses, detail) => {
-                send("progress", { phase, pass, totalPasses, detail });
+                send("progress", { phase, pass, totalPasses, detail, analysisId: analysis.id });
               }
             );
 

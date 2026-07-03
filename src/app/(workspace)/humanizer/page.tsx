@@ -126,6 +126,31 @@ export default function HumanizerPage() {
   const [dragOver, setDragOver] = useState(false);
   const [uploaded, setUploaded] = useState<{ name: string; file: File } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [stuckAnalyses, setStuckAnalyses] = useState<Array<{ id: string; fileName: string; tokensUsed: number; createdAt: string }>>([]);
+
+  const refreshStuck = useCallback(async () => {
+    try {
+      const res = await fetch("/api/humanize/stuck");
+      if (!res.ok) return;
+      const data = await res.json();
+      setStuckAnalyses(data.stuck ?? []);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    refreshStuck();
+  }, [refreshStuck]);
+
+  const cleanupStuck = async (id: string) => {
+    try {
+      const res = await fetch(`/api/humanize/${id}/cleanup`, { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`Tokens remboursés (${data.refunded ?? 0}).`);
+        refreshStuck();
+      }
+    } catch { /* ignore */ }
+  };
   const [phase, setPhase] = useState<string>("extracting");
   const [pass, setPass] = useState(0);
   const [totalPasses, setTotalPasses] = useState(0);
@@ -292,6 +317,9 @@ export default function HumanizerPage() {
       const decoder = new TextDecoder();
       let buffer = "";
       let doneId: string | null = null;
+      let startedId: string | null = null;
+      let sawDone = false;
+      let sawError = false;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -313,12 +341,26 @@ export default function HumanizerPage() {
             setPass(data.pass ?? 0);
             setTotalPasses(data.totalPasses ?? 0);
             setPhaseDetail(data.detail ?? "");
+            if (data.analysisId && !startedId) startedId = data.analysisId;
           } else if (eventType === "done") {
             doneId = data.id;
+            sawDone = true;
           } else if (eventType === "error") {
+            sawError = true;
             throw new Error(data.message);
           }
         }
+      }
+
+      // Stream ended without "done" and without "error" → Vercel or CF killed
+      // the request mid-flight. Clean up + refund the analysis on the server.
+      if (!sawDone && !sawError && startedId) {
+        try {
+          await fetch(`/api/humanize/${startedId}/cleanup`, { method: "POST" });
+        } catch {
+          // best-effort
+        }
+        throw new Error("Analyse interrompue par le timeout serveur — tokens remboursés. Réessaie avec un extrait plus court ou passe en mode Basique.");
       }
 
       if (doneId) {
@@ -493,6 +535,34 @@ export default function HumanizerPage() {
       )}
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12">
+        {/* Stuck-analysis banner */}
+        {stuckAnalyses.length > 0 && (
+          <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-300 p-4 sm:p-5">
+            <p className="text-sm font-bold text-amber-900 mb-2">
+              ⚠️ {stuckAnalyses.length} analyse{stuckAnalyses.length > 1 ? "s" : ""} coincée{stuckAnalyses.length > 1 ? "s" : ""} en cours
+            </p>
+            <p className="text-xs text-amber-800 mb-3">
+              Interrompue{stuckAnalyses.length > 1 ? "s" : ""} par un timeout serveur — clique pour rembourser tes tokens.
+            </p>
+            <div className="space-y-2">
+              {stuckAnalyses.map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2 bg-white rounded-xl px-3 py-2 border border-amber-200">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-900 truncate">{s.fileName}</p>
+                    <p className="text-[10px] text-gray-500">{new Date(s.createdAt).toLocaleString("fr-FR")}</p>
+                  </div>
+                  <button
+                    onClick={() => cleanupStuck(s.id)}
+                    className="rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 shrink-0"
+                  >
+                    Rembourser {s.tokensUsed}t
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-6">
           <Link
             href="/app"
