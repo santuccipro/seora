@@ -505,7 +505,7 @@ export default function Home() {
                           </div>
                           <div className="mt-auto">
                             <button
-                              onClick={() => { if (session) router.push("/cv-editor"); else openAuthModal(); }}
+                              onClick={() => { if (session) router.push("/cv-builder"); else openAuthModal(); }}
                               className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-500/20 hover:shadow-lg transition-shadow"
                             >
                               <Sparkles className="h-4 w-4" /> Créer mon CV
