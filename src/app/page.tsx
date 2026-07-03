@@ -204,7 +204,7 @@ export default function Home() {
         {/*  2. HERO — with upload zone merged     */}
         {/* ══════════════════════════════════════ */}
         <section className="relative pt-10 pb-6 sm:pt-20 sm:pb-10">
-          <div className="relative mx-auto max-w-2xl px-5 sm:px-6 text-center">
+          <div className="relative mx-auto max-w-3xl px-5 sm:px-6 text-center">
             {/* Badge — live counter */}
             <div className="animate-fade-up inline-flex items-center gap-2 rounded-full glass-strong px-4 py-1.5 text-xs font-semibold text-indigo-700 mb-6 shadow-sm">
               <span className="relative flex h-2 w-2">
