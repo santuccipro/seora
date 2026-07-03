@@ -9,6 +9,7 @@ const TOKEN_COST: Record<HumanizeMode, number> = {
   basic: 2,
   balanced: 3,
   aggressive: 5,
+  "compilatio-proof": 8,
 };
 
 const MAX_BATCH = 5;

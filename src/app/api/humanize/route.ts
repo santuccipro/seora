@@ -14,6 +14,7 @@ const TOKEN_COST: Record<HumanizeMode, number> = {
   basic: 2,
   balanced: 3,
   aggressive: 5,
+  "compilatio-proof": 8,
 };
 
 /**
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (!(["basic", "balanced", "aggressive"] as HumanizeMode[]).includes(mode)) {
+    if (!(["basic", "balanced", "aggressive", "compilatio-proof"] as HumanizeMode[]).includes(mode)) {
       return NextResponse.json({ error: "Mode invalide" }, { status: 400 });
     }
     if (!(["fr", "en", "es"] as Language[]).includes(language)) {
@@ -152,6 +153,9 @@ export async function POST(req: NextRequest) {
                 scoreDetails: JSON.stringify({
                   before: result.scoreBefore,
                   after: result.scoreAfter,
+                  claudeScoreBefore: result.claudeScoreBefore,
+                  claudeScoreAfter: result.claudeScoreAfter,
+                  claudeReasoning: result.claudeReasoning,
                   metrics: result.metrics,
                   mode: result.mode,
                   language: result.language,
@@ -167,6 +171,9 @@ export async function POST(req: NextRequest) {
               id: analysis.id,
               aiScoreBefore: result.scoreBefore.overall,
               aiScoreAfter: result.scoreAfter.overall,
+              claudeScoreBefore: result.claudeScoreBefore,
+              claudeScoreAfter: result.claudeScoreAfter,
+              claudeReasoning: result.claudeReasoning,
               passesApplied: result.passesApplied,
               wordCount: result.wordCount,
               durationMs: result.durationMs,

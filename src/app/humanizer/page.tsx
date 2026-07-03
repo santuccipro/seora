@@ -35,7 +35,7 @@ import {
   FileSearch,
 } from "lucide-react";
 
-type Mode = "basic" | "balanced" | "aggressive";
+type Mode = "basic" | "balanced" | "aggressive" | "compilatio-proof";
 type Language = "fr" | "en" | "es";
 
 type Detector = "gptZeroLike" | "saplingLike" | "originalityLike" | "compilatioLike";
@@ -45,12 +45,18 @@ type Analysis = {
   fileName: string;
   aiScoreBefore: number | null;
   aiScoreAfter: number | null;
+  claudeScoreBefore?: number | null;
+  claudeScoreAfter?: number | null;
+  claudeReasoning?: string | null;
   scoreDetails: {
     before: Record<string, number>;
     after: Record<string, number>;
     metrics?: Record<string, number>;
     mode?: string;
     language?: string;
+    claudeScoreBefore?: number | null;
+    claudeScoreAfter?: number | null;
+    claudeReasoning?: string | null;
   } | null;
   originalText: string | null;
   humanizedText: string | null;
@@ -94,6 +100,13 @@ const MODE_META: Record<Mode, { label: string; desc: string; tokens: number; col
     tokens: 5,
     color: "red",
     icon: Flame,
+  },
+  "compilatio-proof": {
+    label: "Compilatio-proof",
+    desc: "Boucle Claude Sonnet jusqu'à <15% Compilatio-grade (~3-5 min)",
+    tokens: 8,
+    color: "purple",
+    icon: Shield,
   },
 };
 
@@ -632,6 +645,49 @@ export default function HumanizerPage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Compilatio-grade (Claude Sonnet) score badges */}
+                  {(result.scoreDetails?.claudeScoreBefore != null ||
+                    result.scoreDetails?.claudeScoreAfter != null) && (
+                    <div className="mb-6 rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-fuchsia-50 p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Shield className="h-4 w-4 text-purple-600" />
+                        <p className="text-xs uppercase tracking-widest text-purple-800 font-black">
+                          Score Compilatio-grade · Claude Sonnet
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="rounded-xl bg-white/70 border border-purple-100 p-3 text-center">
+                          <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">Avant</p>
+                          <p className="text-3xl font-black text-red-600">
+                            {result.scoreDetails.claudeScoreBefore ?? "—"}
+                            <span className="text-sm text-gray-400">%</span>
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-white/70 border border-purple-100 p-3 text-center">
+                          <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1">Après</p>
+                          <p className={`text-3xl font-black ${
+                            (result.scoreDetails.claudeScoreAfter ?? 100) <= 15
+                              ? "text-emerald-600"
+                              : (result.scoreDetails.claudeScoreAfter ?? 100) <= 30
+                                ? "text-amber-600"
+                                : "text-red-600"
+                          }`}>
+                            {result.scoreDetails.claudeScoreAfter ?? "—"}
+                            <span className="text-sm text-gray-400">%</span>
+                          </p>
+                        </div>
+                      </div>
+                      {result.scoreDetails.claudeReasoning && (
+                        <p className="text-xs text-purple-900/80 leading-relaxed mt-3 italic">
+                          « {result.scoreDetails.claudeReasoning} »
+                        </p>
+                      )}
+                      <p className="text-[10px] text-purple-700/70 mt-2">
+                        Ce score émule le détecteur ML de Compilatio Studium. Objectif : &lt; 15 %.
+                      </p>
+                    </div>
+                  )}
 
                   {result.scoreDetails && (
                     <>
