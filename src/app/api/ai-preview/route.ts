@@ -106,22 +106,56 @@ async function extractTextInline(
   }
 
   if (type === "application/pdf" || ext === "pdf") {
-    // pdf-parse imports pdf.js internally — call directly.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod: any = await import("pdf-parse");
-    const parser = mod.default ?? mod;
-    // Newer pdf-parse (2.x) exposes a PDFParse class; older versions are a function.
-    if (typeof parser === "function") {
-      const data = await parser(buffer);
-      return data?.text ?? "";
-    }
-    if (mod.PDFParse) {
-      const p = new mod.PDFParse(new Uint8Array(buffer));
-      const r = await p.getText();
-      return (r?.pages ?? []).map((pg: { text: string }) => pg.text).join("\n");
-    }
-    throw new Error("pdf-parse API inconnue");
+    return extractPdfViaSubprocess(buffer);
   }
 
   throw new Error(`Format non supporté : ${ext || fileType}`);
+}
+
+/**
+ * pdf-parse 2.x reaches into pdfjs-dist which needs `DOMMatrix`, absent in
+ * Node < 20. Spawning a child node process picks up the pdfjs polyfill path
+ * that pdf-parse ships with — same trick used by /api/analyze.
+ */
+async function extractPdfViaSubprocess(buffer: Buffer): Promise<string> {
+  const { writeFileSync, unlinkSync, readFileSync } = await import("fs");
+  const { execSync } = await import("child_process");
+  const { join } = await import("path");
+  const { tmpdir } = await import("os");
+  const tmpPdf = join(tmpdir(), `seora_prev_${Date.now()}_${Math.floor(Math.random() * 1e6)}.pdf`);
+  const tmpOut = join(tmpdir(), `seora_prev_${Date.now()}_${Math.floor(Math.random() * 1e6)}.txt`);
+  writeFileSync(tmpPdf, buffer);
+  try {
+    execSync(
+      `node -e "
+        (async () => {
+          const fs = require('fs');
+          const mod = require('pdf-parse');
+          const buf = fs.readFileSync('${tmpPdf}');
+          try {
+            if (typeof (mod.default || mod) === 'function') {
+              const data = await (mod.default || mod)(buf);
+              fs.writeFileSync('${tmpOut}', data.text || '');
+              return;
+            }
+            if (mod.PDFParse) {
+              const p = new mod.PDFParse(new Uint8Array(buf));
+              const r = await p.getText();
+              const text = (r.pages || []).map(pg => pg.text).join('\\n');
+              fs.writeFileSync('${tmpOut}', text);
+              return;
+            }
+            fs.writeFileSync('${tmpOut}', '');
+          } catch (e) {
+            fs.writeFileSync('${tmpOut}', '');
+          }
+        })();
+      "`,
+      { cwd: process.cwd(), timeout: 30_000 }
+    );
+    return readFileSync(tmpOut, "utf-8");
+  } finally {
+    try { unlinkSync(tmpPdf); } catch {}
+    try { unlinkSync(tmpOut); } catch {}
+  }
 }
