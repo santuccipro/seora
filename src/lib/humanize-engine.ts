@@ -789,11 +789,11 @@ const VOICE_INSTRUCTION: Record<Language, string> = {
 };
 
 const MODE_CONFIG: Record<HumanizeMode, { model: ClaudeModel; temperature: number; maxPasses: number; overlap: number }> = {
-  basic: { model: "claude-haiku-4-5", temperature: 0.7, maxPasses: 2, overlap: 200 },
-  balanced: { model: "claude-sonnet-4-6", temperature: 0.95, maxPasses: 3, overlap: 300 },
-  aggressive: { model: "claude-opus-4-7", temperature: 1.0, maxPasses: 4, overlap: 400 },
-  // compilatio-proof = Opus 4.8 + boucle sur score Compilatio-emulator (Opus 4.8) jusqu'à <15%, 5 passes max
-  "compilatio-proof": { model: "claude-opus-4-8", temperature: 1.0, maxPasses: 5, overlap: 400 },
+  basic: { model: "claude-haiku-4-5", temperature: 0.7, maxPasses: 1, overlap: 200 },
+  balanced: { model: "claude-sonnet-4-6", temperature: 0.95, maxPasses: 1, overlap: 300 },
+  aggressive: { model: "claude-opus-4-7", temperature: 1.0, maxPasses: 2, overlap: 400 },
+  // compilatio-proof = Opus 4.8 + boucle sur score Compilatio-emulator (Opus 4.8) jusqu'à <15%, 3 passes max
+  "compilatio-proof": { model: "claude-opus-4-8", temperature: 1.0, maxPasses: 3, overlap: 400 },
 };
 
 /**
@@ -1087,28 +1087,40 @@ export async function llmRewrite(
   }
   if (currentChunk.length > 0) chunks.push(currentChunk);
 
-  // Parallelise chunk rewriting — critical to stay under Vercel Hobby's
-  // 60 s per-request cap. Sequential = 5 chunks × 30 s = 150 s (killed).
-  // Parallel = 5 chunks in ~30 s wall clock (all-in-flight together).
+  // Sequential rewriting — the Mac-mini runner is single-threaded on
+  // `claude --print` subprocess spawns; concurrent calls silently fail
+  // (chunks return original text). Sequential with tight timeout keeps
+  // things fast enough on well-formed docs (~8-12 s per chunk warm).
   const chunkTexts = chunks.map((c) => c.join("\n\n"));
-  const rewritten = await Promise.all(
-    chunkTexts.map((chunkText) =>
-      callClaude(buildPrompt(chunkText, language, mode), {
+  const rewritten: string[] = [];
+  let failures = 0;
+  for (let i = 0; i < chunkTexts.length; i++) {
+    const chunkText = chunkTexts[i];
+    try {
+      const raw = await callClaude(buildPrompt(chunkText, language, mode), {
         model: config.model,
         system:
           "Tu es un assistant qui réécrit du texte académique pour le rendre indétectable par les outils anti-IA (Compilatio, GPTZero). Retourne UNIQUEMENT le texte réécrit, sans commentaire.",
-        timeoutMs: 55_000,
-      })
-        .then((out) => {
-          const t = out.trim();
-          return t.length > 0 ? t : chunkText;
-        })
-        .catch((err) => {
-          console.error("[humanize-engine] llmRewrite chunk failed:", err);
-          return chunkText;
-        })
-    )
-  );
+        timeoutMs: 45_000,
+      });
+      const t = raw.trim();
+      if (t.length < chunkText.length * 0.5) {
+        // Suspicious short output — Claude likely refused or truncated
+        console.warn(`[humanize-engine] chunk ${i + 1}/${chunkTexts.length} returned short output (${t.length}<${chunkText.length}). Keeping original.`);
+        rewritten.push(chunkText);
+        failures++;
+      } else {
+        rewritten.push(t);
+      }
+    } catch (err) {
+      console.error(`[humanize-engine] llmRewrite chunk ${i + 1}/${chunkTexts.length} failed:`, err instanceof Error ? err.message : err);
+      rewritten.push(chunkText);
+      failures++;
+    }
+  }
+  if (failures === chunkTexts.length) {
+    console.error(`[humanize-engine] ALL ${chunkTexts.length} chunks failed to rewrite`);
+  }
 
   return { text: rewritten.join("\n\n"), chunkCount: chunks.length };
 }
