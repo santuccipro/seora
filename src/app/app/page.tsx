@@ -33,7 +33,11 @@ import {
   ChevronDown,
   History,
   Bot,
+  ShieldCheck,
 } from "lucide-react";
+import { CvReport } from "@/components/cv-report/cv-report";
+import { CV_SECTOR_LIST, type CvSectorKey } from "@/lib/cv-criteria";
+import type { CvDeepReport } from "@/lib/cv-deep-analysis";
 
 /* ───────── Types ───────── */
 interface Analysis {
@@ -143,6 +147,14 @@ export default function Home() {
   // Job match form
   const [jmTitle, setJmTitle] = useState("");
   const [jmDescription, setJmDescription] = useState("");
+
+  // Deep sector-aware report
+  const [deepReport, setDeepReport] = useState<CvDeepReport | null>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [showSectorPicker, setShowSectorPicker] = useState(false);
+  const [pickerSector, setPickerSector] = useState<CvSectorKey>("generique");
+  const [pickerRole, setPickerRole] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -314,6 +326,44 @@ export default function Home() {
     finally { setLoadingJobMatch(false); }
   };
 
+  /* ─── Deep sector-aware report ─── */
+  const runDeepReport = async () => {
+    if (!analysis) return;
+    setLoadingReport(true);
+    setShowSectorPicker(false);
+    try {
+      const res = await fetch("/api/cv-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cvAnalysisId: analysis.id, sector: pickerSector, targetRole: pickerRole || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Erreur"); return; }
+      setDeepReport(data.report);
+      setShowReport(true);
+      setTokens((t) => (t !== null ? t - 2 : null));
+    } catch { toast.error("Erreur réseau"); }
+    finally { setLoadingReport(false); }
+  };
+
+  const handleDeepUpsell = (key: string) => {
+    if (key === "regenerate_pdf_sector") {
+      window.location.href = "/cv-builder";
+    } else if (key === "photo_pro") {
+      window.location.href = "/photo-pro";
+    } else if (key === "cover_letter") {
+      setShowReport(false);
+      setActiveTab("cover-letter");
+    } else if (key === "linkedin_align") {
+      toast.info("Alignement LinkedIn : arrive bientôt");
+    } else if (key === "rewrite_all") {
+      setShowReport(false);
+      handleCorrections();
+    } else if (key === "coaching_call") {
+      toast.info("Coaching CV : réserve un créneau à l'adresse hello@tryseora.com");
+    }
+  };
+
   /* ─── Buy Tokens ─── */
   const buyTokens = async (packId: string) => {
     try {
@@ -387,6 +437,69 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-mesh">
+      {/* Deep report overlay */}
+      {showReport && deepReport && (
+        <CvReport report={deepReport} onClose={() => setShowReport(false)} onUpsell={handleDeepUpsell} />
+      )}
+
+      {/* Sector picker modal */}
+      {showSectorPicker && analysis && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl overflow-hidden">
+            <div className="p-5 sm:p-6 border-b border-gray-100">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-emerald-600 font-bold mb-1">Rapport par secteur</p>
+                  <h3 className="text-lg font-black text-gray-900">Choisis ton secteur cible</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    On adapte le verdict, les critères ATS et les quick wins au secteur visé.
+                  </p>
+                </div>
+                <button onClick={() => setShowSectorPicker(false)} className="text-gray-400 hover:text-gray-900 p-1">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="p-5 sm:p-6 max-h-[60vh] overflow-y-auto">
+              <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2 block">Secteur *</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
+                {CV_SECTOR_LIST.map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => setPickerSector(s.key)}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold border transition-colors text-left ${
+                      pickerSector === s.key
+                        ? "bg-emerald-100 border-emerald-500 text-emerald-900"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2 block">Poste visé (optionnel)</label>
+              <input
+                value={pickerRole}
+                onChange={(e) => setPickerRole(e.target.value)}
+                placeholder="Ex : Analyste financier junior"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              />
+            </div>
+            <div className="p-5 sm:p-6 border-t border-gray-100 flex items-center justify-between gap-3 bg-gray-50">
+              <p className="text-[11px] text-gray-500">Coût : <span className="font-bold text-gray-900">2 tokens</span></p>
+              <button
+                onClick={runDeepReport}
+                disabled={loadingReport}
+                className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-2.5 text-sm font-bold shadow-md hover:shadow-lg transition-shadow disabled:opacity-50 flex items-center gap-2"
+              >
+                {loadingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                Lancer le rapport
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══════ NAV ═══════ */}
       <nav className="sticky top-0 z-50 border-b border-gray-200/40 bg-white/60 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -781,7 +894,28 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Action buttons */}
+                    {/* Deep sector-aware report CTA — hero action */}
+                    <button
+                      onClick={() => { setShowSectorPicker(true); }}
+                      disabled={loadingReport}
+                      className="w-full flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white p-5 shadow-2xl border border-white/10 hover:scale-[1.01] active:scale-[0.99] transition-transform disabled:opacity-50"
+                    >
+                      <div className="flex items-center gap-3 text-left">
+                        <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-inner">
+                          {loadingReport ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-black leading-tight">Rapport complet par secteur</p>
+                          <p className="text-[11px] text-white/70 mt-0.5">Verdict honnête, ATS, red flags, quick wins</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold">2 tokens</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </div>
+                    </button>
+
+                    {/* Secondary action buttons */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                       {!corrections && (
                         <button
