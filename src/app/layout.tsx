@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { AnalyticsProvider } from "@/components/analytics-provider";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -48,6 +49,7 @@ export default function RootLayout({
     <html lang="fr" className="scroll-smooth">
       <body className={`${inter.variable} font-sans antialiased`}>
         <Providers>
+          <AnalyticsProvider />
           {children}
           <Toaster position="top-center" richColors />
         </Providers>

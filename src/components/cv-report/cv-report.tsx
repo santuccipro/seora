@@ -18,6 +18,7 @@ import {
   Target,
   FileDown,
   X,
+  Loader2,
 } from "lucide-react";
 import type { CvDeepReport } from "@/lib/cv-deep-analysis";
 import { CV_SECTOR_CRITERIA } from "@/lib/cv-criteria";
@@ -45,19 +46,29 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
   const [filter, setFilter] = useState<"all" | "critical" | "sections" | "wins">("all");
   const [openSection, setOpenSection] = useState<number | null>(0);
   const sectorLabel = CV_SECTOR_CRITERIA[report.sector]?.label ?? "Secteur";
+  const dimensions = report.dimensions ?? [];
+  const sections = report.sections ?? [];
+  const redFlags = report.redFlags ?? [];
+  const quickWins = report.quickWins ?? [];
+  const upsell = report.upsell ?? [];
+  const isLoading = !report.verdict || dimensions.length === 0;
+  const hasFlags = redFlags.length > 0;
+  const hasWins = quickWins.length > 0;
+  const hasAts = Boolean(report.atsMatch?.matchedKeywords || report.atsMatch?.missingKeywords);
 
+  const score = report.globalScore ?? 0;
   const scoreColor = useMemo(() => {
-    if (report.globalScore >= 85) return "text-emerald-600";
-    if (report.globalScore >= 70) return "text-sky-600";
-    if (report.globalScore >= 50) return "text-amber-600";
+    if (score >= 85) return "text-emerald-600";
+    if (score >= 70) return "text-sky-600";
+    if (score >= 50) return "text-amber-600";
     return "text-red-600";
-  }, [report.globalScore]);
+  }, [score]);
   const scoreGradient = useMemo(() => {
-    if (report.globalScore >= 85) return "from-emerald-500 to-teal-500";
-    if (report.globalScore >= 70) return "from-sky-500 to-indigo-500";
-    if (report.globalScore >= 50) return "from-amber-500 to-orange-500";
+    if (score >= 85) return "from-emerald-500 to-teal-500";
+    if (score >= 70) return "from-sky-500 to-indigo-500";
+    if (score >= 50) return "from-amber-500 to-orange-500";
     return "from-red-500 to-rose-500";
-  }, [report.globalScore]);
+  }, [score]);
 
   return (
     <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
@@ -71,10 +82,10 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Score global</p>
-              <p className={`text-2xl font-black leading-none ${scoreColor}`}>{report.globalScore}<span className="text-sm text-gray-400">/100</span></p>
+              <p className={`text-2xl font-black leading-none ${scoreColor}`}>{score}<span className="text-sm text-gray-400">/100</span></p>
             </div>
             <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${scoreGradient} flex items-center justify-center text-white font-black text-xs shadow-lg`}>
-              {report.scoreLabel.split(" ").map((w) => w[0]).slice(0, 2).join("")}
+              {(report.scoreLabel ?? "Analyse en cours…").split(" ").map((w) => w[0]).slice(0, 2).join("")}
             </div>
             <button
               onClick={onClose}
@@ -88,16 +99,23 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
       </div>
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+        {isLoading && (
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1.5 text-xs font-semibold">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Claude construit ton rapport… les sections apparaissent au fur et à mesure.
+          </div>
+        )}
+
         {/* Verdict block */}
         <div className={`rounded-3xl bg-gradient-to-br ${scoreGradient} text-white p-6 sm:p-8 shadow-2xl mb-8`}>
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <p className="text-[10px] uppercase tracking-widest text-white/70 font-bold mb-2">Rapport {sectorLabel}</p>
-              <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight">{report.scoreLabel}</h1>
+              <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight">{(report.scoreLabel ?? "Analyse en cours…")}</h1>
               <p className="text-sm sm:text-base text-white/90 mt-2 leading-relaxed">{report.headline}</p>
             </div>
             <div className="text-right hidden sm:block">
-              <p className="text-6xl font-black leading-none">{report.globalScore}</p>
+              <p className="text-6xl font-black leading-none">{score}</p>
               <p className="text-xs text-white/70 mt-1">/ 100</p>
             </div>
           </div>
@@ -119,8 +137,8 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
           {[
             { key: "all", label: "Tout le rapport", icon: TrendingUp },
             { key: "sections", label: "Sections", icon: Info },
-            { key: "critical", label: `Points critiques (${report.redFlags?.filter((f) => f.severity === "critical").length ?? 0})`, icon: ShieldAlert },
-            { key: "wins", label: `Quick wins (${report.quickWins?.length ?? 0})`, icon: Zap },
+            { key: "critical", label: `Points critiques (${redFlags.filter((f) => f.severity === "critical").length})`, icon: ShieldAlert },
+            { key: "wins", label: `Quick wins (${quickWins.length})`, icon: Zap },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = filter === tab.key;
@@ -144,7 +162,7 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
           <section className="mb-8">
             <h2 className="text-xs uppercase tracking-widest font-black text-gray-500 mb-3">6 dimensions notées</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {report.dimensions.map((d) => (
+              {dimensions.map((d) => (
                 <div key={d.key} className="rounded-2xl border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-bold text-gray-700">{d.label}</p>
@@ -170,7 +188,7 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
           <section className="mb-8">
             <h2 className="text-xs uppercase tracking-widest font-black text-gray-500 mb-3">Verdict par section</h2>
             <div className="space-y-2">
-              {report.sections.map((sec, i) => {
+              {sections.map((sec, i) => {
                 const style = STATUS_COLORS[sec.status] ?? STATUS_COLORS.correct;
                 const Icon = style.icon;
                 const open = openSection === i;
@@ -215,11 +233,11 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
         )}
 
         {/* Red flags */}
-        {(filter === "all" || filter === "critical") && report.redFlags?.length > 0 && (
+        {(filter === "all" || filter === "critical") && hasFlags && (
           <section className="mb-8">
             <h2 className="text-xs uppercase tracking-widest font-black text-gray-500 mb-3">Signaux critiques</h2>
             <div className="space-y-2">
-              {report.redFlags.map((f, i) => {
+              {redFlags.map((f, i) => {
                 const style = SEVERITY_COLORS[f.severity] ?? SEVERITY_COLORS.info;
                 const Icon = style.icon;
                 return (
@@ -242,11 +260,11 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
         )}
 
         {/* Quick wins */}
-        {(filter === "all" || filter === "wins") && report.quickWins?.length > 0 && (
+        {(filter === "all" || filter === "wins") && hasWins && (
           <section className="mb-8">
             <h2 className="text-xs uppercase tracking-widest font-black text-gray-500 mb-3">Quick wins — impact / effort</h2>
             <div className="space-y-3">
-              {report.quickWins.map((w, i) => (
+              {quickWins.map((w, i) => (
                 <div key={i} className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
@@ -280,7 +298,7 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
         )}
 
         {/* ATS coverage */}
-        {filter === "all" && report.atsMatch && (
+        {filter === "all" && hasAts && report.atsMatch && (
           <section className="mb-8">
             <div className="rounded-2xl border border-gray-200 bg-white p-5">
               <div className="flex items-center justify-between gap-3 mb-3">
@@ -326,11 +344,11 @@ export function CvReport({ report, onClose, onUpsell }: Props) {
         )}
 
         {/* Upsell hooks */}
-        {filter === "all" && report.upsell?.length > 0 && (
+        {filter === "all" && upsell.length > 0 && (
           <section className="mb-8">
             <h2 className="text-xs uppercase tracking-widest font-black text-gray-500 mb-3">Passer à l&apos;action</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {report.upsell.map((u) => (
+              {upsell.map((u) => (
                 <button
                   key={u.key}
                   onClick={() => onUpsell?.(u.key)}

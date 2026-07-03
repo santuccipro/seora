@@ -9,7 +9,8 @@ const STEP_LABELS = [
   "Expériences",
   "Formation",
   "Langues",
-  "Style",
+  "Disposition",
+  "Couleurs",
 ];
 
 interface ProgressBarProps {

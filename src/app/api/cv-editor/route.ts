@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
     if (analysis.structuredCV) {
       return NextResponse.json({
         structuredCV: JSON.parse(analysis.structuredCV),
+        originalImage: analysis.originalImage || null,
       });
     }
 
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return NextResponse.json({ structuredCV: result });
+      return NextResponse.json({ structuredCV: result, originalImage: analysis.originalImage || null });
     } catch (error) {
       // Refund tokens on failure
       await prisma.user.update({

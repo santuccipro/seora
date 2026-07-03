@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
@@ -24,6 +24,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { CV_SECTOR_LIST, CvSectorKey } from "@/lib/cv-criteria";
+import { track, EVT } from "@/lib/analytics";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
@@ -97,10 +98,14 @@ const STORAGE_KEY = "seora_cv_builder_draft_v1";
 export default function CvBuilderPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromCv = searchParams.get("fromCv");
   const [step, setStep] = useState<Step>(1);
   const [draft, setDraft] = useState<CvDraft>(EMPTY_DRAFT);
   const [polishing, setPolishing] = useState<string | null>(null); // key currently being polished by Claude
   const [generating, setGenerating] = useState(false);
+  const [prefilling, setPrefilling] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   // Auth gate — redirect to signin
   useEffect(() => {
@@ -109,24 +114,75 @@ export default function CvBuilderPage() {
     }
   }, [status, router]);
 
-  // Load draft from localStorage
+  // Load draft — priority: fromCv prefill > server autosave > localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setDraft(JSON.parse(raw));
-    } catch {
-      // ignore
-    }
-  }, []);
+    let cancelled = false;
+    (async () => {
+      if (fromCv) {
+        setPrefilling(true);
+        try {
+          const res = await fetch(`/api/cv-build/prefill?cvAnalysisId=${fromCv}`);
+          const data = await res.json();
+          if (!cancelled && res.ok && data.draft) {
+            setDraft(data.draft as CvDraft);
+            toast.success("CV pré-rempli depuis ton analyse");
+            setPrefilling(false);
+            return;
+          }
+        } catch {
+          // fall through
+        }
+        setPrefilling(false);
+      }
+      // Try server autosave
+      try {
+        const res = await fetch("/api/cv-drafts");
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.draft) {
+            setDraft(data.draft as CvDraft);
+            return;
+          }
+        }
+      } catch {
+        // fall through
+      }
+      // Fallback: localStorage
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!cancelled && raw) setDraft(JSON.parse(raw));
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [fromCv]);
 
-  // Persist draft
+  // Persist draft — localStorage instantly, server debounced 3s
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }, [draft]);
+
+  useEffect(() => {
+    if (!session) return;
+    setSaveState("saving");
+    const t = setTimeout(async () => {
+      try {
+        await fetch("/api/cv-drafts", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ draft }),
+        });
+        setSaveState("saved");
+        setTimeout(() => setSaveState("idle"), 1500);
+      } catch {
+        setSaveState("idle");
+      }
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [draft, session]);
 
   const updateDraft = <K extends keyof CvDraft>(key: K, value: CvDraft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -153,13 +209,18 @@ export default function CvBuilderPage() {
     }
   }, [step, draft]);
 
-  const goNext = () => setStep((s) => (Math.min(8, (s + 1) as Step)) as Step);
+  const goNext = () => setStep((s) => {
+    const next = Math.min(8, (s + 1) as Step) as Step;
+    track(EVT.CV_WIZARD_STEP, { from: s, to: next, sector: draft.sector });
+    return next;
+  });
   const goPrev = () => setStep((s) => (Math.max(1, (s - 1) as Step)) as Step);
 
   // Claude polish helper
   const polishField = useCallback(
     async (kind: "summary" | "bullet", payload: Record<string, unknown>) => {
       setPolishing(kind);
+      track(EVT.CV_WIZARD_POLISH, { kind, sector: draft.sector });
       try {
         const res = await fetch("/api/cv-build/polish", {
           method: "POST",
@@ -233,6 +294,7 @@ export default function CvBuilderPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      track(EVT.CV_WIZARD_PDF, { sector: draft.sector, hasPhoto: Boolean(draft.photoUrl) });
       toast.success("CV PDF généré ✨");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur");
@@ -263,13 +325,26 @@ export default function CvBuilderPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-12">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Retour
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Retour
+          </Link>
+          <div className="text-[10px] uppercase tracking-widest font-bold">
+            {prefilling ? (
+              <span className="inline-flex items-center gap-1 text-emerald-700"><Loader2 className="h-3 w-3 animate-spin" /> Pré-remplissage…</span>
+            ) : saveState === "saving" ? (
+              <span className="inline-flex items-center gap-1 text-gray-400"><Loader2 className="h-3 w-3 animate-spin" /> Sauvegarde…</span>
+            ) : saveState === "saved" ? (
+              <span className="inline-flex items-center gap-1 text-emerald-600"><Check className="h-3 w-3" /> Sauvegardé</span>
+            ) : (
+              <span className="text-gray-300">Autosave activé</span>
+            )}
+          </div>
+        </div>
 
         {/* Progress rail */}
         <div className="mb-8">

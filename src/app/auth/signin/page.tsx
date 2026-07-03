@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   Sparkles,
-  Bot,
+  Camera,
   BarChart3,
   ArrowRight,
 } from "lucide-react";
@@ -22,7 +22,7 @@ const benefits = [
   { icon: Sparkles, text: "5 tokens offerts à l'inscription" },
   { icon: BarChart3, text: "Analyse CV détaillée sur 6 critères" },
   { icon: FileText, text: "Lettre de motivation personnalisée IA" },
-  { icon: Bot, text: "Texte 100% indétectable IA" },
+  { icon: Camera, text: "Éditeur de CV guidé étape par étape" },
 ];
 
 export default function SignInPage() {

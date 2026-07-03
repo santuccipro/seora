@@ -36,8 +36,12 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { CvReport } from "@/components/cv-report/cv-report";
+import { CoverLetterReport } from "@/components/cv-report/cover-letter-report";
+import { NotEnoughTokensModal } from "@/components/not-enough-tokens-modal";
 import { CV_SECTOR_LIST, type CvSectorKey } from "@/lib/cv-criteria";
 import type { CvDeepReport } from "@/lib/cv-deep-analysis";
+import type { ClDeepReport } from "@/lib/cover-letter-deep-analysis";
+import { track, EVT } from "@/lib/analytics";
 
 /* ───────── Types ───────── */
 interface Analysis {
@@ -156,6 +160,59 @@ export default function Home() {
   const [pickerSector, setPickerSector] = useState<CvSectorKey>("generique");
   const [pickerRole, setPickerRole] = useState("");
 
+  // Upsell modal
+  const [upsellOpen, setUpsellOpen] = useState(false);
+  const [upsellNeeded, setUpsellNeeded] = useState(1);
+  const [upsellReason, setUpsellReason] = useState<string>("");
+  const openUpsellFor = (needed: number, reason: string) => {
+    setUpsellNeeded(needed);
+    setUpsellReason(reason);
+    setUpsellOpen(true);
+  };
+
+  // Cover letter deep report
+  const [clReport, setClReport] = useState<ClDeepReport | null>(null);
+  const [loadingClReport, setLoadingClReport] = useState(false);
+  const [showClReport, setShowClReport] = useState(false);
+  const runCoverLetterReport = async () => {
+    if (!coverLetter) return;
+    if (tokens !== null && tokens < 2) {
+      openUpsellFor(2, "L'analyse profonde de la lettre consomme 2 tokens.");
+      return;
+    }
+    setLoadingClReport(true);
+    try {
+      const res = await fetch("/api/cover-letter/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          letterText: coverLetter.coverLetter,
+          companyName: clCompany,
+          targetRole: clJob.split("\n")[0]?.slice(0, 80),
+        }),
+      });
+      if (res.status === 403) {
+        openUpsellFor(2, "L'analyse profonde de la lettre consomme 2 tokens.");
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Erreur"); return; }
+      setClReport(data.report);
+      setShowClReport(true);
+      setTokens((t) => (t !== null ? t - 2 : null));
+    } catch { toast.error("Erreur réseau"); }
+    finally { setLoadingClReport(false); }
+  };
+  const handleClUpsell = (key: string) => {
+    if (key === "rewrite_letter" || key === "generate_from_cv") {
+      setShowClReport(false);
+      setCoverLetter(null);
+      toast.info("Modifie les champs puis relance la génération avec le contexte enrichi.");
+    } else if (key === "coaching_call") {
+      toast.info("Coaching : écris à hello@tryseora.com");
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -212,11 +269,13 @@ export default function Home() {
         return data;
       };
 
+      track(EVT.ANALYZE_CV_START, { fileType: file.type, sizeKB: Math.round(file.size / 1024) });
       try {
         const [, apiResult] = await Promise.all([animate(), callApi()]);
         if (apiResult) {
           setAnalysis(apiResult);
           setTokens((t) => (t !== null ? t - 1 : null));
+          track(EVT.ANALYZE_CV_DONE, { score: apiResult.score });
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Erreur réseau";
@@ -326,29 +385,81 @@ export default function Home() {
     finally { setLoadingJobMatch(false); }
   };
 
-  /* ─── Deep sector-aware report ─── */
+  /* ─── Deep sector-aware report (SSE streaming) ─── */
   const runDeepReport = async () => {
     if (!analysis) return;
+    if (tokens !== null && tokens < 2) {
+      setShowSectorPicker(false);
+      openUpsellFor(2, "Le rapport complet par secteur consomme 2 tokens.");
+      return;
+    }
     setLoadingReport(true);
     setShowSectorPicker(false);
+    setDeepReport(null);
+    setShowReport(true);
+    track(EVT.DEEP_REPORT_START, { sector: pickerSector, hasRole: Boolean(pickerRole) });
     try {
-      const res = await fetch("/api/cv-report", {
+      const res = await fetch("/api/cv-report/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cvAnalysisId: analysis.id, sector: pickerSector, targetRole: pickerRole || undefined }),
       });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.error || "Erreur"); return; }
-      setDeepReport(data.report);
-      setShowReport(true);
-      setTokens((t) => (t !== null ? t - 2 : null));
-    } catch { toast.error("Erreur réseau"); }
+      if (res.status === 403) {
+        setShowReport(false);
+        openUpsellFor(2, "Le rapport complet par secteur consomme 2 tokens.");
+        return;
+      }
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Erreur");
+        setShowReport(false);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const combined: Partial<CvDeepReport> = {
+        sector: pickerSector,
+        targetRole: pickerRole || undefined,
+      } as Partial<CvDeepReport>;
+      // read chunks
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const evtRaw of events) {
+          if (!evtRaw.startsWith("data: ")) continue;
+          try {
+            const evt = JSON.parse(evtRaw.slice(6));
+            if (evt.type === "phase" && evt.data) {
+              Object.assign(combined, evt.data);
+              setDeepReport({ ...(combined as CvDeepReport) });
+            } else if (evt.type === "done" && evt.report) {
+              setDeepReport(evt.report);
+              setTokens((t) => (t !== null ? t - 2 : null));
+              track(EVT.DEEP_REPORT_DONE, { sector: pickerSector, score: evt.report?.globalScore });
+            } else if (evt.type === "error") {
+              toast.error(evt.error || "Erreur");
+              setShowReport(false);
+            }
+          } catch {
+            // ignore parse errors on partial chunks
+          }
+        }
+      }
+    } catch {
+      toast.error("Erreur réseau");
+      setShowReport(false);
+    }
     finally { setLoadingReport(false); }
   };
 
   const handleDeepUpsell = (key: string) => {
+    track(EVT.DEEP_REPORT_UPSELL_CLICK, { key });
     if (key === "regenerate_pdf_sector") {
-      window.location.href = "/cv-builder";
+      window.location.href = `/cv-builder?fromCv=${analysis?.id ?? ""}`;
     } else if (key === "photo_pro") {
       window.location.href = "/photo-pro";
     } else if (key === "cover_letter") {
@@ -441,6 +552,20 @@ export default function Home() {
       {showReport && deepReport && (
         <CvReport report={deepReport} onClose={() => setShowReport(false)} onUpsell={handleDeepUpsell} />
       )}
+
+      {/* Cover letter deep report overlay */}
+      {showClReport && clReport && (
+        <CoverLetterReport report={clReport} onClose={() => setShowClReport(false)} onUpsell={handleClUpsell} />
+      )}
+
+      {/* Upsell tokens modal */}
+      <NotEnoughTokensModal
+        open={upsellOpen}
+        needed={upsellNeeded}
+        current={tokens}
+        reason={upsellReason}
+        onClose={() => setUpsellOpen(false)}
+      />
 
       {/* Sector picker modal */}
       {showSectorPicker && analysis && (
@@ -1021,6 +1146,25 @@ export default function Home() {
                             {coverLetter.coverLetter}
                           </div>
                         </div>
+                        <button
+                          onClick={runCoverLetterReport}
+                          disabled={loadingClReport}
+                          className="w-full flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white p-5 shadow-2xl border border-white/10 hover:scale-[1.01] active:scale-[0.99] transition-transform disabled:opacity-50"
+                        >
+                          <div className="flex items-center gap-3 text-left">
+                            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+                              {loadingClReport ? <Loader2 className="h-5 w-5 animate-spin" /> : <BarChart3 className="h-5 w-5" />}
+                            </div>
+                            <div>
+                              <p className="text-sm font-black leading-tight">Rapport complet de ta lettre</p>
+                              <p className="text-[11px] text-white/70 mt-0.5">6 dimensions, tone match, red flags, quick wins</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold">2 tokens</span>
+                            <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </button>
                         <button onClick={() => setCoverLetter(null)} className="text-sm text-gray-500 hover:text-indigo-600 font-medium">← Nouvelle lettre</button>
                       </div>
                     ) : (

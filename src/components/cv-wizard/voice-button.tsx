@@ -3,15 +3,22 @@
 import { useState, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 interface VoiceButtonProps {
-  onRecordingComplete: (blob: Blob) => void;
+  onTranscription: (text: string) => void;
+  /** @deprecated Use onTranscription instead */
+  onRecordingComplete?: (blob: Blob) => void;
+  /** Context hint for smarter reformulation: "profile" | "skills" | "experience" | "style" */
+  context?: string;
   label?: string;
   className?: string;
 }
 
 export default function VoiceButton({
+  onTranscription,
   onRecordingComplete,
+  context,
   label = "Dicter",
   className = "",
 }: VoiceButtonProps) {
@@ -20,6 +27,39 @@ export default function VoiceButton({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const transcribeAudio = useCallback(async (blob: Blob) => {
+    setProcessing(true);
+    try {
+      // Legacy callback
+      if (onRecordingComplete) onRecordingComplete(blob);
+
+      const formData = new FormData();
+      formData.append("audio", blob, "recording.webm");
+      if (context) formData.append("context", context);
+
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error("Transcription failed");
+      }
+
+      const data = await res.json();
+      if (data.text && data.text.trim()) {
+        onTranscription(data.text.trim());
+        toast.success("Transcription terminée");
+      } else {
+        toast.error("Aucun texte détecté, réessaie");
+      }
+    } catch {
+      toast.error("Erreur de transcription");
+    } finally {
+      setProcessing(false);
+    }
+  }, [onTranscription, onRecordingComplete]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -35,10 +75,7 @@ export default function VoiceButton({
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        setProcessing(true);
-        onRecordingComplete(blob);
-        setTimeout(() => setProcessing(false), 500);
-        // Cleanup stream
+        transcribeAudio(blob);
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       };
@@ -46,9 +83,9 @@ export default function VoiceButton({
       mediaRecorder.start();
       setRecording(true);
     } catch {
-      // Permission denied or no mic
+      toast.error("Micro non disponible");
     }
-  }, [onRecordingComplete]);
+  }, [transcribeAudio]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current?.state === "recording") {
@@ -79,7 +116,6 @@ export default function VoiceButton({
             exit={{ scale: 0 }}
             className="relative"
           >
-            {/* Pulse ring */}
             <motion.div
               className="absolute inset-0 rounded-full bg-red-400"
               animate={{ scale: [1, 1.8, 1], opacity: [0.5, 0, 0.5] }}
@@ -107,7 +143,7 @@ export default function VoiceButton({
           </motion.div>
         )}
       </AnimatePresence>
-      <span>{recording ? "Stop" : processing ? "..." : label}</span>
+      <span>{recording ? "Stop" : processing ? "Transcription..." : label}</span>
     </button>
   );
 }

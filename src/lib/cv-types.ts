@@ -41,6 +41,22 @@ export interface StructuredCV {
   detectedTheme?: string;
 }
 
+/* ─── CV Layouts ─── */
+export type CVLayoutId = "sidebar-left" | "sidebar-right" | "top-header" | "minimal";
+
+export interface CVLayoutDef {
+  id: CVLayoutId;
+  name: string;
+  description: string;
+}
+
+export const CV_LAYOUTS: CVLayoutDef[] = [
+  { id: "sidebar-left", name: "Classique", description: "Sidebar à gauche — le format le plus utilisé" },
+  { id: "sidebar-right", name: "Inversé", description: "Sidebar à droite — élégant et distinctif" },
+  { id: "top-header", name: "Header", description: "En-tête pleine largeur — moderne et aéré" },
+  { id: "minimal", name: "Minimaliste", description: "Une seule colonne — épuré et lisible" },
+];
+
 /* ─── CV Themes ─── */
 export type CVThemeId = "corporate" | "modern" | "creative" | "medical" | "classic" | "tech";
 
@@ -197,6 +213,27 @@ export const CV_THEMES: Record<CVThemeId, CVTheme> = {
     tagStyle: "rounded",
   },
 };
+
+/** Get recommended themes ordered by relevance for the detected sector */
+export function getRecommendedThemes(detectedTheme?: string): { recommended: CVThemeId[]; others: CVThemeId[] } {
+  const all: CVThemeId[] = ["corporate", "modern", "creative", "medical", "classic", "tech"];
+  const primary = getThemeForSector(detectedTheme);
+
+  // Pick a secondary recommendation based on sector affinity
+  const affinityMap: Record<CVThemeId, CVThemeId> = {
+    corporate: "classic",
+    classic: "corporate",
+    tech: "modern",
+    modern: "tech",
+    creative: "modern",
+    medical: "classic",
+  };
+  const secondary = affinityMap[primary] || "modern";
+
+  const recommended = [primary, ...(secondary !== primary ? [secondary] : [])];
+  const others = all.filter((t) => !recommended.includes(t));
+  return { recommended, others };
+}
 
 /** Map detected sector keywords to theme */
 export function getThemeForSector(detectedTheme?: string): CVThemeId {

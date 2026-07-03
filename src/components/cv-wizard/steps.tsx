@@ -10,10 +10,10 @@ import {
   Globe,
   Palette,
   ZoomIn,
-  Move,
+  Loader2,
 } from "lucide-react";
-import type { StructuredCV, CVTheme, CVThemeId } from "@/lib/cv-types";
-import { CV_THEMES } from "@/lib/cv-types";
+import type { StructuredCV, CVTheme, CVThemeId, CVLayoutId } from "@/lib/cv-types";
+import { CV_THEMES, CV_LAYOUTS, getRecommendedThemes } from "@/lib/cv-types";
 import VoiceButton from "./voice-button";
 
 /* ─── Shared types ─── */
@@ -101,17 +101,11 @@ function formatPhone(raw: string): string {
   return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
 }
 
-/* ─── Photo editor with crop circle (Instagram-style) ─── */
-const CROP_SIZE = 250; // crop circle diameter — large enough for mobile
-const CROP_EXPORT = 400; // exported image resolution
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 3;
+/* ─── Photo editor with crop (react-easy-crop) ─── */
+import Cropper from "react-easy-crop";
+import type { Area } from "react-easy-crop";
 
-function getTouchDistance(t1: Touch, t2: Touch) {
-  const dx = t1.clientX - t2.clientX;
-  const dy = t1.clientY - t2.clientY;
-  return Math.sqrt(dx * dx + dy * dy);
-}
+const CROP_EXPORT = 400;
 
 function PhotoEditor({
   photoUrl,
@@ -119,275 +113,117 @@ function PhotoEditor({
   onRemove,
 }: {
   photoUrl: string;
-  onCrop: (dataUrl: string) => void;
+  onCrop: (dataUrl: string, shape: "round" | "rect") => void;
   onRemove: () => void;
 }) {
-  const [zoom, setZoom] = useState(MIN_ZOOM);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [imgAspect, setImgAspect] = useState(1);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [shape, setShape] = useState<"round" | "rect">("round");
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
 
-  // Refs for gesture state (no re-renders during drag)
-  const dragState = useRef({
-    active: false,
-    startX: 0,
-    startY: 0,
-    posX: 0,
-    posY: 0,
-  });
-  const pinchState = useRef({
-    active: false,
-    startDist: 0,
-    startZoom: 1,
-  });
-  const currentZoom = useRef(MIN_ZOOM);
-  const currentPos = useRef({ x: 0, y: 0 });
+  const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
+    setCroppedAreaPixels(areaPixels);
+  }, []);
 
-  const clampPosition = useCallback(
-    (x: number, y: number, z: number) => {
-      const imgW = CROP_SIZE * imgAspect * z;
-      const imgH = CROP_SIZE * z;
-      const maxX = Math.max(0, (imgW - CROP_SIZE) / 2);
-      const maxY = Math.max(0, (imgH - CROP_SIZE) / 2);
-      return {
-        x: Math.max(-maxX, Math.min(maxX, x)),
-        y: Math.max(-maxY, Math.min(maxY, y)),
-      };
-    },
-    [imgAspect],
-  );
+  const handleConfirm = useCallback(async () => {
+    if (!croppedAreaPixels) return;
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.src = photoUrl;
+    await new Promise((resolve) => { image.onload = resolve; });
 
-  const exportCrop = useCallback(() => {
-    const img = imgRef.current;
-    if (!img || !img.naturalWidth) return;
     const canvas = document.createElement("canvas");
     canvas.width = CROP_EXPORT;
     canvas.height = CROP_EXPORT;
     const ctx = canvas.getContext("2d")!;
 
-    const z = currentZoom.current;
-    const pos = currentPos.current;
-    const displayH = CROP_SIZE * z;
-    const scaleToNatural = img.naturalHeight / displayH;
-    const cropNatural = CROP_SIZE * scaleToNatural;
-    const cx = (img.naturalWidth - cropNatural) / 2 - pos.x * scaleToNatural;
-    const cy = (img.naturalHeight - cropNatural) / 2 - pos.y * scaleToNatural;
-
-    ctx.beginPath();
-    ctx.arc(CROP_EXPORT / 2, CROP_EXPORT / 2, CROP_EXPORT / 2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(img, cx, cy, cropNatural, cropNatural, 0, 0, CROP_EXPORT, CROP_EXPORT);
-    onCrop(canvas.toDataURL("image/jpeg", 0.85));
-  }, [onCrop]);
-
-  // ── Touch events (native) for pinch-to-zoom + drag ──
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const onTouchStart = (e: TouchEvent) => {
-      e.preventDefault();
-      if (e.touches.length === 2) {
-        // Start pinch
-        pinchState.current = {
-          active: true,
-          startDist: getTouchDistance(e.touches[0], e.touches[1]),
-          startZoom: currentZoom.current,
-        };
-        dragState.current.active = false;
-      } else if (e.touches.length === 1) {
-        // Start drag
-        dragState.current = {
-          active: true,
-          startX: e.touches[0].clientX,
-          startY: e.touches[0].clientY,
-          posX: currentPos.current.x,
-          posY: currentPos.current.y,
-        };
-        pinchState.current.active = false;
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-      if (pinchState.current.active && e.touches.length === 2) {
-        const dist = getTouchDistance(e.touches[0], e.touches[1]);
-        const ratio = dist / pinchState.current.startDist;
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchState.current.startZoom * ratio));
-        currentZoom.current = newZoom;
-        const clamped = clampPosition(currentPos.current.x, currentPos.current.y, newZoom);
-        currentPos.current = clamped;
-        setZoom(newZoom);
-        setPosition(clamped);
-      } else if (dragState.current.active && e.touches.length === 1) {
-        const dx = e.touches[0].clientX - dragState.current.startX;
-        const dy = e.touches[0].clientY - dragState.current.startY;
-        const clamped = clampPosition(
-          dragState.current.posX + dx,
-          dragState.current.posY + dy,
-          currentZoom.current,
-        );
-        currentPos.current = clamped;
-        setPosition(clamped);
-      }
-    };
-
-    const onTouchEnd = (e: TouchEvent) => {
-      e.preventDefault();
-      if (e.touches.length === 0) {
-        dragState.current.active = false;
-        pinchState.current.active = false;
-        exportCrop();
-      } else if (e.touches.length === 1) {
-        // Went from pinch to single finger — restart drag from current touch
-        pinchState.current.active = false;
-        dragState.current = {
-          active: true,
-          startX: e.touches[0].clientX,
-          startY: e.touches[0].clientY,
-          posX: currentPos.current.x,
-          posY: currentPos.current.y,
-        };
-      }
-    };
-
-    el.addEventListener("touchstart", onTouchStart, { passive: false });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", onTouchEnd, { passive: false });
-    return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
-    };
-  }, [clampPosition, exportCrop]);
-
-  // ── Mouse drag (desktop) ──
-  const handleMouseDown = (e: React.MouseEvent) => {
-    dragState.current = {
-      active: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      posX: currentPos.current.x,
-      posY: currentPos.current.y,
-    };
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!dragState.current.active) return;
-      const dx = ev.clientX - dragState.current.startX;
-      const dy = ev.clientY - dragState.current.startY;
-      const clamped = clampPosition(
-        dragState.current.posX + dx,
-        dragState.current.posY + dy,
-        currentZoom.current,
-      );
-      currentPos.current = clamped;
-      setPosition(clamped);
-    };
-    const onMouseUp = () => {
-      dragState.current.active = false;
-      exportCrop();
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-  };
-
-  const handleZoomChange = (newZoom: number) => {
-    currentZoom.current = newZoom;
-    const clamped = clampPosition(currentPos.current.x, currentPos.current.y, newZoom);
-    currentPos.current = clamped;
-    setZoom(newZoom);
-    setPosition(clamped);
-  };
-
-  const handleImageLoad = () => {
-    const img = imgRef.current;
-    if (img && img.naturalWidth) {
-      const aspect = img.naturalWidth / img.naturalHeight;
-      setImgAspect(aspect);
-      // Auto-zoom so shortest side fills the crop circle
-      const fitZoom = aspect >= 1 ? 1 : 1 / aspect;
-      const initialZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, fitZoom));
-      currentZoom.current = initialZoom;
-      currentPos.current = { x: 0, y: 0 };
-      setZoom(initialZoom);
-      setPosition({ x: 0, y: 0 });
-      // Auto-export initial crop
-      setTimeout(() => exportCrop(), 50);
+    if (shape === "round") {
+      ctx.beginPath();
+      ctx.arc(CROP_EXPORT / 2, CROP_EXPORT / 2, CROP_EXPORT / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
     }
-  };
+    ctx.drawImage(
+      image,
+      croppedAreaPixels.x, croppedAreaPixels.y,
+      croppedAreaPixels.width, croppedAreaPixels.height,
+      0, 0, CROP_EXPORT, CROP_EXPORT,
+    );
+    onCrop(canvas.toDataURL("image/jpeg", 0.85), shape);
+  }, [croppedAreaPixels, photoUrl, onCrop, shape]);
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative">
-        {/* Crop container */}
-        <div
-          ref={containerRef}
-          className="relative cursor-grab active:cursor-grabbing select-none overflow-hidden rounded-full"
-          style={{
-            width: CROP_SIZE,
-            height: CROP_SIZE,
-            touchAction: "none",
-          }}
-          onMouseDown={handleMouseDown}
-        >
-          {/* Image layer */}
-          <img
-            ref={imgRef}
-            src={photoUrl}
-            alt="Photo"
-            className="pointer-events-none select-none"
-            style={{
-              position: "absolute",
-              height: `${zoom * 100}%`,
-              width: "auto",
-              left: "50%",
-              top: "50%",
-              transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px))`,
-            }}
-            draggable={false}
-            onLoad={handleImageLoad}
-          />
-          {/* Crop circle border + dark overlay outside */}
-          <div
-            className="absolute inset-0 rounded-full border-[3px] border-indigo-400 pointer-events-none"
-            style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }}
-          />
-        </div>
-        {/* Remove button */}
+    <div className="flex flex-col items-center gap-3 w-full">
+      {/* Shape toggle */}
+      <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-0.5">
         <button
-          onClick={onRemove}
-          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 transition-colors z-10"
+          type="button"
+          onClick={() => setShape("round")}
+          className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${shape === "round" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-400"}`}
         >
-          <X className="h-4 w-4" />
+          Rond
+        </button>
+        <button
+          type="button"
+          onClick={() => setShape("rect")}
+          className={`px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${shape === "rect" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-400"}`}
+        >
+          Carré
         </button>
       </div>
 
-      {/* Drag / pinch hint */}
-      <p className="text-xs text-gray-400 flex items-center gap-1.5">
-        <Move className="h-3.5 w-3.5" /> Glisser pour repositionner
-      </p>
+      {/* Crop area */}
+      <div className="relative w-full rounded-2xl overflow-hidden bg-black" style={{ height: 280 }}>
+        <Cropper
+          image={photoUrl}
+          crop={crop}
+          zoom={zoom}
+          aspect={1}
+          cropShape={shape}
+          showGrid={false}
+          onCropChange={setCrop}
+          onZoomChange={setZoom}
+          onCropComplete={onCropComplete}
+          style={{
+            containerStyle: { borderRadius: 16 },
+            mediaStyle: {},
+            cropAreaStyle: { border: "3px solid rgba(99,102,241,0.8)" },
+          }}
+        />
+      </div>
 
-      {/* Zoom slider — big and thumb-friendly */}
-      <div className="flex items-center gap-3 w-full max-w-[280px] px-2">
-        <ZoomIn className="h-5 w-5 text-gray-400 shrink-0" />
+      {/* Zoom */}
+      <div className="flex items-center gap-3 w-full max-w-[280px]">
+        <ZoomIn className="h-4 w-4 text-gray-400 shrink-0" />
         <input
           type="range"
-          min={MIN_ZOOM}
-          max={MAX_ZOOM}
-          step={0.02}
+          min={1}
+          max={3}
+          step={0.05}
           value={zoom}
-          onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
-          onMouseUp={exportCrop}
-          onTouchEnd={exportCrop}
-          className="flex-1 h-2.5 accent-indigo-500 rounded-full"
-          style={{ WebkitAppearance: "none", appearance: "none" }}
+          onChange={(e) => setZoom(parseFloat(e.target.value))}
+          className="flex-1 h-1.5 accent-indigo-500 rounded-full"
         />
-        <span className="text-xs text-gray-400 w-10 text-right font-medium">
-          {Math.round(zoom * 100)}%
-        </span>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          <X className="h-3.5 w-3.5" />
+          Annuler
+        </button>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:shadow-lg transition-all"
+        >
+          <Check className="h-3.5 w-3.5" />
+          Valider
+        </button>
       </div>
     </div>
   );
@@ -396,32 +232,15 @@ function PhotoEditor({
 /* ═══════════════════════════════════════════════ */
 /*           STEP 1 — Contact Info                 */
 /* ═══════════════════════════════════════════════ */
-export function StepContact({ cv, updateHeader }: StepProps) {
-  /* Keep raw (full-res) image for the photo editor, separate from cropped */
+export function StepContact({ cv, updateHeader, cvOriginalImage, extractingPhoto }: StepProps & { cvOriginalImage?: string | null; extractingPhoto?: boolean }) {
   const [rawPhoto, setRawPhoto] = useState<string>("");
+  const [photoShape, setPhotoShape] = useState<"round" | "rect">("round");
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setRawPhoto(dataUrl);
-      // Also do initial center crop for the CV
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const size = Math.min(img.width, img.height, 400);
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d")!;
-        const sx = (img.width - size) / 2;
-        const sy = (img.height - size) / 2;
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
-        updateHeader("photoUrl", canvas.toDataURL("image/jpeg", 0.85));
-      };
-      img.src = dataUrl;
-    };
+    reader.onload = () => setRawPhoto(reader.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -434,30 +253,54 @@ export function StepContact({ cv, updateHeader }: StepProps) {
 
       {/* Photo with zoom/drag editor */}
       <div className="flex justify-center">
-        {cv.header.photoUrl || rawPhoto ? (
+        {rawPhoto ? (
           <PhotoEditor
-            photoUrl={rawPhoto || cv.header.photoUrl || ""}
-            onCrop={(dataUrl) => updateHeader("photoUrl", dataUrl)}
+            photoUrl={rawPhoto}
+            onCrop={(dataUrl, s) => { updateHeader("photoUrl", dataUrl); setPhotoShape(s); setRawPhoto(""); }}
             onRemove={() => {
               updateHeader("photoUrl", "");
               setRawPhoto("");
             }}
           />
+        ) : cv.header.photoUrl ? (
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative">
+              <div className={`w-28 h-28 overflow-hidden border-3 border-indigo-400 shadow-lg ${photoShape === "rect" ? "rounded-2xl" : "rounded-full"}`}>
+                <img src={cv.header.photoUrl} alt="Photo" className="w-full h-full object-cover" />
+              </div>
+              <button
+                type="button"
+                onClick={() => { updateHeader("photoUrl", ""); }}
+                className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setRawPhoto(cv.header.photoUrl || "")}
+                className="text-[11px] text-indigo-500 underline hover:text-indigo-700"
+              >
+                Recadrer
+              </button>
+              <span className="text-gray-300">·</span>
+              <label className="text-[11px] text-gray-400 underline cursor-pointer hover:text-indigo-500">
+                Changer la photo
+                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+              </label>
+            </div>
+          </div>
         ) : (
           <label className="w-24 h-24 rounded-2xl border-2 border-dashed border-indigo-300 flex flex-col items-center justify-center cursor-pointer hover:bg-indigo-50/50 transition-colors">
             <Camera className="h-6 w-6 text-indigo-400 mb-1" />
             <span className="text-[10px] text-indigo-400 font-medium">Photo</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handlePhotoUpload}
-            />
+            <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
           </label>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input
           label="Prénom"
           value={cv.header.firstName}
@@ -510,7 +353,7 @@ export function StepContact({ cv, updateHeader }: StepProps) {
         placeholder="Paris, France"
       />
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input
           label="LinkedIn"
           value={cv.header.linkedin || ""}
@@ -533,7 +376,6 @@ export function StepContact({ cv, updateHeader }: StepProps) {
 /*           STEP 2 — Profile / Summary            */
 /* ═══════════════════════════════════════════════ */
 export function StepProfile({ cv, setCv }: StepProps) {
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
 
   return (
     <div className="space-y-5">
@@ -550,28 +392,40 @@ export function StepProfile({ cv, setCv }: StepProps) {
         </label>
         <textarea
           value={cv.summary || ""}
-          onChange={(e) =>
-            setCv((prev) => ({ ...prev, summary: e.target.value }))
-          }
-          rows={5}
+          onChange={(e) => {
+            setCv((prev) => ({ ...prev, summary: e.target.value }));
+            // Auto-resize
+            e.target.style.height = "auto";
+            e.target.style.height = e.target.scrollHeight + "px";
+          }}
+          ref={(el) => {
+            // Auto-resize on mount
+            if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
+          }}
+          rows={3}
           placeholder="Professionnel expérimenté avec 5+ ans d'expérience en..."
-          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 transition-all resize-none"
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 transition-all resize-none overflow-hidden"
         />
       </div>
 
       <div className="flex items-center gap-3">
         <VoiceButton
-          onRecordingComplete={(blob) => {
-            setAudioBlob(blob);
-            // TODO: Send to Whisper API for transcription
+          context="profile"
+          onTranscription={(text) => {
+            setCv({ ...cv, summary: text });
           }}
           label="Dicter mon profil"
         />
-        {audioBlob && (
-          <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-            <Check className="h-3.5 w-3.5" />
-            Audio enregistré ({(audioBlob.size / 1024).toFixed(0)} KB)
-          </span>
+        {cv.summary && (
+          <>
+            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+              <Check className="h-3.5 w-3.5" />
+              Profil renseigné
+            </span>
+            <button type="button" onClick={() => setCv({ ...cv, summary: "" })} className="ml-auto text-gray-300 hover:text-red-400 transition-colors" title="Effacer">
+              <X className="h-4 w-4" />
+            </button>
+          </>
         )}
       </div>
 
@@ -727,8 +581,15 @@ export function StepSkills({ cv, setCv }: StepProps) {
           </div>
 
           <VoiceButton
-            onRecordingComplete={() => {
-              // TODO: transcribe and parse skills
+            context="skills"
+            onTranscription={(text) => {
+              // Parse comma/newline separated skills and add to first category
+              const newSkills = text.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+              if (newSkills.length > 0 && cv.skills.length > 0) {
+                const updated = [...cv.skills];
+                updated[0] = { ...updated[0], items: [...updated[0].items, ...newSkills] };
+                setCv({ ...cv, skills: updated });
+              }
             }}
             label="Dicter mes compétences"
           />
@@ -825,7 +686,7 @@ export function StepExperiences({ cv, setCv }: StepProps) {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Poste"
               value={exp.position}
@@ -849,7 +710,7 @@ export function StepExperiences({ cv, setCv }: StepProps) {
             placeholder="Paris, France"
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Date début"
               value={exp.startDate}
@@ -871,16 +732,22 @@ export function StepExperiences({ cv, setCv }: StepProps) {
             </label>
             {exp.bullets.map((bullet, bi) => (
               <div key={bi} className="flex gap-2 mb-2">
-                <span className="mt-3 h-1.5 w-1.5 rounded-full bg-indigo-400 shrink-0" />
-                <input
+                <span className="mt-3 h-2 w-2 rounded-full bg-indigo-400 shrink-0" />
+                <textarea
                   value={bullet}
                   onChange={(e) => {
                     const newBullets = [...exp.bullets];
                     newBullets[bi] = e.target.value;
                     updateExp(i, "bullets", newBullets);
+                    e.target.style.height = "auto";
+                    e.target.style.height = e.target.scrollHeight + "px";
                   }}
+                  ref={(el) => {
+                    if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
+                  }}
+                  rows={1}
                   placeholder="Décris une réalisation..."
-                  className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-base placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
+                  className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-base placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all resize-none overflow-hidden"
                 />
                 <button
                   onClick={() => {
@@ -903,8 +770,12 @@ export function StepExperiences({ cv, setCv }: StepProps) {
           </div>
 
           <VoiceButton
-            onRecordingComplete={() => {
-              // TODO: transcribe and fill description
+            context="experience"
+            onTranscription={(text) => {
+              const newBullets = text.split(/[.\n]+/).map(s => s.trim()).filter(s => s.length > 5);
+              if (newBullets.length > 0) {
+                updateExp(i, "bullets", [...exp.bullets.filter(b => b.trim()), ...newBullets]);
+              }
             }}
             label="Dicter la description"
           />
@@ -1000,7 +871,7 @@ export function StepEducation({ cv, setCv }: StepProps) {
             required
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Date début"
               value={edu.startDate}
@@ -1206,16 +1077,168 @@ export interface CustomColors {
   sidebarAccent: string;
 }
 
+/* ═══════════════════════════════════════════════ */
+/*           STEP 7 — Layout (Disposition)         */
+/* ═══════════════════════════════════════════════ */
+export function StepLayout({
+  selectedLayout,
+  setSelectedLayout,
+}: {
+  selectedLayout: CVLayoutId;
+  setSelectedLayout: (id: CVLayoutId) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="text-center mb-2">
+        <h2 className="text-xl font-bold text-gray-900">Disposition du CV</h2>
+        <p className="text-sm text-gray-400 mt-1">Choisis la structure qui te correspond</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {CV_LAYOUTS.map((layout) => {
+          const active = selectedLayout === layout.id;
+          return (
+            <button
+              key={layout.id}
+              type="button"
+              onClick={() => setSelectedLayout(layout.id)}
+              className={`relative rounded-2xl border-2 p-3 text-left transition-all ${
+                active
+                  ? "border-indigo-500 bg-indigo-50/50 shadow-md shadow-indigo-500/10 scale-[1.02]"
+                  : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+              }`}
+            >
+              {active && (
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center">
+                  <Check className="h-3 w-3 text-white" />
+                </div>
+              )}
+
+              {/* Mini layout preview */}
+              <div className="w-full aspect-[3/4] rounded-lg overflow-hidden border border-gray-200/60 mb-2.5 bg-gray-50">
+                {layout.id === "sidebar-left" && (
+                  <div className="flex h-full">
+                    <div className="w-[35%] bg-gray-700 p-2 flex flex-col gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-gray-500 mx-auto" />
+                      <div className="h-1 bg-gray-500 rounded w-3/4 mx-auto" />
+                      <div className="h-0.5 bg-gray-500/40 rounded w-full mt-1" />
+                      <div className="h-0.5 bg-gray-500/40 rounded w-4/5" />
+                      <div className="h-0.5 bg-gray-500/40 rounded w-full mt-1" />
+                      <div className="h-0.5 bg-gray-500/40 rounded w-3/5" />
+                    </div>
+                    <div className="flex-1 p-2 flex flex-col gap-1.5">
+                      <div className="h-2 bg-gray-300 rounded w-2/3" />
+                      <div className="h-1 bg-gray-200 rounded w-1/2" />
+                      <div className="h-0.5 bg-gray-100 rounded w-full mt-1" />
+                      <div className="h-0.5 bg-gray-100 rounded w-full" />
+                      <div className="h-0.5 bg-gray-100 rounded w-4/5" />
+                      <div className="h-1.5 bg-gray-200 rounded w-1/3 mt-1" />
+                      <div className="h-0.5 bg-gray-100 rounded w-full" />
+                      <div className="h-0.5 bg-gray-100 rounded w-full" />
+                    </div>
+                  </div>
+                )}
+                {layout.id === "sidebar-right" && (
+                  <div className="flex h-full">
+                    <div className="flex-1 p-2 flex flex-col gap-1.5">
+                      <div className="h-2 bg-gray-300 rounded w-2/3" />
+                      <div className="h-1 bg-gray-200 rounded w-1/2" />
+                      <div className="h-0.5 bg-gray-100 rounded w-full mt-1" />
+                      <div className="h-0.5 bg-gray-100 rounded w-full" />
+                      <div className="h-0.5 bg-gray-100 rounded w-4/5" />
+                      <div className="h-1.5 bg-gray-200 rounded w-1/3 mt-1" />
+                      <div className="h-0.5 bg-gray-100 rounded w-full" />
+                      <div className="h-0.5 bg-gray-100 rounded w-full" />
+                    </div>
+                    <div className="w-[35%] bg-gray-700 p-2 flex flex-col gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-gray-500 mx-auto" />
+                      <div className="h-1 bg-gray-500 rounded w-3/4 mx-auto" />
+                      <div className="h-0.5 bg-gray-500/40 rounded w-full mt-1" />
+                      <div className="h-0.5 bg-gray-500/40 rounded w-4/5" />
+                      <div className="h-0.5 bg-gray-500/40 rounded w-full mt-1" />
+                      <div className="h-0.5 bg-gray-500/40 rounded w-3/5" />
+                    </div>
+                  </div>
+                )}
+                {layout.id === "top-header" && (
+                  <div className="flex flex-col h-full">
+                    <div className="bg-gray-700 p-2 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-gray-500 shrink-0" />
+                      <div className="flex-1">
+                        <div className="h-1.5 bg-gray-400 rounded w-2/3 mb-1" />
+                        <div className="h-0.5 bg-gray-500/50 rounded w-1/2" />
+                      </div>
+                    </div>
+                    <div className="flex flex-1">
+                      <div className="w-[40%] p-1.5 flex flex-col gap-1 border-r border-gray-200">
+                        <div className="h-1 bg-gray-300 rounded w-2/3" />
+                        <div className="h-0.5 bg-gray-100 rounded w-full" />
+                        <div className="h-0.5 bg-gray-100 rounded w-4/5" />
+                        <div className="h-1 bg-gray-300 rounded w-1/2 mt-1" />
+                        <div className="h-0.5 bg-gray-100 rounded w-full" />
+                      </div>
+                      <div className="flex-1 p-1.5 flex flex-col gap-1">
+                        <div className="h-1 bg-gray-300 rounded w-1/2" />
+                        <div className="h-0.5 bg-gray-100 rounded w-full" />
+                        <div className="h-0.5 bg-gray-100 rounded w-full" />
+                        <div className="h-0.5 bg-gray-100 rounded w-3/4" />
+                        <div className="h-1 bg-gray-300 rounded w-1/3 mt-1" />
+                        <div className="h-0.5 bg-gray-100 rounded w-full" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {layout.id === "minimal" && (
+                  <div className="flex flex-col h-full p-2 gap-1.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-6 h-6 rounded-full bg-gray-300 shrink-0" />
+                      <div className="flex-1">
+                        <div className="h-2 bg-gray-300 rounded w-1/2 mb-0.5" />
+                        <div className="h-0.5 bg-gray-200 rounded w-1/3" />
+                      </div>
+                    </div>
+                    <div className="h-px bg-gray-200 my-0.5" />
+                    <div className="h-0.5 bg-gray-100 rounded w-full" />
+                    <div className="h-0.5 bg-gray-100 rounded w-full" />
+                    <div className="h-0.5 bg-gray-100 rounded w-4/5" />
+                    <div className="h-1.5 bg-gray-200 rounded w-1/4 mt-1" />
+                    <div className="h-0.5 bg-gray-100 rounded w-full" />
+                    <div className="h-0.5 bg-gray-100 rounded w-full" />
+                    <div className="h-0.5 bg-gray-100 rounded w-3/5" />
+                    <div className="h-1.5 bg-gray-200 rounded w-1/4 mt-1" />
+                    <div className="h-0.5 bg-gray-100 rounded w-full" />
+                    <div className="h-0.5 bg-gray-100 rounded w-4/5" />
+                  </div>
+                )}
+              </div>
+
+              <p className="text-sm font-bold text-gray-900">{layout.name}</p>
+              <p className="text-[11px] text-gray-400 leading-snug mt-0.5">{layout.description}</p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════ */
+/*           STEP 8 — Colors (Thème couleur)       */
+/* ═══════════════════════════════════════════════ */
 export function StepStyle({
   cv,
   selectedTheme,
   setSelectedTheme,
   customColors,
   setCustomColors,
-}: StepStyleProps) {
-  const allThemes = Object.values(CV_THEMES);
+  detectedTheme,
+}: StepStyleProps & { detectedTheme?: string }) {
   const theme = CV_THEMES[selectedTheme];
   const [showCustom, setShowCustom] = useState(false);
+  const [styleNote, setStyleNote] = useState("");
+
+  // Get recommended vs other themes
+  const { recommended, others } = getRecommendedThemes(detectedTheme);
 
   // Mini preview
   const previewTheme: CVTheme = {
@@ -1225,69 +1248,110 @@ export function StepStyle({
     sidebarAccent: customColors.sidebarAccent || theme.sidebarAccent,
   };
 
+  const ThemeCard = ({ t, badge }: { t: CVTheme; badge?: string }) => (
+    <button
+      onClick={() => {
+        setSelectedTheme(t.id);
+        setCustomColors({ sidebarBg: "", accentColor: "", sidebarAccent: "" });
+      }}
+      className={`relative rounded-2xl border-2 p-3 text-left transition-all ${
+        selectedTheme === t.id
+          ? "border-indigo-500 shadow-lg scale-[1.02]"
+          : "border-gray-200 hover:border-gray-300"
+      }`}
+    >
+      {badge && (
+        <div className="absolute -top-2 left-3 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-sm">
+          {badge}
+        </div>
+      )}
+      {selectedTheme === t.id && (
+        <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-indigo-500 flex items-center justify-center">
+          <Check className="h-3 w-3 text-white" />
+        </div>
+      )}
+
+      {/* Mini preview */}
+      <div className="flex rounded-lg overflow-hidden h-16 mb-2 shadow-sm">
+        <div className="w-1/3" style={{ backgroundColor: t.sidebarBg }}>
+          <div className="flex flex-col items-center justify-center h-full gap-1">
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.sidebarAccent + "40" }} />
+            <div className="w-6 h-0.5 rounded" style={{ backgroundColor: t.sidebarAccent + "60" }} />
+          </div>
+        </div>
+        <div className="flex-1 bg-white p-1.5">
+          <div className="w-8 h-1 rounded mb-1" style={{ backgroundColor: t.accentColor }} />
+          <div className="w-full h-0.5 rounded bg-gray-100 mb-1" />
+          <div className="w-3/4 h-0.5 rounded bg-gray-100" />
+        </div>
+      </div>
+
+      <div className="text-xs font-bold text-gray-900">{t.name}</div>
+      <div className="text-[10px] text-gray-400 leading-tight mt-0.5">{t.description}</div>
+    </button>
+  );
+
   return (
     <div className="space-y-5">
       <div className="text-center mb-2">
         <h2 className="text-xl font-bold text-gray-900">Style & Personnalisation</h2>
         <p className="text-sm text-gray-400 mt-1">
-          Choisis un thème et personnalise les couleurs
+          On te recommande un style adapté à ton profil
         </p>
       </div>
 
-      {/* Theme grid */}
-      <div className="grid grid-cols-2 gap-3">
-        {allThemes.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => {
-              setSelectedTheme(t.id);
-              setCustomColors({ sidebarBg: "", accentColor: "", sidebarAccent: "" });
+      {/* Recommended themes */}
+      <div>
+        <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">
+          Recommandé pour toi
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {recommended.map((id, i) => (
+            <ThemeCard key={id} t={CV_THEMES[id]} badge={i === 0 ? "Recommandé" : "Compatible"} />
+          ))}
+        </div>
+      </div>
+
+      {/* Other themes */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          Autres styles
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {others.map((id) => (
+            <ThemeCard key={id} t={CV_THEMES[id]} />
+          ))}
+        </div>
+      </div>
+
+      {/* Free-form style description */}
+      <div className="rounded-2xl bg-indigo-50/50 border border-indigo-100 p-4">
+        <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide mb-1.5">
+          Décris le style que tu veux
+        </p>
+        <p className="text-[10px] text-indigo-400 mb-2">
+          Dis-nous ce que tu imagines — on adaptera le design
+        </p>
+        <textarea
+          value={styleNote}
+          onChange={(e) => {
+            setStyleNote(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = e.target.scrollHeight + "px";
+          }}
+          rows={2}
+          placeholder="Ex: Je veux un CV sobre et élégant pour la banque, avec des tons bleu foncé..."
+          className="w-full rounded-xl border border-indigo-200 bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all resize-none overflow-hidden"
+        />
+        <div className="mt-2">
+          <VoiceButton
+            context="style"
+            onTranscription={(text) => {
+              setStyleNote(prev => prev ? prev + " " + text : text);
             }}
-            className={`relative rounded-2xl border-2 p-3 text-left transition-all ${
-              selectedTheme === t.id
-                ? "border-indigo-500 shadow-lg scale-[1.02]"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            {selectedTheme === t.id && (
-              <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-indigo-500 flex items-center justify-center">
-                <Check className="h-3 w-3 text-white" />
-              </div>
-            )}
-
-            {/* Mini preview */}
-            <div className="flex rounded-lg overflow-hidden h-16 mb-2 shadow-sm">
-              <div
-                className="w-1/3"
-                style={{ backgroundColor: t.sidebarBg }}
-              >
-                <div className="flex flex-col items-center justify-center h-full gap-1">
-                  <div
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: t.sidebarAccent + "40" }}
-                  />
-                  <div
-                    className="w-6 h-0.5 rounded"
-                    style={{ backgroundColor: t.sidebarAccent + "60" }}
-                  />
-                </div>
-              </div>
-              <div className="flex-1 bg-white p-1.5">
-                <div
-                  className="w-8 h-1 rounded mb-1"
-                  style={{ backgroundColor: t.accentColor }}
-                />
-                <div className="w-full h-0.5 rounded bg-gray-100 mb-1" />
-                <div className="w-3/4 h-0.5 rounded bg-gray-100" />
-              </div>
-            </div>
-
-            <div className="text-xs font-bold text-gray-900">{t.name}</div>
-            <div className="text-[10px] text-gray-400 leading-tight mt-0.5">
-              {t.description}
-            </div>
-          </button>
-        ))}
+            label="Dicter mes préférences"
+          />
+        </div>
       </div>
 
       {/* Custom color toggle */}
@@ -1295,7 +1359,7 @@ export function StepStyle({
         onClick={() => setShowCustom(!showCustom)}
         className="w-full text-center text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors py-2"
       >
-        {showCustom ? "Masquer" : "Personnaliser les couleurs"}
+        {showCustom ? "Masquer les couleurs" : "Personnaliser les couleurs"}
       </button>
 
       {showCustom && (
@@ -1315,7 +1379,6 @@ export function StepStyle({
             value={customColors.sidebarAccent || previewTheme.sidebarAccent}
             onChange={(v) => setCustomColors({ ...customColors, sidebarAccent: v })}
           />
-
           <button
             onClick={() => setCustomColors({ sidebarBg: "", accentColor: "", sidebarAccent: "" })}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
@@ -1331,42 +1394,22 @@ export function StepStyle({
           Aperçu
         </div>
         <div className="flex h-40">
-          <div
-            className="w-1/3 p-3 flex flex-col gap-2"
-            style={{ backgroundColor: previewTheme.sidebarBg }}
-          >
-            <div
-              className="w-8 h-8 rounded-full mx-auto"
-              style={{ backgroundColor: previewTheme.sidebarAccent + "30", border: `2px solid ${previewTheme.sidebarAccent}` }}
-            />
+          <div className="w-1/3 p-3 flex flex-col gap-2" style={{ backgroundColor: previewTheme.sidebarBg }}>
+            <div className="w-8 h-8 rounded-full mx-auto" style={{ backgroundColor: previewTheme.sidebarAccent + "30", border: `2px solid ${previewTheme.sidebarAccent}` }} />
             <div className="space-y-1 mt-1">
               <div className="h-1 w-10 mx-auto rounded" style={{ backgroundColor: previewTheme.sidebarAccent + "60" }} />
               <div className="h-0.5 w-8 mx-auto rounded" style={{ backgroundColor: previewTheme.sidebarAccent + "40" }} />
             </div>
             <div className="flex flex-wrap gap-1 justify-center mt-auto">
               {["A", "B", "C"].map((s) => (
-                <span
-                  key={s}
-                  className="text-[6px] px-1.5 py-0.5 rounded"
-                  style={{
-                    backgroundColor: previewTheme.sidebarAccent + "20",
-                    color: previewTheme.sidebarAccent,
-                  }}
-                >
-                  {s}
-                </span>
+                <span key={s} className="text-[6px] px-1.5 py-0.5 rounded" style={{ backgroundColor: previewTheme.sidebarAccent + "20", color: previewTheme.sidebarAccent }}>{s}</span>
               ))}
             </div>
           </div>
           <div className="flex-1 bg-white p-3">
-            <div className="text-xs font-bold" style={{ color: previewTheme.accentColor }}>
-              {cv.header.firstName} {cv.header.lastName}
-            </div>
+            <div className="text-xs font-bold" style={{ color: previewTheme.accentColor }}>{cv.header.firstName} {cv.header.lastName}</div>
             <div className="text-[8px] text-gray-400 mt-0.5">{cv.header.title}</div>
-            <div
-              className="h-0.5 rounded my-2"
-              style={{ background: `linear-gradient(90deg, ${previewTheme.accentColor}, transparent)` }}
-            />
+            <div className="h-0.5 rounded my-2" style={{ background: `linear-gradient(90deg, ${previewTheme.accentColor}, transparent)` }} />
             <div className="space-y-1">
               <div className="h-1 w-full rounded bg-gray-100" />
               <div className="h-1 w-3/4 rounded bg-gray-100" />

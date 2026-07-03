@@ -40,11 +40,13 @@ import {
   StepExperiences,
   StepEducation,
   StepLanguagesInterests,
+  StepLayout,
   StepStyle,
   type CustomColors,
 } from "@/components/cv-wizard/steps";
+import type { CVLayoutId } from "@/lib/cv-types";
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 
 /* ─── Inline Editable Field (for preview/edit mode) ─── */
 function EditField({
@@ -141,14 +143,16 @@ function SectionCard({
 function PDFTemplate({
   cv,
   theme,
+  layout = "sidebar-left",
   innerRef,
 }: {
   cv: StructuredCV;
   theme: CVTheme;
+  layout?: CVLayoutId;
   innerRef: React.Ref<HTMLDivElement>;
 }) {
   const t = theme;
-  const isRight = t.sidebarPosition === "right";
+  const isRight = layout === "sidebar-right" || (layout === "sidebar-left" && t.sidebarPosition === "right");
 
   const sectionHeading = (label: string) => (
     <div
@@ -518,10 +522,75 @@ function PDFTemplate({
         overflow: "hidden",
       }}
     >
-      <div style={{ display: "flex", height: "100%", flexDirection: isRight ? "row-reverse" : "row" as "row" | "row-reverse" }}>
-        {sidebar}
-        {mainContent}
-      </div>
+      {(layout === "sidebar-left" || layout === "sidebar-right") && (
+        <div style={{ display: "flex", height: "100%", flexDirection: isRight ? "row-reverse" : "row" as "row" | "row-reverse" }}>
+          {sidebar}
+          {mainContent}
+        </div>
+      )}
+      {layout === "top-header" && (
+        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+          {/* Header band */}
+          <div style={{ background: t.sidebarBg, color: t.sidebarText, padding: "20px 30px", display: "flex", alignItems: "center", gap: "16px" }}>
+            {cv.header.photoUrl ? (
+              <img src={cv.header.photoUrl} alt="" style={{ width: "70px", height: "70px", borderRadius: "50%", objectFit: "cover" as const, border: `2px solid ${t.sidebarAccent}` }} />
+            ) : (
+              <div style={{ width: "70px", height: "70px", borderRadius: "50%", background: t.sidebarAccent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", fontWeight: 700 }}>
+                {cv.header.firstName?.[0]}{cv.header.lastName?.[0]}
+              </div>
+            )}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "22px", fontWeight: 800 }}>
+                {cv.header.firstName} <span style={{ color: t.sidebarAccent }}>{cv.header.lastName}</span>
+              </div>
+              <div style={{ fontSize: "11px", opacity: 0.8, marginTop: "2px" }}>{cv.header.title}</div>
+              <div style={{ display: "flex", gap: "12px", fontSize: "9px", marginTop: "6px", opacity: 0.7, flexWrap: "wrap" as const }}>
+                {cv.header.email && <span>{cv.header.email}</span>}
+                {cv.header.phone && <span>{cv.header.phone}</span>}
+                {cv.header.location && <span>{cv.header.location}</span>}
+              </div>
+            </div>
+          </div>
+          {/* 2-column body */}
+          <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+            <div style={{ width: "280px", padding: "16px 20px", borderRight: `1px solid ${t.borderColor}`, fontSize: "9px", lineHeight: 1.5, overflowY: "hidden" as const }}>
+              {cv.skills.length > 0 && <>{sectionHeading("Compétences")}{cv.skills.map((cat, i) => <div key={i} style={{ marginBottom: "8px" }}><div style={{ fontWeight: 600, fontSize: "9px", marginBottom: "3px" }}>{cat.category}</div><div style={{ display: "flex", flexWrap: "wrap" as const, gap: "3px" }}>{cat.items.map((s, j) => <span key={j} style={{ background: t.accentColor + "15", color: t.accentColor, padding: "1px 6px", borderRadius: "3px", fontSize: "8px" }}>{s}</span>)}</div></div>)}</>}
+              {cv.languages.length > 0 && <div style={{ marginTop: "10px" }}>{sectionHeading("Langues")}{cv.languages.map((l, i) => <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}><span>{l.name}</span><span style={{ color: t.accentColor, fontSize: "8px" }}>{l.level}</span></div>)}</div>}
+              {cv.education.length > 0 && <div style={{ marginTop: "10px" }}>{sectionHeading("Formation")}{cv.education.map((e, i) => <div key={i} style={{ marginBottom: "6px" }}><div style={{ fontWeight: 600, fontSize: "9px" }}>{e.degree}</div><div style={{ fontSize: "8px", color: t.subTextColor }}>{e.school} · {e.startDate} — {e.endDate}</div></div>)}</div>}
+            </div>
+            <div style={{ flex: 1, padding: "16px 24px", fontSize: "9px", lineHeight: 1.5, overflowY: "hidden" as const }}>
+              {cv.summary && <>{sectionHeading("Profil")}<p style={{ fontSize: "9px", color: t.mainText, marginBottom: "12px" }}>{cv.summary}</p></>}
+              {cv.experiences.length > 0 && <>{sectionHeading("Expériences")}{cv.experiences.map((exp, i) => <div key={i} style={{ marginBottom: "10px" }}><div style={{ fontWeight: 700, fontSize: "10px" }}>{exp.position}</div><div style={{ fontSize: "8px", color: t.accentColor }}>{exp.company} · {exp.startDate} — {exp.endDate}</div>{exp.bullets.map((b, j) => <div key={j} style={{ paddingLeft: "8px", fontSize: "8.5px", marginTop: "2px" }}>• {b}</div>)}</div>)}</>}
+            </div>
+          </div>
+        </div>
+      )}
+      {layout === "minimal" && (
+        <div style={{ padding: "36px 40px", height: "100%", overflow: "hidden", fontSize: "9.5px", lineHeight: 1.6 }}>
+          {/* Centered header */}
+          <div style={{ textAlign: "center" as const, marginBottom: "16px" }}>
+            {cv.header.photoUrl && (
+              <img src={cv.header.photoUrl} alt="" style={{ width: "70px", height: "70px", borderRadius: "50%", objectFit: "cover" as const, margin: "0 auto 10px", display: "block", border: `2px solid ${t.accentColor}` }} />
+            )}
+            <div style={{ fontSize: "24px", fontWeight: 800, color: t.headingColor }}>
+              {cv.header.firstName} {cv.header.lastName}
+            </div>
+            <div style={{ fontSize: "12px", color: t.accentColor, marginTop: "2px" }}>{cv.header.title}</div>
+            <div style={{ display: "flex", justifyContent: "center", gap: "14px", fontSize: "9px", color: t.subTextColor, marginTop: "8px", flexWrap: "wrap" as const }}>
+              {cv.header.email && <span>{cv.header.email}</span>}
+              {cv.header.phone && <span>{cv.header.phone}</span>}
+              {cv.header.location && <span>{cv.header.location}</span>}
+              {cv.header.linkedin && <span>{cv.header.linkedin}</span>}
+            </div>
+          </div>
+          <div style={{ borderTop: `2px solid ${t.accentColor}`, marginBottom: "14px" }} />
+          {cv.summary && <>{sectionHeading("Profil")}<p style={{ marginBottom: "14px", color: t.mainText }}>{cv.summary}</p></>}
+          {cv.experiences.length > 0 && <>{sectionHeading("Expériences professionnelles")}{cv.experiences.map((exp, i) => <div key={i} style={{ marginBottom: "10px" }}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontWeight: 700, fontSize: "10px" }}>{exp.position}</span><span style={{ fontSize: "8px", color: t.subTextColor }}>{exp.startDate} — {exp.endDate}</span></div><div style={{ fontSize: "9px", color: t.accentColor }}>{exp.company}{exp.location ? ` · ${exp.location}` : ""}</div>{exp.bullets.map((b, j) => <div key={j} style={{ paddingLeft: "10px", fontSize: "8.5px", marginTop: "2px" }}>• {b}</div>)}</div>)}</>}
+          {cv.education.length > 0 && <>{sectionHeading("Formation")}{cv.education.map((e, i) => <div key={i} style={{ marginBottom: "6px", display: "flex", justifyContent: "space-between" }}><div><span style={{ fontWeight: 600 }}>{e.degree}</span><span style={{ color: t.subTextColor }}> — {e.school}</span></div><span style={{ fontSize: "8px", color: t.subTextColor }}>{e.startDate} — {e.endDate}</span></div>)}</>}
+          {cv.skills.length > 0 && <>{sectionHeading("Compétences")}<div style={{ display: "flex", flexWrap: "wrap" as const, gap: "4px" }}>{cv.skills.flatMap(c => c.items).map((s, i) => <span key={i} style={{ background: t.accentColor + "12", color: t.accentColor, padding: "2px 8px", borderRadius: "4px", fontSize: "8px", fontWeight: 500 }}>{s}</span>)}</div></>}
+          {cv.languages.length > 0 && <div style={{ marginTop: "10px" }}>{sectionHeading("Langues")}<div style={{ display: "flex", gap: "16px" }}>{cv.languages.map((l, i) => <span key={i}>{l.name} <span style={{ color: t.accentColor, fontSize: "8px" }}>({l.level})</span></span>)}</div></div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -903,8 +972,7 @@ function PreviewEditor({
         <button
           onClick={onExport}
           disabled={exporting}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-bold text-white transition-all active:scale-[0.98] shadow-lg"
-          style={{ backgroundColor: theme.accentColor }}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-bold text-white transition-all active:scale-[0.98] shadow-lg brand-gradient"
         >
           {exporting ? (
             <>
@@ -942,7 +1010,10 @@ export default function CVEditorPage() {
   const [cv, setCv] = useState<StructuredCV | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [cvOriginalImage, setCvOriginalImage] = useState<string | null>(null);
+  const [extractingPhoto, setExtractingPhoto] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<CVThemeId>("modern");
+  const [selectedLayout, setSelectedLayout] = useState<CVLayoutId>("sidebar-left");
   const [customColors, setCustomColors] = useState<CustomColors>({
     sidebarBg: "",
     accentColor: "",
@@ -978,12 +1049,30 @@ export default function CVEditorPage() {
 
   /* ── Load structured CV ── */
   useEffect(() => {
+    // Create mode: no analysisId → start with blank template
     if (!analysisId) {
-      toast.error("Aucune analyse trouvée");
-      router.push("/app");
+      const userName = session?.user?.name?.split(" ") || [];
+      setCv({
+        header: {
+          firstName: userName[0] || "",
+          lastName: userName.slice(1).join(" ") || "",
+          title: "",
+          email: session?.user?.email || "",
+          phone: "",
+          location: "",
+        },
+        summary: "",
+        experiences: [],
+        education: [],
+        skills: [{ category: "Compétences", items: [] }],
+        languages: [],
+        interests: [],
+      });
+      setLoading(false);
       return;
     }
 
+    // Edit mode: load from API
     fetch("/api/cv-editor", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -992,8 +1081,14 @@ export default function CVEditorPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.structuredCV) {
-          setCv(data.structuredCV);
-          const detected = getThemeForSector(data.structuredCV.detectedTheme);
+          const structured = data.structuredCV;
+          setCv(structured);
+
+          // Store original image for reference
+          if (data.originalImage) {
+            setCvOriginalImage(data.originalImage);
+          }
+          const detected = getThemeForSector(structured.detectedTheme);
           setSelectedTheme(detected);
         } else {
           toast.error(data.error || "Erreur");
@@ -1002,7 +1097,7 @@ export default function CVEditorPage() {
       })
       .catch(() => toast.error("Erreur réseau"))
       .finally(() => setLoading(false));
-  }, [analysisId, router]);
+  }, [analysisId, router, session]);
 
   /* ── Update helpers ── */
   const updateHeader = useCallback(
@@ -1046,11 +1141,12 @@ export default function CVEditorPage() {
       el.style.left = "-9999px";
       el.style.top = "0";
 
-      await new Promise((r) => setTimeout(r, 250));
+      await new Promise((r) => setTimeout(r, 500));
 
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: "#ffffff",
         logging: false,
         width: el.scrollWidth,
@@ -1080,14 +1176,16 @@ export default function CVEditorPage() {
   /* ── Loading state ── */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-mesh">
         <div className="text-center px-6">
           <div className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-indigo-50">
             <Sparkles className="h-7 w-7 animate-pulse text-indigo-600" />
           </div>
-          <p className="text-base font-semibold text-gray-900">Génération en cours...</p>
+          <p className="text-base font-semibold text-gray-900">
+            {analysisId ? "Génération en cours..." : "Préparation..."}
+          </p>
           <p className="mt-1 text-sm text-gray-500">
-            L&apos;IA restructure et optimise ton CV
+            {analysisId ? "L'IA restructure et optimise ton CV" : "On prépare ton éditeur de CV"}
           </p>
         </div>
       </div>
@@ -1118,7 +1216,7 @@ export default function CVEditorPage() {
 
     switch (currentStep) {
       case 0:
-        return <StepContact {...stepProps} />;
+        return <StepContact {...stepProps} cvOriginalImage={cvOriginalImage} extractingPhoto={extractingPhoto} />;
       case 1:
         return <StepProfile {...stepProps} />;
       case 2:
@@ -1131,12 +1229,20 @@ export default function CVEditorPage() {
         return <StepLanguagesInterests {...stepProps} />;
       case 6:
         return (
+          <StepLayout
+            selectedLayout={selectedLayout}
+            setSelectedLayout={setSelectedLayout}
+          />
+        );
+      case 7:
+        return (
           <StepStyle
             cv={cv}
             selectedTheme={selectedTheme}
             setSelectedTheme={setSelectedTheme}
             customColors={customColors}
             setCustomColors={setCustomColors}
+            detectedTheme={cv.detectedTheme}
           />
         );
       default:
@@ -1160,15 +1266,14 @@ export default function CVEditorPage() {
             </button>
 
             <div className="flex items-center gap-1.5">
-              <Eye className="h-4 w-4" style={{ color: theme.accentColor }} />
+              <Eye className="h-4 w-4 text-indigo-600" />
               <span className="text-sm font-bold text-gray-900">Aperçu & Édition</span>
             </div>
 
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all active:scale-95"
-              style={{ backgroundColor: theme.accentColor }}
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all active:scale-95 brand-gradient"
             >
               {exporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1190,7 +1295,7 @@ export default function CVEditorPage() {
         />
 
         {/* Hidden PDF template */}
-        <PDFTemplate cv={cv} theme={theme} innerRef={cvPrintRef} />
+        <PDFTemplate cv={cv} theme={theme} layout={selectedLayout} innerRef={cvPrintRef} />
       </div>
     );
   }
@@ -1280,7 +1385,7 @@ export default function CVEditorPage() {
       </div>
 
       {/* Hidden PDF template */}
-      <PDFTemplate cv={cv} theme={theme} innerRef={cvPrintRef} />
+      <PDFTemplate cv={cv} theme={theme} layout={selectedLayout} innerRef={cvPrintRef} />
     </div>
   );
 }

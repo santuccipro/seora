@@ -29,6 +29,16 @@ model User {
   jobMatches          JobMatch[]
   tokenPurchases      TokenPurchase[]
   humanizerAnalyses   HumanizerAnalysis[]
+  cvDraft             CvDraft?
+}
+
+model CvDraft {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  payload   String   // JSON serialised CvDraft (see /cv-builder)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {

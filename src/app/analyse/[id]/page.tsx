@@ -57,6 +57,35 @@ function PriorityBadge({ priority }: { priority: string }) {
   );
 }
 
+function CollapsiblePoint({ title, detail, color }: { title: string; detail: string; color: "green" | "orange" }) {
+  const [open, setOpen] = useState(false);
+  const dotColor = color === "green" ? "bg-green-400" : "bg-orange-400";
+  const bgColor = color === "green" ? "hover:bg-green-50/50" : "hover:bg-orange-50/50";
+
+  // Remove markdown bold markers
+  const cleanTitle = title.replace(/\*\*/g, "");
+
+  return (
+    <div className={`rounded-xl border border-gray-100 transition-colors ${bgColor}`}>
+      <button
+        onClick={() => detail && setOpen(!open)}
+        className="w-full flex items-start gap-2.5 p-3 text-left"
+      >
+        <div className={`mt-1.5 h-2 w-2 rounded-full ${dotColor} flex-shrink-0`} />
+        <span className="flex-1 text-sm font-medium text-gray-800 leading-snug">{cleanTitle}</span>
+        {detail && (
+          <ChevronDown className={`h-4 w-4 text-gray-300 flex-shrink-0 mt-0.5 transition-transform ${open ? "rotate-180" : ""}`} />
+        )}
+      </button>
+      {open && detail && (
+        <div className="px-3 pb-3 pl-[26px]">
+          <p className="text-xs text-gray-500 leading-relaxed">{detail.replace(/\*\*/g, "")}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AnalysisPage() {
   const { id } = useParams();
   const { status } = useSession();
@@ -209,33 +238,33 @@ export default function AnalysisPage() {
           </div>
         </div>
 
-        {/* Strengths & Weaknesses */}
+        {/* Strengths & Weaknesses — compact collapsible cards */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl bg-white border border-gray-200 p-8 shadow-sm">
+          <div className="rounded-2xl bg-white border border-gray-200 p-5 sm:p-8 shadow-sm">
             <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
               <CheckCircle2 className="h-5 w-5 text-green-500" /> Points forts
             </h3>
-            <ul className="space-y-3">
-              {analysis.strengths.map((s, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <div className="mt-1.5 h-2 w-2 rounded-full bg-green-400 flex-shrink-0" />
-                  <span className="text-sm text-gray-700">{s}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-2">
+              {analysis.strengths.map((s, i) => {
+                const colonIdx = s.indexOf(" : ");
+                const title = colonIdx > 0 ? s.slice(0, colonIdx) : s.split(/(?<=[.!?])\s/)[0];
+                const detail = colonIdx > 0 ? s.slice(colonIdx + 3).trim() : s.slice(title.length).trim();
+                return <CollapsiblePoint key={i} title={title} detail={detail} color="green" />;
+              })}
+            </div>
           </div>
-          <div className="rounded-2xl bg-white border border-gray-200 p-8 shadow-sm">
+          <div className="rounded-2xl bg-white border border-gray-200 p-5 sm:p-8 shadow-sm">
             <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-4">
               <AlertTriangle className="h-5 w-5 text-orange-500" /> Axes d&apos;amélioration
             </h3>
-            <ul className="space-y-3">
-              {analysis.weaknesses.map((w, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <div className="mt-1.5 h-2 w-2 rounded-full bg-orange-400 flex-shrink-0" />
-                  <span className="text-sm text-gray-700">{w}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-2">
+              {analysis.weaknesses.map((w, i) => {
+                const colonIdx = w.indexOf(" : ");
+                const title = colonIdx > 0 ? w.slice(0, colonIdx) : w.split(/(?<=[.!?])\s/)[0];
+                const detail = colonIdx > 0 ? w.slice(colonIdx + 3).trim() : w.slice(title.length).trim();
+                return <CollapsiblePoint key={i} title={title} detail={detail} color="orange" />;
+              })}
+            </div>
           </div>
         </div>
 
