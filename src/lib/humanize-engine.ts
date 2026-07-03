@@ -789,8 +789,8 @@ const VOICE_INSTRUCTION: Record<Language, string> = {
 };
 
 const MODE_CONFIG: Record<HumanizeMode, { model: ClaudeModel; temperature: number; maxPasses: number; overlap: number }> = {
-  basic: { model: "claude-haiku-4-5", temperature: 0.7, maxPasses: 1, overlap: 200 },
-  balanced: { model: "claude-sonnet-4-6", temperature: 0.9, maxPasses: 2, overlap: 300 },
+  basic: { model: "claude-haiku-4-5", temperature: 0.7, maxPasses: 2, overlap: 200 },
+  balanced: { model: "claude-sonnet-4-6", temperature: 0.95, maxPasses: 3, overlap: 300 },
   aggressive: { model: "claude-opus-4-7", temperature: 1.0, maxPasses: 4, overlap: 400 },
   // compilatio-proof = Opus 4.8 + boucle sur score Compilatio-emulator (Opus 4.8) jusqu'à <15%, 5 passes max
   "compilatio-proof": { model: "claude-opus-4-8", temperature: 1.0, maxPasses: 5, overlap: 400 },
@@ -1021,7 +1021,10 @@ function buildPrompt(text: string, language: Language, mode: HumanizeMode): stri
     mode === "aggressive" ? "AGGRESSIVE" :
     mode === "balanced" ? "ÉQUILIBRÉ" :
     "BASIQUE";
-  const isHard = mode === "aggressive" || mode === "compilatio-proof";
+  // Anti-Compilatio rules now apply from BALANCED and up — the previous
+  // restriction to aggressive+ meant balanced runs delivered only a ~10 pt
+  // drop on real DPPs, which is worthless.
+  const isHard = mode === "balanced" || mode === "aggressive" || mode === "compilatio-proof";
   return `${VOICE_INSTRUCTION[language]}
 
 MISSION : réécrire le texte académique dans TON style personnel, mode ${intensity}. Garde le sens exact et le fond réglementaire/technique. NE change PAS les faits, chiffres, noms propres, références légales.
@@ -1084,20 +1087,28 @@ export async function llmRewrite(
   }
   if (currentChunk.length > 0) chunks.push(currentChunk);
 
-  const rewritten: string[] = [];
-  for (const chunk of chunks) {
-    const chunkText = chunk.join("\n\n");
-    try {
-      const out = (await callClaude(buildPrompt(chunkText, language, mode), {
+  // Parallelise chunk rewriting — critical to stay under Vercel Hobby's
+  // 60 s per-request cap. Sequential = 5 chunks × 30 s = 150 s (killed).
+  // Parallel = 5 chunks in ~30 s wall clock (all-in-flight together).
+  const chunkTexts = chunks.map((c) => c.join("\n\n"));
+  const rewritten = await Promise.all(
+    chunkTexts.map((chunkText) =>
+      callClaude(buildPrompt(chunkText, language, mode), {
         model: config.model,
-        system: "Tu es un assistant qui réécrit du texte académique pour le rendre indétectable par les outils anti-IA (Compilatio, GPTZero). Retourne UNIQUEMENT le texte réécrit, sans commentaire.",
-      })).trim();
-      rewritten.push(out.length > 0 ? out : chunkText);
-    } catch (err) {
-      console.error("[humanize-engine] llmRewrite chunk failed:", err);
-      rewritten.push(chunkText);
-    }
-  }
+        system:
+          "Tu es un assistant qui réécrit du texte académique pour le rendre indétectable par les outils anti-IA (Compilatio, GPTZero). Retourne UNIQUEMENT le texte réécrit, sans commentaire.",
+        timeoutMs: 55_000,
+      })
+        .then((out) => {
+          const t = out.trim();
+          return t.length > 0 ? t : chunkText;
+        })
+        .catch((err) => {
+          console.error("[humanize-engine] llmRewrite chunk failed:", err);
+          return chunkText;
+        })
+    )
+  );
 
   return { text: rewritten.join("\n\n"), chunkCount: chunks.length };
 }
