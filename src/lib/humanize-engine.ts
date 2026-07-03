@@ -228,7 +228,7 @@ const PARALLEL_PATTERNS: Record<Language, RegExp[]> = {
  * an LLM call.
  */
 const COMPILATIO_SIGNATURE_PATTERNS_FR: Array<{ re: RegExp; weight: number; key: string }> = [
-  // Weight 3 — hard AI signature
+  // ══════════════ Weight 3 — HARD AI signature (each hit = +15 pts, capped 90) ══════════════
   { re: /premi[èe]rement[\s\S]{0,600}deuxi[èe]mement[\s\S]{0,600}troisi[èe]mement/gi, weight: 3, key: "cascade_enum" },
   { re: /\bn'est pas\b[^.!?]{5,60}\bc'est\b/gi, weight: 3, key: "balanced_antithesis" },
   { re: /\bloin d'être\b/gi, weight: 3, key: "loin_d_etre" },
@@ -236,23 +236,56 @@ const COMPILATIO_SIGNATURE_PATTERNS_FR: Array<{ re: RegExp; weight: number; key:
   { re: /\bil (est|convient) important de noter\b/gi, weight: 3, key: "chatgpt_verify" },
   { re: /\b(explorons|plongeons dans|démystifions|décryptons|approfondissons|éclairons)\b/gi, weight: 3, key: "chatgpt_explore" },
   { re: /\beffets? (convergents?|concomitants?|concordants?)\b/gi, weight: 3, key: "convergent_effects" },
-  { re: /\bde surcroît\b|\bcorollairement\b|\bconcomitamment\b/gi, weight: 3, key: "connector_surcroit" },
-  { re: /\bà (moyen|long) terme,?\s+[^.]{0,120}(produira|entraînera|générera|convergent)/gi, weight: 3, key: "future_projection" },
-  { re: /\bnon seulement\b[^.]{5,80}\bmais aussi\b/gi, weight: 2, key: "non_seulement" },
-  // Weight 2 — medium AI signature
-  { re: /\bun socle\s+(de|d')/gi, weight: 2, key: "socle_de" },
+  { re: /\bde surcroît\b|\bcorollairement\b|\bconcomitamment\b|\bnonobstant\b|\bpar-delà\b/gi, weight: 3, key: "connector_surcroit" },
+  { re: /\bà (moyen|long) terme,?\s+[^.]{0,120}(produira|entraînera|générera|convergent|permettra)/gi, weight: 3, key: "future_projection" },
   { re: /\bn'est pas un coût,?\s+c'est un actif\b/gi, weight: 3, key: "actif_metaphor_exact" },
+  { re: /\bun renforcement de la (fidélisation|conformité|performance|compétitivité)/gi, weight: 3, key: "renforcement_de_la" },
+  { re: /\bcette conviction que j'emporte\b/gi, weight: 3, key: "conviction_emporte" },
+  { re: /\b(cinq|quatre|trois|six|sept)\s+enseignements\s+(transversaux|principaux|majeurs|clés)/gi, weight: 3, key: "n_enseignements" },
+  { re: /\bcette (fiche|section|démarche|analyse|réflexion) m'a permis de\b/gi, weight: 3, key: "meta_narration_permis" },
+  { re: /\bil (importe|convient|est essentiel|est fondamental) (de|d')\b/gi, weight: 3, key: "il_convient_de" },
+  { re: /\bla (pérennisation|consolidation|structuration|systématisation|généralisation)\s+de\s+/gi, weight: 3, key: "nominalization_lourde" },
+  { re: /\bau moins aussi importants? que\b/gi, weight: 3, key: "au_moins_aussi" },
+  { re: /\b(cadre|socle|pilier|levier|vecteur) (de|d')\s+(la|le|l'|un|une)\s+/gi, weight: 3, key: "socle_pilier_levier" },
+
+  // ══════════════ Weight 2 — MEDIUM AI signature (each hit = +10 pts, capped 60) ══════════════
+  { re: /\bnon seulement\b[^.]{5,80}\bmais aussi\b/gi, weight: 2, key: "non_seulement" },
+  { re: /\bun socle\s+(de|d')/gi, weight: 2, key: "socle_de" },
   { re: /\best un actif\b/gi, weight: 2, key: "actif_metaphor" },
-  { re: /\b(par ailleurs|toutefois|néanmoins|en outre)\b/gi, weight: 1, key: "connector_par_ailleurs" },
-  { re: /\b(ainsi|de même|similairement)\s*,?\s+/gi, weight: 1, key: "connector_ainsi" },
-  { re: /\b(en somme|en définitive|pour conclure|fondamentalement)\b/gi, weight: 2, key: "conclusion_synthesis" },
-  { re: /\bce (dossier|mémoire|rapport|travail) m'a permis de (comprendre|vérifier|structurer|approfondir|saisir)/gi, weight: 2, key: "meta_narration" },
+  { re: /\b(en somme|en définitive|pour conclure|fondamentalement|en substance)\b/gi, weight: 2, key: "conclusion_synthesis" },
+  { re: /\bce (dossier|mémoire|rapport|travail) m'a permis de (comprendre|vérifier|structurer|approfondir|saisir|valider)/gi, weight: 2, key: "meta_narration" },
   { re: /\bobjectif smart\s*:/gi, weight: 2, key: "smart_objective" },
   { re: /\btableau\s+\d+\s*[—-]\s*synthèse/gi, weight: 2, key: "table_synthesis" },
-  { re: /\bl'(identification|formalisation|pérennisation|structuration|mise en œuvre) (des|de|du|d')/gi, weight: 2, key: "nominalization" },
-  // Weight 1 — soft signal
-  { re: /\bapproche\s+(durable|responsable|structurante|holistique)\b/gi, weight: 1, key: "adjective_pair" },
+  { re: /\bl'(identification|formalisation|pérennisation|structuration|mise en œuvre|généralisation|systématisation|consolidation) (des|de|du|d')/gi, weight: 2, key: "nominalization" },
+  { re: /\b(indicateurs?|effets?|résultats?|bénéfices?) (de suivi|attendus?|escomptés?|prévus?|projetés?)\s+(proposés?|clés?|majeurs?)?\b/gi, weight: 2, key: "indicateurs_suivi" },
+  { re: /\bcette (démarche|approche|stratégie|posture) (s'avère|permet de|répond à|s'inscrit dans)/gi, weight: 2, key: "cette_demarche" },
+  { re: /\bl'ensemble d(es|u|e la)\s+/gi, weight: 2, key: "ensemble_des" },
+  { re: /\bpour aligner (mes|nos|ses|leurs) pratiques\b/gi, weight: 2, key: "aligner_pratiques" },
+  { re: /\bpour (répondre|adresser|traiter) (à|aux) (ces|ces enjeux|cette problématique)/gi, weight: 2, key: "pour_repondre" },
+  { re: /\ben effet,?\s+(cette|ce|ces|il|elle|nous|on)\s+/gi, weight: 2, key: "en_effet_cette" },
+  { re: /\bpar ailleurs,?\s+(cette|ce|ces|il|elle|nous|on)\s+/gi, weight: 2, key: "par_ailleurs_cette" },
+  { re: /\b(rigoureuse|systématique|approfondi[e]?|structurant[e]?|itérativ[e]?)\s+(approche|démarche|analyse|méthodologie)\b/gi, weight: 2, key: "adjectif_approche" },
+  { re: /\bau service (de|d')\s+/gi, weight: 2, key: "au_service_de" },
+  { re: /\bs'inscrit dans\s+(une|un|la|le|des|les)\s+(logique|démarche|dynamique|perspective|volonté)\b/gi, weight: 2, key: "s_inscrit_dans" },
+  { re: /\bconstitue (un|une|le|la)\s+(pilier|socle|levier|vecteur|point|élément|facteur)\b/gi, weight: 2, key: "constitue_un_pilier" },
+  { re: /\ba pour (vocation|objectif|ambition|finalité) de\b/gi, weight: 2, key: "a_pour_vocation" },
+  { re: /\bdans (un|une) (logique|démarche|dynamique|optique|perspective)\s+d(e|')/gi, weight: 2, key: "dans_une_logique" },
+  { re: /\bnotamment (par|via|à travers|grâce à|au moyen)/gi, weight: 2, key: "notamment_par" },
+  { re: /\bpar l'entremise de\b|\bpar le biais de\b|\bpar le truchement de\b/gi, weight: 2, key: "par_le_biais" },
+  { re: /\bil s'agit (bien|là) (de|d')\b/gi, weight: 2, key: "il_s_agit_bien" },
+  { re: /\bau-delà (du|des|de la|de l')\b/gi, weight: 2, key: "au_dela_du" },
+  { re: /\btirer (parti|profit|le meilleur) de\b/gi, weight: 2, key: "tirer_parti" },
+
+  // ══════════════ Weight 1 — SOFT signal (each hit = +4 pts, capped 30) ══════════════
+  { re: /\b(par ailleurs|toutefois|néanmoins|en outre|de plus)\b/gi, weight: 1, key: "connector_par_ailleurs" },
+  { re: /\b(ainsi|de même|similairement)\s*,?\s+/gi, weight: 1, key: "connector_ainsi" },
+  { re: /\bapproche\s+(durable|responsable|structurante|holistique|systémique|inclusive)\b/gi, weight: 1, key: "adjective_pair" },
   { re: /\brythme ternaire|,\s+\w+,\s+et\s+/gi, weight: 1, key: "ternary_rhythm" },
+  { re: /\b(fondamental|crucial|primordial|essentiel|majeur|significatif|considérable|impératif)\b/gi, weight: 1, key: "adjectifs_soutenus" },
+  { re: /\b(témoigne|témoignent|témoignant) (de|d')\b/gi, weight: 1, key: "temoigne_de" },
+  { re: /\b(engendre|génère|produit|entraîne)\s+(des|un|une)\s+(effet|dynamique|bénéfice)/gi, weight: 1, key: "engendre_des" },
+  { re: /\ben (matière|termes) de\s+/gi, weight: 1, key: "en_matiere_de" },
+  { re: /\b(mettre en (lumière|évidence|exergue))\b/gi, weight: 1, key: "mettre_en_lumiere" },
 ];
 
 const COMPILATIO_SIGNATURE_PATTERNS_EN: Array<{ re: RegExp; weight: number; key: string }> = [
@@ -276,15 +309,25 @@ function scoreCompilatioSignatures(text: string, language: Language): number {
     language === "en" ? COMPILATIO_SIGNATURE_PATTERNS_EN :
     language === "es" ? COMPILATIO_SIGNATURE_PATTERNS_ES :
     COMPILATIO_SIGNATURE_PATTERNS_FR;
+  const wordCount = text.split(/\s+/).length || 1;
   let score = 0;
+  let hardHits = 0;
   for (const { re, weight } of list) {
     const hits = (text.match(re) ?? []).length;
     if (hits === 0) continue;
-    if (weight === 3) score += Math.min(45, hits * 15);
-    else if (weight === 2) score += Math.min(24, hits * 8);
-    else score += Math.min(9, hits * 3);
+    if (weight === 3) { score += Math.min(90, hits * 15); hardHits += hits; }
+    else if (weight === 2) { score += Math.min(60, hits * 10); }
+    else { score += Math.min(30, hits * 4); }
   }
-  return Math.min(95, score);
+  // Density normalisation — a text with lots of patterns per 1k words is
+  // categorically more AI-like than a long text with same absolute count.
+  const perThousand = (score / wordCount) * 1000;
+  const densityBoost = Math.min(15, perThousand * 0.4);
+  const raw = Math.min(95, score + densityBoost);
+
+  // Hard-signature threshold — ≥3 weight-3 hits = min 45%
+  const floor = hardHits >= 3 ? 45 : hardHits >= 2 ? 30 : hardHits >= 1 ? 20 : 0;
+  return Math.max(floor, Math.round(raw));
 }
 
 export function detectAI(text: string, language: Language = "fr"): DetectorScore {
@@ -341,30 +384,32 @@ export function detectAI(text: string, language: Language = "fr"): DetectorScore
   // between our 13% heuristic and Compilatio's 47%.
   const signatureHits = scoreCompilatioSignatures(clean, language);
 
-  // Composite scores — inject signature hits with a fat weight
+  // Composite scores — inject signature hits with a fat weight.
+  // Signature score is now the DOMINANT term (60-85 %) because on well-edited
+  // academic French, pattern presence is far more predictive than raw stats.
   const gptZeroLike = Math.round(
-    0.55 * weighted(
+    0.40 * weighted(
       { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
       { homoglyphs: 0.30, perplexity: 0.25, burstiness: 0.25, connectors: 0.10, formality: 0.05, parallelism: 0.05 }
-    ) + 0.45 * signatureHits
+    ) + 0.60 * signatureHits
   );
   const saplingLike = Math.round(
-    0.5 * weighted(
-      { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
-      { homoglyphs: 0.25, perplexity: 0.20, burstiness: 0.15, connectors: 0.20, formality: 0.15, parallelism: 0.05 }
-    ) + 0.5 * signatureHits
-  );
-  const originalityLike = Math.round(
-    0.55 * weighted(
-      { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
-      { homoglyphs: 0.35, perplexity: 0.15, burstiness: 0.20, connectors: 0.10, formality: 0.10, parallelism: 0.10 }
-    ) + 0.45 * signatureHits
-  );
-  const compilatioLike = Math.round(
     0.35 * weighted(
       { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
-      { homoglyphs: 0.40, perplexity: 0.10, burstiness: 0.15, connectors: 0.15, formality: 0.10, parallelism: 0.10 }
+      { homoglyphs: 0.25, perplexity: 0.20, burstiness: 0.15, connectors: 0.20, formality: 0.15, parallelism: 0.05 }
     ) + 0.65 * signatureHits
+  );
+  const originalityLike = Math.round(
+    0.35 * weighted(
+      { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
+      { homoglyphs: 0.35, perplexity: 0.15, burstiness: 0.20, connectors: 0.10, formality: 0.10, parallelism: 0.10 }
+    ) + 0.65 * signatureHits
+  );
+  const compilatioLike = Math.round(
+    0.15 * weighted(
+      { homoglyphs, perplexity, burstiness, connectors, formality, parallelism },
+      { homoglyphs: 0.40, perplexity: 0.10, burstiness: 0.15, connectors: 0.15, formality: 0.10, parallelism: 0.10 }
+    ) + 0.85 * signatureHits
   );
 
   const overall = Math.round(
