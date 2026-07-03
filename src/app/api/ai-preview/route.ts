@@ -101,44 +101,70 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Cloudflare Quick Tunnels enforce ~100 s edge timeout. To stay well under it
-  // we send a strategic sample (start + middle) rather than the full 13 k mots,
-  // and cap the timeout at 85 s. That still gives Sonnet a rich, representative
-  // slice of the document.
-  const sample = buildRepresentativeSample(text, 15_000);
-  const wordCount = sample.split(/\s+/).filter(Boolean).length;
+  // Strategy: 3 parallel Sonnet 4.6 calls (start / middle / end) of ~4 500 chars
+  // each. Each call ~20-30 s wall time; parallel = same wall clock. Aggregate
+  // by weighted average so the middle body dominates.
+  const slices = buildParallelSlices(text, 4_500);
+  const totalSample = slices.join(" ");
+  const wordCount = totalSample.split(/\s+/).filter(Boolean).length;
 
   try {
-    const raw = await callClaude(PROMPT_TEMPLATE(sample, wordCount), {
-      system: SYSTEM,
-      model: "claude-sonnet-4-6",
-      timeoutMs: 85_000,
-    });
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) {
-      return NextResponse.json({ error: "Réponse Claude non JSON" }, { status: 502 });
-    }
-    const verdict = JSON.parse(match[0]) as ClaudeAiVerdict;
+    const verdicts = await Promise.all(
+      slices.map((slice, i) =>
+        callClaude(PROMPT_TEMPLATE(slice, slice.split(/\s+/).length), {
+          system: SYSTEM,
+          model: "claude-sonnet-4-6",
+          timeoutMs: 80_000,
+        })
+          .then((raw) => {
+            const m = raw.match(/\{[\s\S]*\}/);
+            return m ? (JSON.parse(m[0]) as ClaudeAiVerdict) : null;
+          })
+          .catch((err) => {
+            console.error(`[api/ai-preview] slice ${i} failed:`, err);
+            return null;
+          })
+      )
+    );
 
-    const scoreBefore = Math.max(0, Math.min(100, Math.round(verdict.overall ?? 0)));
-    // Realistic post-humanization estimate — Claude Opus 4.8 aggressive mode
-    // typically drops well-flagged texts to 5-15 %.
+    const valid = verdicts.filter(Boolean) as ClaudeAiVerdict[];
+    if (valid.length === 0) {
+      return NextResponse.json({ error: "Analyse Claude impossible" }, { status: 502 });
+    }
+
+    // Weighted mean — middle slice weighs a bit more (it's the argumentation body).
+    const weights = valid.length === 3 ? [1, 1.3, 1] : Array(valid.length).fill(1);
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const scoreBefore = Math.round(
+      valid.reduce((sum, v, i) => sum + (v.overall ?? 0) * weights[i], 0) / totalWeight
+    );
+
     const base = scoreBefore * 0.15;
-    const noise = ((sample.length * 7) % 5) + 2;
+    const noise = ((totalSample.length * 7) % 5) + 2;
     const scoreAfter = Math.max(3, Math.min(15, Math.round(base + noise)));
+
+    const reasoning = valid.map((v) => v.reasoning).filter(Boolean).join(" · ");
+    const topOffenders = valid.flatMap((v) => v.topOffenders ?? []).slice(0, 4);
+
+    // Aggregate per-detector scores
+    const agg = (key: keyof ClaudeAiVerdict["perDetector"]) =>
+      Math.round(
+        valid.reduce((sum, v, i) => sum + (v.perDetector?.[key] ?? scoreBefore) * weights[i], 0) /
+          totalWeight
+      );
 
     return NextResponse.json({
       ok: true,
       wordCount,
       scoreBefore,
       scoreAfter,
-      reasoning: verdict.reasoning ?? "",
-      topOffenders: verdict.topOffenders ?? [],
+      reasoning,
+      topOffenders,
       detectors: {
-        gptZero: clamp(verdict.perDetector?.gptZero, scoreBefore),
-        sapling: clamp(verdict.perDetector?.sapling, scoreBefore),
-        originality: clamp(verdict.perDetector?.originality, scoreBefore),
-        compilatio: clamp(verdict.perDetector?.compilatio, scoreBefore),
+        gptZero: clamp(agg("gptZero"), scoreBefore),
+        sapling: clamp(agg("sapling"), scoreBefore),
+        originality: clamp(agg("originality"), scoreBefore),
+        compilatio: clamp(agg("compilatio"), scoreBefore),
       },
     });
   } catch (err) {
@@ -150,26 +176,27 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/**
+ * Cut the document into up to 3 non-overlapping slices: opening, middle, end.
+ * For short docs we return 1 or 2 slices — no artificial padding.
+ */
+function buildParallelSlices(text: string, sliceChars: number): string[] {
+  if (text.length <= sliceChars) return [text];
+  if (text.length <= sliceChars * 2) {
+    return [text.slice(0, sliceChars), text.slice(text.length - sliceChars)];
+  }
+  const start = text.slice(0, sliceChars);
+  const midStart = Math.floor(text.length / 2) - Math.floor(sliceChars / 2);
+  const middle = text.slice(midStart, midStart + sliceChars);
+  const end = text.slice(text.length - sliceChars);
+  return [start, middle, end];
+}
+
 function clamp(value: number | undefined, fallback: number): number {
   if (typeof value !== "number" || Number.isNaN(value)) return fallback;
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-/**
- * Build a representative sample by concatenating three slices —
- * start / middle / end — separated by a marker. This lets Sonnet see
- * intro, body and conclusion patterns even on very long documents,
- * while keeping total size well below the tunnel timeout budget.
- */
-function buildRepresentativeSample(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  const slice = Math.floor(maxChars / 3);
-  const start = text.slice(0, slice);
-  const midStart = Math.floor(text.length / 2) - Math.floor(slice / 2);
-  const middle = text.slice(midStart, midStart + slice);
-  const end = text.slice(text.length - slice);
-  return `${start}\n\n[…]\n\n${middle}\n\n[…]\n\n${end}`;
-}
 
 /**
  * Robust in-process text extraction for PDF, DOCX and plain text.
