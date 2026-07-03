@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { callClaude } from "@/lib/claude-client";
 import { briefForClaude, CvSectorKey } from "@/lib/cv-criteria";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 /**
  * POST /api/cv-build/polish
  *

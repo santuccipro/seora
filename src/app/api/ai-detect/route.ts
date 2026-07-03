@@ -6,6 +6,9 @@ import { rateLimit } from "@/lib/rate-limit";
 import { Language, detectAI } from "@/lib/humanize-engine";
 import { emulateCompilatio, COMPILATIO_PATTERNS } from "@/lib/compilatio-emulator";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 const TOKEN_COST = 1;
 const MAX_CHARS = 10000;
 

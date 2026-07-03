@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { analyzeCoverLetterDeep } from "@/lib/cover-letter-deep-analysis";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 /**
  * POST /api/cover-letter/report
  *

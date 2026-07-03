@@ -6,6 +6,9 @@ import { generateCoverLetter } from "@/lib/analyze-cv";
 import { researchCompany } from "@/lib/scrape-company";
 import { rateLimit } from "@/lib/rate-limit";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

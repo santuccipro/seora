@@ -6,6 +6,9 @@ import { rateLimit } from "@/lib/rate-limit";
 import { analyzeCVDeep } from "@/lib/cv-deep-analysis";
 import { CvSectorKey } from "@/lib/cv-criteria";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 /**
  * POST /api/cv-report
  *

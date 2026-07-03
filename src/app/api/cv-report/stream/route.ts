@@ -6,6 +6,9 @@ import { rateLimit } from "@/lib/rate-limit";
 import { callClaude, type ClaudeModel } from "@/lib/claude-client";
 import { briefForClaude, CV_SECTOR_CRITERIA, CvSectorKey } from "@/lib/cv-criteria";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 /**
  * SSE variant of /api/cv-report.
  *

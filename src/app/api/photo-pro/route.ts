@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { v2 as cloudinary } from "cloudinary";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 const TOKEN_COST = 1;
 
 cloudinary.config({

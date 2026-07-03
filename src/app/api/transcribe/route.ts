@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { callClaude } from "@/lib/claude-client";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 const ELEVEN_STT_URL = "https://api.elevenlabs.io/v1/speech-to-text";
 const ELEVEN_MODEL = "scribe_v1";
 

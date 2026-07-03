@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { structureCV } from "@/lib/analyze-cv";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 /**
  * GET /api/cv-build/prefill?cvAnalysisId=...
  *

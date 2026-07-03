@@ -10,6 +10,9 @@ import {
   Language,
 } from "@/lib/humanize-engine";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 const TOKEN_COST: Record<HumanizeMode, number> = {
   basic: 2,
   balanced: 3,

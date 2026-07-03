@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { CV_SECTOR_CRITERIA, CvSectorKey, CvTemplateKey } from "@/lib/cv-criteria";
 import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, rgb, RGB } from "pdf-lib";
 
+export const runtime = "nodejs";
+export const maxDuration = 300;
+
 interface Experience {
   id: string;
   title: string;
