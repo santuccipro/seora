@@ -122,6 +122,44 @@ export default function HumanizerPage() {
   const [showReport, setShowReport] = useState(false);
   const [showFullText, setShowFullText] = useState<"before" | "after" | null>(null);
 
+  // Deep Claude sentence-by-sentence report (post-humanization proof)
+  const [claudeReport, setClaudeReport] = useState<{
+    overall: {
+      overall: number;
+      gptZeroLike: number; saplingLike: number; originalityLike: number; compilatioLike: number;
+      perplexity: number; burstiness: number; homoglyphs: number;
+      connectors: number; formality: number; parallelism: number;
+    };
+    paragraphs: Array<{ index: number; text: string; score: number; risk: "high" | "medium" | "low"; reason?: string }>;
+    topRiskZones?: string[];
+    summary?: string;
+  } | null>(null);
+  const [loadingClaudeReport, setLoadingClaudeReport] = useState(false);
+  const [showClaudeReport, setShowClaudeReport] = useState(false);
+
+  const runClaudeReport = async () => {
+    if (!result?.humanizedText) return;
+    setLoadingClaudeReport(true);
+    try {
+      const res = await fetch("/api/ai-detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: result.humanizedText, language }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Analyse Claude impossible");
+        return;
+      }
+      setClaudeReport(data);
+      setShowClaudeReport(true);
+    } catch {
+      toast.error("Erreur réseau");
+    } finally {
+      setLoadingClaudeReport(false);
+    }
+  };
+
   // Config
   const [mode, setMode] = useState<Mode>("balanced");
   const [language, setLanguage] = useState<Language>("fr");
@@ -722,7 +760,7 @@ export default function HumanizerPage() {
               )}
             </div>
 
-            {/* Voir le rapport complet */}
+            {/* Voir le rapport complet (heuristique — gratuit) */}
             <button
               onClick={() => setShowReport(true)}
               className="w-full rounded-3xl bg-gradient-to-r from-orange-500 to-amber-600 p-6 sm:p-7 text-white shadow-xl hover:shadow-2xl transition-shadow flex items-center gap-4 text-left"
@@ -739,6 +777,49 @@ export default function HumanizerPage() {
               </div>
               <ArrowRight className="h-5 w-5 shrink-0" />
             </button>
+
+            {/* Analyse fine phrase-par-phrase par Claude (payante) */}
+            {claudeReport ? (
+              <button
+                onClick={() => setShowClaudeReport(true)}
+                className="w-full rounded-3xl bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white p-6 shadow-2xl border border-white/10 hover:scale-[1.005] active:scale-[0.995] transition-transform flex items-center gap-4 text-left"
+              >
+                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shrink-0">
+                  <FileSearch className="h-7 w-7" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Rapport Claude · phrase par phrase</p>
+                  <h2 className="text-lg sm:text-xl font-extrabold">Preuve détaillée par Claude Sonnet</h2>
+                  <p className="text-xs opacity-90 mt-0.5">
+                    {claudeReport.paragraphs.length} segments analysés · surlignage inline par phrase · zones à risque top 5
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 shrink-0" />
+              </button>
+            ) : (
+              <button
+                onClick={runClaudeReport}
+                disabled={loadingClaudeReport}
+                className="w-full rounded-3xl bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white p-6 shadow-2xl border border-white/10 hover:scale-[1.005] active:scale-[0.995] transition-transform disabled:opacity-60 flex items-center gap-4 text-left"
+              >
+                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shrink-0">
+                  {loadingClaudeReport ? <Loader2 className="h-7 w-7 animate-spin" /> : <FileSearch className="h-7 w-7" />}
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Preuve par Claude</p>
+                  <h2 className="text-lg sm:text-xl font-extrabold">Analyse fine phrase-par-phrase</h2>
+                  <p className="text-xs opacity-90 mt-0.5">
+                    {loadingClaudeReport
+                      ? "Claude Sonnet analyse chaque phrase de ton texte humanisé…"
+                      : "Claude Sonnet passe ton texte au peigne fin — chaque phrase notée + zones à risque restantes"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold">1 token</span>
+                  <ArrowRight className="h-5 w-5" />
+                </div>
+              </button>
+            )}
 
             {/* Actions */}
             <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
@@ -1100,6 +1181,33 @@ export default function HumanizerPage() {
           } : undefined}
           summary={`Score IA passé de ${result.aiScoreBefore ?? 0}% à ${result.aiScoreAfter ?? 0}% en ${result.passesApplied ?? 0} passes. ${(result.aiScoreAfter ?? 100) <= 15 ? "Le texte passe désormais les détecteurs." : "Certaines zones restent à humaniser."}`}
           onClose={() => setShowReport(false)}
+        />
+      )}
+
+      {/* Claude sentence-by-sentence report overlay */}
+      {showClaudeReport && claudeReport && result && (
+        <AiReport
+          fileName={`${result.fileName} · analyse Claude`}
+          overallScore={claudeReport.overall.overall}
+          wordCount={result.wordCount ?? 0}
+          paragraphs={claudeReport.paragraphs}
+          detectorScores={{
+            gptZeroLike: claudeReport.overall.gptZeroLike,
+            saplingLike: claudeReport.overall.saplingLike,
+            originalityLike: claudeReport.overall.originalityLike,
+            compilatioLike: claudeReport.overall.compilatioLike,
+          }}
+          dimensionScores={{
+            perplexity: claudeReport.overall.perplexity,
+            burstiness: claudeReport.overall.burstiness,
+            homoglyphs: claudeReport.overall.homoglyphs,
+            connectors: claudeReport.overall.connectors,
+            formality: claudeReport.overall.formality,
+            parallelism: claudeReport.overall.parallelism,
+          }}
+          summary={claudeReport.summary}
+          topRiskZones={claudeReport.topRiskZones}
+          onClose={() => setShowClaudeReport(false)}
         />
       )}
     </div>
