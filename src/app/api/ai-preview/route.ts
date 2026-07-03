@@ -106,56 +106,13 @@ async function extractTextInline(
   }
 
   if (type === "application/pdf" || ext === "pdf") {
-    return extractPdfViaSubprocess(buffer);
+    // `unpdf` bundles a serverless-friendly build of pdfjs (no DOMMatrix, no
+    // subprocess, no filesystem). Works in Vercel Node runtime.
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const doc = await getDocumentProxy(new Uint8Array(buffer));
+    const { text } = await extractText(doc, { mergePages: true });
+    return Array.isArray(text) ? text.join("\n") : (text as string);
   }
 
   throw new Error(`Format non supporté : ${ext || fileType}`);
-}
-
-/**
- * pdf-parse 2.x reaches into pdfjs-dist which needs `DOMMatrix`, absent in
- * Node < 20. Spawning a child node process picks up the pdfjs polyfill path
- * that pdf-parse ships with — same trick used by /api/analyze.
- */
-async function extractPdfViaSubprocess(buffer: Buffer): Promise<string> {
-  const { writeFileSync, unlinkSync, readFileSync } = await import("fs");
-  const { execSync } = await import("child_process");
-  const { join } = await import("path");
-  const { tmpdir } = await import("os");
-  const tmpPdf = join(tmpdir(), `seora_prev_${Date.now()}_${Math.floor(Math.random() * 1e6)}.pdf`);
-  const tmpOut = join(tmpdir(), `seora_prev_${Date.now()}_${Math.floor(Math.random() * 1e6)}.txt`);
-  writeFileSync(tmpPdf, buffer);
-  try {
-    execSync(
-      `node -e "
-        (async () => {
-          const fs = require('fs');
-          const mod = require('pdf-parse');
-          const buf = fs.readFileSync('${tmpPdf}');
-          try {
-            if (typeof (mod.default || mod) === 'function') {
-              const data = await (mod.default || mod)(buf);
-              fs.writeFileSync('${tmpOut}', data.text || '');
-              return;
-            }
-            if (mod.PDFParse) {
-              const p = new mod.PDFParse(new Uint8Array(buf));
-              const r = await p.getText();
-              const text = (r.pages || []).map(pg => pg.text).join('\\n');
-              fs.writeFileSync('${tmpOut}', text);
-              return;
-            }
-            fs.writeFileSync('${tmpOut}', '');
-          } catch (e) {
-            fs.writeFileSync('${tmpOut}', '');
-          }
-        })();
-      "`,
-      { cwd: process.cwd(), timeout: 30_000 }
-    );
-    return readFileSync(tmpOut, "utf-8");
-  } finally {
-    try { unlinkSync(tmpPdf); } catch {}
-    try { unlinkSync(tmpOut); } catch {}
-  }
 }
