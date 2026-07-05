@@ -30,7 +30,7 @@ import {
 const NAV = [
   { key: "dashboard", href: "/app", label: "Dashboard", icon: LayoutDashboard, group: "home" },
   { key: "ai-detector", href: "/ai-detector", label: "Détection IA texte", icon: Search, cost: "1 token", group: "features" },
-  { key: "humanizer", href: "/humanizer", label: "Analyse doc / DPP", icon: Bot, cost: "3 tokens", group: "features" },
+  { key: "humanizer", href: "/humanizer", label: "Analyse doc / DPP", icon: Bot, cost: "1 token", group: "features" },
   { key: "cv-analyze", href: "/app?tab=analyze", label: "Analyser mon CV", icon: BarChart3, cost: "1 token", group: "cv" },
   { key: "cv-builder", href: "/cv-builder", label: "Créer mon CV", icon: Plus, cost: "gratuit", group: "cv" },
   { key: "photo-pro", href: "/photo-pro", label: "Photo pro IA", icon: Camera, cost: "1 token", group: "features" },

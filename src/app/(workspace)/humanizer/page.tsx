@@ -68,6 +68,25 @@ type Analysis = {
   diff?: Array<{ before: string; after: string; changed: boolean; similarity: number }>;
 };
 
+type ParagraphScore = {
+  index: number;
+  text: string;
+  score: number;
+  risk: "high" | "medium" | "low";
+  details?: Record<string, number>;
+};
+
+type AnalyzeOnlyResult = {
+  id: string;
+  fileName: string;
+  wordCount: number;
+  heuristicScore: number;
+  claudeScore: number;
+  claudeReasoning: string;
+  topOffenders: string[];
+  paragraphs: ParagraphScore[];
+};
+
 const PHASE_LABELS: Record<string, string> = {
   extracting: "Extraction du texte du document",
   "detecting-before": "Scan initial du score IA (4 détecteurs)",
@@ -126,6 +145,8 @@ export default function HumanizerPage() {
   const [dragOver, setDragOver] = useState(false);
   const [uploaded, setUploaded] = useState<{ name: string; file: File } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeOnlyResult, setAnalyzeOnlyResult] = useState<AnalyzeOnlyResult | null>(null);
+  const [analyzingOnly, setAnalyzingOnly] = useState(false);
   const [stuckAnalyses, setStuckAnalyses] = useState<Array<{ id: string; fileName: string; tokensUsed: number; createdAt: string }>>([]);
 
   const refreshStuck = useCallback(async () => {
@@ -285,6 +306,31 @@ export default function HumanizerPage() {
     setUploaded({ name: file.name, file });
     setResult(null);
   }, []);
+
+  const startAnalyzeOnly = useCallback(async () => {
+    if (!uploaded) return;
+    setAnalyzingOnly(true);
+    setAnalyzeOnlyResult(null);
+    setResult(null);
+
+    const fd = new FormData();
+    fd.append("file", uploaded.file);
+    fd.append("language", language);
+
+    try {
+      const res = await fetch("/api/humanize/analyze", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setAnalyzeOnlyResult(data as AnalyzeOnlyResult);
+      toast.success(`Analyse terminée — score IA ${data.claudeScore}%`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de l'analyse");
+    } finally {
+      setAnalyzingOnly(false);
+    }
+  }, [uploaded, language]);
 
   const startAnalysis = useCallback(async () => {
     if (!uploaded) return;
@@ -476,6 +522,8 @@ export default function HumanizerPage() {
     setUploaded(null);
     setResult(null);
     setAnalyzing(false);
+    setAnalyzeOnlyResult(null);
+    setAnalyzingOnly(false);
     setPhase("extracting");
     setPass(0);
     setPreservationList([]);
@@ -588,7 +636,7 @@ export default function HumanizerPage() {
             Analyse mon mémoire / DPP
           </h1>
           <p className="text-gray-600 max-w-lg mx-auto">
-            Compilatio-emulator (5 perspectives Claude Opus 4.8) + humanisation Claude jusqu&apos;à &lt; 15 % IA détectée.
+            Score IA global + zones à risque paragraphe par paragraphe. Humanisation en 1 clic si besoin.
           </p>
         </div>
 
@@ -1024,8 +1072,205 @@ export default function HumanizerPage() {
           </div>
         )}
 
+        {/* Loader analyse-only (avant réécriture) */}
+        {analyzingOnly && (
+          <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-8 mb-6">
+            <div className="flex flex-col items-center">
+              <div className="relative mb-6">
+                <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg">
+                  <FileSearch className="h-9 w-9 text-white" />
+                </div>
+                <div
+                  className="absolute -inset-3 rounded-3xl border-2 border-orange-300/40 animate-spin"
+                  style={{ borderStyle: "dashed", animationDuration: "3s" }}
+                />
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                <p className="text-sm font-semibold text-gray-800">
+                  Analyse en cours — extraction + score IA
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 max-w-md text-center mt-2">
+                Aucune réécriture — juste la mesure du score IA global et le repérage des zones à risque paragraphe par paragraphe.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Résultat de l'analyse-only (avant humanisation) */}
+        {!analyzingOnly && !analyzing && !result && analyzeOnlyResult && (
+          <div className="space-y-5 mb-6">
+            {/* Score global */}
+            <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Résultat de l&apos;analyse</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {analyzeOnlyResult.fileName} · {analyzeOnlyResult.wordCount} mots
+                  </p>
+                </div>
+                <span className="text-[10px] uppercase tracking-widest font-bold text-orange-600 bg-orange-50 rounded-full px-3 py-1">
+                  Aucune réécriture
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                <div className="text-center">
+                  <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
+                    Score IA (Claude Sonnet)
+                  </p>
+                  <ScoreRing value={analyzeOnlyResult.claudeScore} kind="before" />
+                  <p className="mt-3 text-sm font-medium text-gray-600">
+                    Estimation Compilatio-grade
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
+                    Score heuristique
+                  </p>
+                  <ScoreRing value={analyzeOnlyResult.heuristicScore} kind="before" />
+                  <p className="mt-3 text-sm font-medium text-gray-600">
+                    Patterns + statistiques
+                  </p>
+                </div>
+              </div>
+
+              {analyzeOnlyResult.claudeReasoning && (
+                <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-purple-800 font-black mb-1">
+                    Diagnostic Claude
+                  </p>
+                  <p className="text-xs text-purple-900/80 italic leading-relaxed">
+                    « {analyzeOnlyResult.claudeReasoning} »
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Top patterns détectés */}
+            {analyzeOnlyResult.topOffenders && analyzeOnlyResult.topOffenders.length > 0 && (
+              <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
+                <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-red-500" />
+                  Passages les plus flaggués
+                </h3>
+                <div className="space-y-2">
+                  {analyzeOnlyResult.topOffenders.slice(0, 5).map((snippet, i) => (
+                    <div key={i} className="rounded-xl bg-red-50/60 border border-red-100 p-3">
+                      <p className="text-xs text-gray-800 italic leading-relaxed">« {snippet} »</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Zones par paragraphe */}
+            {analyzeOnlyResult.paragraphs && analyzeOnlyResult.paragraphs.length > 0 && (
+              <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-orange-500" />
+                    Zones à risque paragraphe par paragraphe
+                  </h3>
+                  <div className="flex items-center gap-3 text-[10px] font-semibold">
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Faible</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Moyen</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Élevé</span>
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                  {analyzeOnlyResult.paragraphs.map((p) => {
+                    const bg = p.risk === "high" ? "bg-red-50/60 border-red-200" :
+                               p.risk === "medium" ? "bg-amber-50/60 border-amber-200" :
+                               "bg-emerald-50/40 border-emerald-100";
+                    const dot = p.risk === "high" ? "bg-red-500" :
+                                p.risk === "medium" ? "bg-amber-500" :
+                                "bg-emerald-500";
+                    return (
+                      <div key={p.index} className={`rounded-xl border p-3 ${bg}`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2 w-2 rounded-full ${dot}`} />
+                            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+                              Paragraphe {p.index + 1}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-600">
+                            {p.score}% IA
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-800 leading-relaxed">{p.text}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* CTA Humaniser */}
+            <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Étape suivante — optionnelle</p>
+                  <h3 className="text-lg sm:text-xl font-extrabold">Humaniser ce document ?</h3>
+                  <p className="text-xs opacity-90 mt-1 leading-relaxed">
+                    Claude Opus 4.8 va réécrire les passages à risque pour faire chuter le score IA sous 15 %. Choisis une intensité — le coût s&apos;ajoute au token déjà utilisé pour l&apos;analyse.
+                  </p>
+                </div>
+              </div>
+
+              {/* Mode picker inline */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {(Object.keys(MODE_META) as Mode[]).map((m) => {
+                  const meta = MODE_META[m];
+                  const Icon = meta.icon;
+                  const active = mode === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setMode(m)}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                        active
+                          ? "bg-white text-orange-700 shadow-sm"
+                          : "bg-white/15 text-white hover:bg-white/25"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {meta.label}
+                      <span className={`rounded-full px-1.5 text-[9px] font-bold ${active ? "bg-orange-100 text-orange-700" : "bg-white/25"}`}>
+                        {meta.tokens}t
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={startAnalysis}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-white text-orange-700 px-5 py-3.5 text-sm font-black shadow-lg hover:shadow-xl transition-all"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Humaniser en {MODE_META[mode].label} ({MODE_META[mode].tokens} tokens)
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={resetAll}
+                  className="rounded-2xl bg-white/15 px-5 py-3.5 text-sm font-semibold hover:bg-white/25 transition-all"
+                >
+                  Analyser un autre doc
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Upload + config */}
-        {!analyzing && !result && (
+        {!analyzingOnly && !analyzing && !result && !analyzeOnlyResult && (
           <>
             {/* Big drop zone at the top */}
             <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8 mb-4">
@@ -1091,61 +1336,38 @@ export default function HumanizerPage() {
               )}
             </div>
 
-            {/* Compact horizontal mode bandeau */}
+            {/* Réglages avancés (langue, préservation) — l'intensité d'humanisation
+                se choisit après l'analyse, dans la CTA "Humaniser". */}
             <div className="rounded-2xl bg-white shadow-sm border border-orange-100 p-3 sm:p-4 mb-4">
-              <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black">
-                  Intensité d&apos;humanisation
-                </p>
-                <button
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="text-[10px] font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1"
-                >
-                  <Settings2 className="h-3 w-3" />
-                  {showAdvanced ? "Cacher" : "Avancé"}
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(MODE_META) as Mode[]).map((m) => {
-                  const meta = MODE_META[m];
-                  const Icon = meta.icon;
-                  const active = mode === m;
-                  return (
-                    <button
-                      key={m}
-                      onClick={() => setMode(m)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                        active
-                          ? "border-orange-500 bg-orange-500 text-white shadow-sm"
-                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                      }`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {meta.label}
-                      <span className={`rounded-full px-1.5 text-[9px] font-bold ${active ? "bg-white/25" : "bg-orange-100 text-orange-700"}`}>
-                        {meta.tokens}t
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-[10px] text-gray-400 mt-2">
-                Quelle que soit l&apos;intensité, Claude va analyser CHAQUE aspect (structure, ton, patterns) et humaniser en profondeur.
-              </p>
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="w-full flex items-center justify-between text-[10px] uppercase tracking-widest text-gray-500 font-black"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Settings2 className="h-3 w-3 text-orange-600" />
+                  Réglages avancés (langue, zones à préserver)
+                </span>
+                <span className="text-orange-600 font-semibold">
+                  {showAdvanced ? "Cacher" : "Afficher"}
+                </span>
+              </button>
             </div>
 
-            {/* Big single-CTA */}
+            {/* Big single-CTA — étape 1 : analyse seule (1 token) */}
             <button
-              onClick={startAnalysis}
+              onClick={startAnalyzeOnly}
               disabled={!uploaded}
               className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed mb-4"
             >
-              <Sparkles className="h-4 w-4" />
+              <FileSearch className="h-4 w-4" />
               {uploaded
-                ? `Analyser + Humaniser (${MODE_META[mode].tokens} tokens)`
+                ? "Analyser mon document (1 token)"
                 : "Dépose un document pour commencer"}
               <ArrowRight className="h-4 w-4" />
             </button>
+            <p className="text-[11px] text-gray-500 text-center -mt-2 mb-4">
+              L&apos;analyse ne réécrit rien. Tu verras ton score IA + les zones à risque, puis tu décideras si tu veux humaniser.
+            </p>
 
             {/* Advanced settings */}
             <div className={showAdvanced ? "rounded-3xl bg-white shadow-sm border border-orange-100 p-6 mb-4" : "hidden"}>
