@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { Fragment, useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -1558,14 +1558,7 @@ export default function HumanizerPage() {
 function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
   const paragraphs = result.paragraphs ?? [];
   const flagged = paragraphs.filter((p) => p.risk === "high" || p.risk === "medium");
-  const highCount = paragraphs.filter((p) => p.risk === "high").length;
-  const mediumCount = paragraphs.filter((p) => p.risk === "medium").length;
   const [currentIdx, setCurrentIdx] = useState(0);
-
-  const scoreColor =
-    result.claudeScore >= 50 ? "text-red-500" :
-    result.claudeScore >= 30 ? "text-amber-500" :
-    "text-emerald-500";
 
   const goto = (idx: number) => {
     if (flagged.length === 0) return;
@@ -1576,12 +1569,9 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const excerpt = (text: string, max = 90) =>
-    text.length > max ? text.slice(0, max).trim() + "…" : text;
-
   return (
     <div className="rounded-3xl bg-white shadow-xl border border-orange-100 overflow-hidden">
-      {/* Header — fichier + badge "Aucune réécriture" */}
+      {/* Header orange — filename */}
       <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-5 sm:px-6 py-4 text-white flex items-center gap-3">
         <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
           <FileText className="h-4 w-4" />
@@ -1589,218 +1579,220 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold truncate">{result.fileName}</p>
           <p className="text-[10px] opacity-80">
-            {result.wordCount.toLocaleString("fr-FR")} mots · {paragraphs.length} zones analysées · {flagged.length} à risque
+            {result.wordCount.toLocaleString("fr-FR")} mots · {paragraphs.length} zones analysées · {flagged.length} à risque IA
           </p>
         </div>
         <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-black bg-white/15 rounded-full px-3 py-1">
-          Aucune réécriture
+          Détection IA
         </span>
       </div>
 
-      {/* Score bar — % global + résumé chips */}
-      <div className="px-5 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Cpu className="h-4 w-4 text-gray-400" />
-          <span className="text-[11px] uppercase tracking-widest text-gray-500 font-black">
-            Score IA global
-          </span>
+      {/* Score + timeline bâtonnets */}
+      <div className="px-5 sm:px-6 py-6 bg-gray-50/50 border-b border-gray-100">
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-2 shrink-0">
+            <Cpu className="h-4 w-4 text-cyan-600" />
+            <span className="text-[11px] uppercase tracking-widest text-gray-500 font-black hidden sm:inline">
+              Détection IA
+            </span>
+          </div>
+          <TimelineBars
+            paragraphs={paragraphs}
+            flagged={flagged}
+            currentIdx={currentIdx}
+            onSelect={goto}
+          />
+          <div className="text-4xl font-black text-cyan-500 shrink-0 tabular-nums">
+            {result.claudeScore}<span className="text-base opacity-70">%</span>
+          </div>
         </div>
-        <div className={`text-3xl font-black ${scoreColor}`}>
-          {result.claudeScore}<span className="text-base opacity-70">%</span>
-        </div>
-        <div className="flex-1" />
-        {highCount > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-[11px] font-bold text-red-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-            {highCount} élevé{highCount > 1 ? "es" : "e"}
-          </span>
-        )}
-        {mediumCount > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            {mediumCount} moyen{mediumCount > 1 ? "nes" : "ne"}
-          </span>
+
+        {/* Nav */}
+        {flagged.length > 0 && (
+          <div className="flex items-center justify-between mt-5 text-xs">
+            <button
+              onClick={() => goto(0)}
+              className="font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              « Début du document
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => goto(currentIdx - 1)}
+                disabled={currentIdx === 0}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronUp className="h-4 w-4 text-gray-600" />
+              </button>
+              <span className="font-bold text-gray-700 tabular-nums min-w-[3.5rem] text-center">
+                {currentIdx + 1} / {flagged.length}
+              </span>
+              <button
+                onClick={() => goto(currentIdx + 1)}
+                disabled={currentIdx === flagged.length - 1}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronDown className="h-4 w-4 text-gray-600" />
+              </button>
+            </div>
+            <button
+              onClick={() => goto(flagged.length - 1)}
+              className="font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              Fin du document »
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Split view — sidebar (zones) + reader */}
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
-        {/* Sidebar — liste des zones à risque cliquables */}
-        <div className="max-h-[300px] lg:max-h-[640px] overflow-y-auto bg-gray-50/40">
-          <div className="sticky top-0 z-10 bg-gray-100/80 backdrop-blur px-4 py-3 border-b border-gray-200">
-            <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black">
-              Zones à risque ({flagged.length})
-            </p>
-            <p className="text-[10px] text-gray-500 mt-0.5">Clique pour aller au passage</p>
-          </div>
-          {flagged.length === 0 ? (
-            <div className="px-4 py-6 text-center">
-              <div className="mx-auto h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              </div>
-              <p className="text-xs text-gray-600">Aucune zone à risque détectée</p>
-            </div>
-          ) : (
-            <ul>
-              {flagged.map((p, i) => {
-                const isCurrent = i === currentIdx;
-                const dot = p.risk === "high" ? "bg-red-500" : "bg-amber-500";
-                const badgeBg = p.risk === "high" ? "bg-red-500" : "bg-amber-500";
-                return (
-                  <li key={p.index}>
-                    <button
-                      onClick={() => goto(i)}
-                      className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-white transition-colors ${
-                        isCurrent ? "bg-white shadow-sm ring-2 ring-inset ring-orange-400" : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <div className={`h-6 w-6 rounded-md ${badgeBg} flex items-center justify-center text-white text-[10px] font-black shrink-0`}>
-                          {i + 1}
-                        </div>
-                        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                          Zone {p.index + 1}
-                        </span>
-                        <span className="ml-auto text-[10px] font-black text-gray-700 tabular-nums">
-                          {p.score}%
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-gray-700 leading-relaxed line-clamp-3">
-                        « {excerpt(p.text, 120)} »
-                      </p>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+      {/* Analyse globale Claude */}
+      {result.claudeReasoning && (
+        <div className="px-5 sm:px-6 py-4 border-b border-gray-100 bg-gradient-to-br from-purple-50 to-fuchsia-50">
+          <p className="text-[10px] uppercase tracking-widest text-purple-800 font-black mb-2 flex items-center gap-1.5">
+            <Shield className="h-3 w-3" />
+            Analyse globale Claude Sonnet
+          </p>
+          <p className="text-sm text-purple-900/90 leading-relaxed">
+            {result.claudeReasoning}
+          </p>
         </div>
+      )}
 
-        {/* Reader — texte scrollable */}
-        <div className="max-h-[640px] overflow-y-auto bg-white">
-          {flagged.length > 0 && (
-            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-              <button
-                onClick={() => goto(0)}
-                className="text-[11px] font-semibold text-gray-500 hover:text-gray-900"
-              >
-                ↥ Début
-              </button>
-              <div className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1">
-                <button
-                  onClick={() => goto(currentIdx - 1)}
-                  disabled={currentIdx === 0}
-                  className="text-gray-500 hover:text-gray-900 disabled:opacity-30"
-                >
-                  <ChevronUp className="h-3.5 w-3.5" />
-                </button>
-                <span className="text-[11px] font-bold text-gray-700 tabular-nums">
-                  {currentIdx + 1} / {flagged.length}
-                </span>
-                <button
-                  onClick={() => goto(currentIdx + 1)}
-                  disabled={currentIdx === flagged.length - 1}
-                  className="text-gray-500 hover:text-gray-900 disabled:opacity-30"
-                >
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <button
-                onClick={() => goto(flagged.length - 1)}
-                className="text-[11px] font-semibold text-gray-500 hover:text-gray-900"
-              >
-                Fin ↧
-              </button>
-            </div>
-          )}
-          <div className="px-5 py-5 space-y-3">
-            {paragraphs.map((p) => {
-              const flagIdx = flagged.findIndex((f) => f.index === p.index);
-              const isFlagged = flagIdx !== -1;
-              const isCurrent = isFlagged && flagIdx === currentIdx;
+      {/* Reader — flux du texte avec surlignage inline + badges à droite */}
+      <div className="max-h-[720px] overflow-y-auto bg-white">
+        <div className="px-5 sm:px-8 py-6 grid grid-cols-[1fr_60px] gap-x-3 gap-y-1">
+          {paragraphs.map((p) => {
+            const flagIdx = flagged.findIndex((f) => f.index === p.index);
+            const isFlagged = flagIdx !== -1;
+            const isCurrent = isFlagged && flagIdx === currentIdx;
+            const bg = isFlagged
+              ? p.risk === "high"
+                ? "bg-cyan-100"
+                : "bg-cyan-50"
+              : "";
 
-              const bg =
-                p.risk === "high" ? "bg-red-50" :
-                p.risk === "medium" ? "bg-amber-50" :
-                "";
-              const border =
-                p.risk === "high" ? "border-l-red-400" :
-                p.risk === "medium" ? "border-l-amber-400" :
-                "border-l-transparent";
-              const badgeBg = p.risk === "high" ? "bg-red-500" : "bg-amber-500";
-
-              return (
-                <div
-                  key={p.index}
+            return (
+              <Fragment key={p.index}>
+                <p
                   id={`report-para-${p.index}`}
-                  className="flex items-start gap-2 scroll-mt-14"
+                  className={`text-[15px] text-gray-800 leading-[1.85] scroll-mt-6 rounded-md transition-all ${bg} ${
+                    isFlagged ? "px-2 -mx-2" : ""
+                  } ${isCurrent ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-white shadow-sm" : ""}`}
                 >
-                  <div
-                    className={`flex-1 rounded-lg px-4 py-3 border-l-4 transition-all ${
-                      isFlagged ? bg + " " + border : "border-l-transparent"
-                    } ${isCurrent ? "ring-2 ring-orange-400 shadow-md" : ""}`}
-                  >
-                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                      {p.text}
-                    </p>
-                  </div>
+                  {p.text}
+                </p>
+                <div className="flex items-start justify-center pt-1">
                   {isFlagged && (
                     <button
                       onClick={() => goto(flagIdx)}
-                      className="flex flex-col items-center gap-0.5 shrink-0 pt-2 group"
+                      className={`flex flex-col items-center rounded-lg px-2 py-1.5 border-2 bg-white shadow-sm group hover:scale-105 transition-transform ${
+                        isCurrent ? "border-orange-400" : "border-cyan-400"
+                      }`}
                       title={`Zone ${flagIdx + 1} · ${p.score}% IA`}
                     >
-                      <div
-                        className={`h-8 w-8 rounded-lg ${badgeBg} flex items-center justify-center text-white text-[11px] font-black shadow-sm group-hover:scale-105 transition-transform ${
-                          isCurrent ? "ring-2 ring-orange-400 ring-offset-1" : ""
-                        }`}
-                      >
+                      <Cpu className={`h-3.5 w-3.5 ${isCurrent ? "text-orange-500" : "text-cyan-500"}`} />
+                      <div className={`text-[13px] font-black tabular-nums ${isCurrent ? "text-orange-500" : "text-cyan-500"}`}>
                         {flagIdx + 1}
                       </div>
-                      <div className="text-[9px] font-bold text-gray-500 tabular-nums">
+                      <div className="text-[8px] font-bold text-gray-400 tabular-nums leading-none mt-0.5">
                         {p.score}%
                       </div>
                     </button>
                   )}
                 </div>
-              );
-            })}
-          </div>
+              </Fragment>
+            );
+          })}
         </div>
       </div>
 
-      {/* Diagnostic Claude + top offenders en pied de card */}
-      {(result.claudeReasoning || (result.topOffenders && result.topOffenders.length > 0)) && (
-        <div className="border-t border-gray-100 bg-gradient-to-br from-purple-50 to-fuchsia-50 px-5 sm:px-6 py-4">
-          {result.claudeReasoning && (
-            <div className="mb-3">
-              <p className="text-[10px] uppercase tracking-widest text-purple-800 font-black mb-1 flex items-center gap-1.5">
-                <Shield className="h-3 w-3" />
-                Diagnostic Claude Sonnet
-              </p>
-              <p className="text-xs text-purple-900/80 italic leading-relaxed">
-                « {result.claudeReasoning} »
-              </p>
+      {/* Top offenders accordion en pied */}
+      {result.topOffenders && result.topOffenders.length > 0 && (
+        <div className="border-t border-gray-100 bg-gray-50/50 px-5 sm:px-6 py-4">
+          <details className="text-xs">
+            <summary className="cursor-pointer text-[10px] uppercase tracking-widest text-gray-600 font-black hover:text-gray-900 flex items-center gap-1.5">
+              <Flame className="h-3 w-3 text-red-500" />
+              Voir les {Math.min(5, result.topOffenders.length)} extraits les plus flaggués par Claude
+            </summary>
+            <div className="space-y-1.5 mt-3">
+              {result.topOffenders.slice(0, 5).map((snippet, i) => (
+                <p key={i} className="text-xs text-gray-800 italic leading-relaxed pl-3 border-l-2 border-cyan-300">
+                  « {snippet} »
+                </p>
+              ))}
             </div>
-          )}
-          {result.topOffenders && result.topOffenders.length > 0 && (
-            <details className="text-xs">
-              <summary className="cursor-pointer text-[10px] uppercase tracking-widest text-purple-800 font-black hover:text-purple-900 flex items-center gap-1.5">
-                <Flame className="h-3 w-3" />
-                Voir les {Math.min(5, result.topOffenders.length)} extraits les plus flaggués (Claude)
-              </summary>
-              <div className="space-y-1.5 mt-3">
-                {result.topOffenders.slice(0, 5).map((snippet, i) => (
-                  <p key={i} className="text-xs text-gray-800 italic leading-relaxed pl-3 border-l-2 border-red-300">
-                    « {snippet} »
-                  </p>
-                ))}
-              </div>
-            </details>
-          )}
+          </details>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Barre horizontale de bâtonnets — un bâton par zone flaggée, hauteur =
+ * intensité IA, position = index dans le doc. Curseur orange au-dessus
+ * de la zone courante.
+ */
+function TimelineBars({
+  paragraphs,
+  flagged,
+  currentIdx,
+  onSelect,
+}: {
+  paragraphs: ParagraphScore[];
+  flagged: ParagraphScore[];
+  currentIdx: number;
+  onSelect: (i: number) => void;
+}) {
+  if (paragraphs.length === 0) {
+    return <div className="flex-1 h-10 rounded-lg bg-gray-100" />;
+  }
+  const currentAbsIdx = flagged[currentIdx]?.index;
+
+  return (
+    <div className="flex-1 relative h-14 min-w-0">
+      {/* Axe horizontal fin */}
+      <div className="absolute inset-x-0 top-1/2 h-px bg-gray-300" />
+
+      {/* Marker "AI + numéro" au-dessus de la zone courante */}
+      {currentAbsIdx != null && (
+        <div
+          className="absolute -top-1 flex flex-col items-center pointer-events-none z-10 transition-all duration-300"
+          style={{
+            left: `${(currentAbsIdx / Math.max(1, paragraphs.length - 1)) * 100}%`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <div className="h-6 w-6 rounded bg-orange-500 flex items-center justify-center shadow-md">
+            <Cpu className="h-3 w-3 text-white" />
+          </div>
+          <div className="text-[10px] font-black text-orange-500 mt-0.5 tabular-nums">
+            {currentIdx + 1}
+          </div>
+        </div>
+      )}
+
+      {/* Bâtonnets pour chaque zone flaggée */}
+      {flagged.map((p, i) => {
+        const pos = (p.index / Math.max(1, paragraphs.length - 1)) * 100;
+        const heightPct = Math.max(30, Math.min(100, p.score));
+        const isCurrent = i === currentIdx;
+        return (
+          <button
+            key={p.index}
+            onClick={() => onSelect(i)}
+            className={`absolute top-1/2 -translate-y-1/2 rounded-sm transition-all hover:brightness-110 ${
+              isCurrent ? "bg-orange-500 w-1.5 z-10" : p.risk === "high" ? "bg-cyan-500 w-1" : "bg-cyan-300 w-1"
+            }`}
+            style={{
+              left: `${pos}%`,
+              height: `${heightPct * 0.7}%`,
+              minHeight: "18px",
+            }}
+            title={`Zone ${i + 1} · ${p.score}% IA`}
+          />
+        );
+      })}
     </div>
   );
 }
