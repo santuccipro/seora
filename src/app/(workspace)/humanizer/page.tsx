@@ -307,11 +307,16 @@ export default function HumanizerPage() {
     setResult(null);
   }, []);
 
+  const [analyzePhase, setAnalyzePhase] = useState<string>("extracting");
+  const [analyzePhaseDetail, setAnalyzePhaseDetail] = useState<string>("");
+
   const startAnalyzeOnly = useCallback(async () => {
     if (!uploaded) return;
     setAnalyzingOnly(true);
     setAnalyzeOnlyResult(null);
     setResult(null);
+    setAnalyzePhase("extracting");
+    setAnalyzePhaseDetail("");
 
     const fd = new FormData();
     fd.append("file", uploaded.file);
@@ -319,12 +324,51 @@ export default function HumanizerPage() {
 
     try {
       const res = await fetch("/api/humanize/analyze", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
       }
-      setAnalyzeOnlyResult(data as AnalyzeOnlyResult);
-      toast.success(`Analyse terminée — score IA ${data.claudeScore}%`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let done: AnalyzeOnlyResult | null = null;
+      let sawError = false;
+
+      while (true) {
+        const { value, done: streamDone } = await reader.read();
+        if (streamDone) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const ev of events) {
+          if (!ev.trim() || ev.trim().startsWith(":")) continue;
+          const lines = ev.split("\n");
+          const eventLine = lines.find((l) => l.startsWith("event:"));
+          const dataLine = lines.find((l) => l.startsWith("data:"));
+          if (!eventLine || !dataLine) continue;
+          const eventType = eventLine.slice(6).trim();
+          const data = JSON.parse(dataLine.slice(5).trim());
+
+          if (eventType === "progress") {
+            setAnalyzePhase(data.phase);
+            setAnalyzePhaseDetail(data.detail ?? "");
+          } else if (eventType === "done") {
+            done = data as AnalyzeOnlyResult;
+          } else if (eventType === "error") {
+            sawError = true;
+            throw new Error(data.message);
+          }
+        }
+      }
+
+      if (!done && !sawError) {
+        throw new Error("Analyse interrompue avant la fin. Ton token a été remboursé.");
+      }
+      if (done) {
+        setAnalyzeOnlyResult(done);
+        toast.success(`Analyse terminée — score IA ${done.claudeScore}%`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur lors de l'analyse");
     } finally {
@@ -1088,11 +1132,49 @@ export default function HumanizerPage() {
               <div className="flex items-center gap-2 mb-2">
                 <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
                 <p className="text-sm font-semibold text-gray-800">
-                  Analyse en cours — extraction + score IA
+                  {analyzePhase === "extracting" && "Extraction du texte du document…"}
+                  {analyzePhase === "detecting" && "Repérage des zones à risque…"}
+                  {analyzePhase === "scoring" && "Notation Claude Sonnet (3 tranches parallèles)…"}
                 </p>
               </div>
-              <p className="text-xs text-gray-500 max-w-md text-center mt-2">
-                Aucune réécriture — juste la mesure du score IA global et le repérage des zones à risque paragraphe par paragraphe.
+              {analyzePhaseDetail && (
+                <p className="text-xs text-gray-400 italic mb-3 text-center max-w-md">
+                  {analyzePhaseDetail}
+                </p>
+              )}
+              <div className="w-full max-w-md space-y-2 mt-3">
+                {[
+                  { key: "extracting", label: "Extraction du texte" },
+                  { key: "detecting", label: "Score par paragraphe" },
+                  { key: "scoring", label: "Notation Claude Sonnet" },
+                ].map((step, i) => {
+                  const order = ["extracting", "detecting", "scoring"];
+                  const currentIdx = order.indexOf(analyzePhase);
+                  const stepIdx = order.indexOf(step.key);
+                  const active = stepIdx === currentIdx;
+                  const passed = stepIdx < currentIdx;
+                  return (
+                    <div key={step.key} className="flex items-center gap-3">
+                      <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 ${
+                        passed ? "bg-emerald-500" : active ? "bg-orange-500" : "bg-gray-200"
+                      }`}>
+                        {passed ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                        ) : active ? (
+                          <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+                        ) : (
+                          <span className="text-[10px] text-white font-bold">{i + 1}</span>
+                        )}
+                      </div>
+                      <p className={`text-xs ${passed ? "text-gray-500" : active ? "text-gray-900 font-semibold" : "text-gray-400"}`}>
+                        {step.label}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-400 max-w-md text-center mt-5">
+                Aucune réécriture — juste le diagnostic. Ça peut prendre 30-60s sur un gros doc.
               </p>
             </div>
           </div>

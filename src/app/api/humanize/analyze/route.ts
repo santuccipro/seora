@@ -23,21 +23,18 @@ const ANALYZE_TOKEN_COST = 1;
  * (heuristique + Claude Sonnet 4.6) et scoresPar-paragraphe, sans jamais
  * appeler Opus pour réécrire. Coût : 1 token.
  *
+ * Répond en Server-Sent Events pour éviter le timeout browser sur les
+ * documents lourds (les appels Sonnet peuvent prendre 30-60s au total).
+ * Le premier byte part immédiatement, le browser attend le stream final.
+ *
  * FormData:
  *   file       : File           (required)
  *   language   : "fr"|"en"|"es"  (default: "fr")
  *
- * Response JSON:
- *   {
- *     id: string,
- *     fileName: string,
- *     wordCount: number,
- *     heuristicScore: number,
- *     claudeScore: number,
- *     claudeReasoning: string,
- *     topOffenders: string[],
- *     paragraphs: Array<{ index, text, score, risk, details }>,
- *   }
+ * Events SSE:
+ *   event: progress   data: {phase, detail?, analysisId?}
+ *   event: done       data: {id, wordCount, heuristicScore, claudeScore, ...}
+ *   event: error      data: {message}
  */
 export async function POST(req: NextRequest) {
   try {
@@ -94,7 +91,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create analysis row (statut "analyzed" — pas encore humanisé)
     const analysis = await prisma.humanizerAnalysis.create({
       data: {
         userId: user.id,
@@ -106,77 +102,114 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    try {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const originalText = await extractTextFromFile(buffer, file.name, file.type);
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-      if (!originalText || originalText.trim().length < 100) {
-        throw new Error("Le fichier ne contient pas assez de texte à analyser (min. 100 caractères).");
-      }
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        const send = (event: string, data: unknown) => {
+          try {
+            controller.enqueue(
+              encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+            );
+          } catch {
+            // stream already closed
+          }
+        };
 
-      // Score global heuristique (rapide, sub-milliseconde)
-      const heuristic = detectAI(originalText, language);
+        // Heartbeat pour empêcher Vercel/CF de couper la connexion
+        const heartbeat = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(`: ping\n\n`));
+          } catch {
+            clearInterval(heartbeat);
+          }
+        }, 10_000);
 
-      // Score par paragraphe — utilisé pour highlighter les zones à risque
-      const paragraphs = detectByParagraph(originalText, language);
+        try {
+          send("progress", { phase: "extracting", analysisId: analysis.id });
 
-      // Score Claude Sonnet 4.6 (Compilatio-grade) — 3 tranches en parallèle
-      const claude = await claudeScoreText(originalText, language);
+          const originalText = await extractTextFromFile(buffer, file.name, file.type);
+          if (!originalText || originalText.trim().length < 100) {
+            throw new Error("Le fichier ne contient pas assez de texte à analyser (min. 100 caractères).");
+          }
 
-      const wordCount = originalText.trim().split(/\s+/).length;
+          send("progress", { phase: "detecting", detail: `${originalText.split(/\s+/).length} mots extraits` });
+          const heuristic = detectAI(originalText, language);
+          const paragraphs = detectByParagraph(originalText, language);
 
-      const updated = await prisma.humanizerAnalysis.update({
-        where: { id: analysis.id },
-        data: {
-          originalText,
-          aiScoreBefore: heuristic.overall,
-          scoreDetails: JSON.stringify({
-            before: heuristic,
-            claudeScoreBefore: claude.overall,
+          send("progress", { phase: "scoring", detail: "Analyse Claude Sonnet en cours (3 tranches)..." });
+          const claude = await claudeScoreText(originalText, language);
+
+          const wordCount = originalText.trim().split(/\s+/).length;
+
+          await prisma.humanizerAnalysis.update({
+            where: { id: analysis.id },
+            data: {
+              originalText,
+              aiScoreBefore: heuristic.overall,
+              scoreDetails: JSON.stringify({
+                before: heuristic,
+                claudeScoreBefore: claude.overall,
+                claudeReasoning: claude.reasoning,
+                topOffenders: claude.topOffenders,
+                paragraphs,
+                language,
+              }),
+              wordCount,
+              status: "analyzed",
+            },
+          });
+
+          send("done", {
+            id: analysis.id,
+            fileName: file.name,
+            wordCount,
+            heuristicScore: heuristic.overall,
+            claudeScore: claude.overall,
             claudeReasoning: claude.reasoning,
             topOffenders: claude.topOffenders,
             paragraphs,
-            language,
-          }),
-          wordCount,
-          status: "analyzed",
-        },
-      });
+          });
+        } catch (err) {
+          // Rembourse le token en cas d'échec
+          try {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { tokens: { increment: ANALYZE_TOKEN_COST } },
+            });
+            await prisma.humanizerAnalysis.update({
+              where: { id: analysis.id },
+              data: {
+                status: "failed",
+                errorMessage: err instanceof Error ? err.message : "Erreur inconnue",
+              },
+            });
+          } catch {
+            // best-effort
+          }
+          send("error", {
+            message: err instanceof Error ? err.message : "Erreur inconnue",
+          });
+        } finally {
+          clearInterval(heartbeat);
+          try {
+            controller.close();
+          } catch {
+            // already closed
+          }
+        }
+      },
+    });
 
-      return NextResponse.json({
-        id: updated.id,
-        fileName: updated.fileName,
-        wordCount,
-        heuristicScore: heuristic.overall,
-        claudeScore: claude.overall,
-        claudeReasoning: claude.reasoning,
-        topOffenders: claude.topOffenders,
-        paragraphs,
-        status: "analyzed",
-      });
-    } catch (err) {
-      // Rembourse le token en cas d'échec
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { tokens: { increment: ANALYZE_TOKEN_COST } },
-      });
-      await prisma.humanizerAnalysis.update({
-        where: { id: analysis.id },
-        data: {
-          status: "failed",
-          errorMessage: err instanceof Error ? err.message : "Erreur inconnue",
-        },
-      });
-      return NextResponse.json(
-        {
-          error:
-            err instanceof Error
-              ? err.message
-              : "Erreur lors de l'analyse. Ton token a été remboursé.",
-        },
-        { status: 500 }
-      );
-    }
+    return new Response(readable, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+        Connection: "keep-alive",
+      },
+    });
   } catch (err) {
     console.error("[api/humanize/analyze] Fatal:", err);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
