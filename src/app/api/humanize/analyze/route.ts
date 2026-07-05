@@ -11,6 +11,40 @@ import {
   Language,
 } from "@/lib/humanize-engine";
 
+/**
+ * Découpe un texte en chunks de ~150-200 mots découpés proprement à la
+ * fin d'une phrase. Utilisé quand le PDF n'a pas de sauts de paragraphes
+ * naturels — sans ça, tout le texte est vu comme "un seul paragraphe"
+ * et le rapport ne peut pas surligner les zones à risque proprement.
+ */
+function smartChunk(text: string, targetWords = 170): string[] {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return [];
+
+  // Split en phrases (heuristique simple : . ! ? suivis d'un espace + majuscule)
+  const sentences = cleaned
+    .split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const chunks: string[] = [];
+  let buf: string[] = [];
+  let bufWords = 0;
+
+  for (const s of sentences) {
+    const w = s.split(/\s+/).length;
+    if (bufWords + w > targetWords && buf.length > 0) {
+      chunks.push(buf.join(" "));
+      buf = [];
+      bufWords = 0;
+    }
+    buf.push(s);
+    bufWords += w;
+  }
+  if (buf.length > 0) chunks.push(buf.join(" "));
+  return chunks;
+}
+
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -136,7 +170,34 @@ export async function POST(req: NextRequest) {
 
           send("progress", { phase: "detecting", detail: `${originalText.split(/\s+/).length} mots extraits` });
           const heuristic = detectAI(originalText, language);
-          const paragraphs = detectByParagraph(originalText, language);
+
+          // On tente les paragraphes naturels d'abord ; si le PDF a été
+          // extrait sans sauts de ligne (fréquent), on retombe sur un
+          // chunker par phrases pour avoir des zones surlignables.
+          let paragraphs = detectByParagraph(originalText, language);
+          if (paragraphs.length < 6) {
+            const chunks = smartChunk(originalText, 170);
+            paragraphs = chunks.map((text, index) => {
+              const detailed = detectAI(text, language);
+              const score = detailed.overall;
+              const risk: "high" | "medium" | "low" =
+                score >= 60 ? "high" : score >= 30 ? "medium" : "low";
+              return {
+                index,
+                text,
+                score,
+                risk,
+                details: {
+                  perplexity: detailed.perplexity,
+                  burstiness: detailed.burstiness,
+                  homoglyphs: detailed.homoglyphs,
+                  connectors: detailed.connectors,
+                  formality: detailed.formality,
+                  parallelism: detailed.parallelism,
+                },
+              };
+            });
+          }
 
           send("progress", { phase: "scoring", detail: "Analyse Claude Sonnet en cours (3 tranches)..." });
           const claude = await claudeScoreText(originalText, language);

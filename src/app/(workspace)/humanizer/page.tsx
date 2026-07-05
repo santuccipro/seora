@@ -1558,16 +1558,14 @@ export default function HumanizerPage() {
 function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
   const paragraphs = result.paragraphs ?? [];
   const flagged = paragraphs.filter((p) => p.risk === "high" || p.risk === "medium");
+  const highCount = paragraphs.filter((p) => p.risk === "high").length;
+  const mediumCount = paragraphs.filter((p) => p.risk === "medium").length;
   const [currentIdx, setCurrentIdx] = useState(0);
 
   const scoreColor =
     result.claudeScore >= 50 ? "text-red-500" :
     result.claudeScore >= 30 ? "text-amber-500" :
     "text-emerald-500";
-  const trackColor =
-    result.claudeScore >= 50 ? "border-red-500" :
-    result.claudeScore >= 30 ? "border-amber-500" :
-    "border-emerald-500";
 
   const goto = (idx: number) => {
     if (flagged.length === 0) return;
@@ -1577,6 +1575,9 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
     const el = document.getElementById(`report-para-${target.index}`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
+
+  const excerpt = (text: string, max = 90) =>
+    text.length > max ? text.slice(0, max).trim() + "…" : text;
 
   return (
     <div className="rounded-3xl bg-white shadow-xl border border-orange-100 overflow-hidden">
@@ -1588,7 +1589,7 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold truncate">{result.fileName}</p>
           <p className="text-[10px] opacity-80">
-            {result.wordCount.toLocaleString("fr-FR")} mots · {paragraphs.length} paragraphes · {flagged.length} zones à risque
+            {result.wordCount.toLocaleString("fr-FR")} mots · {paragraphs.length} zones analysées · {flagged.length} à risque
           </p>
         </div>
         <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-black bg-white/15 rounded-full px-3 py-1">
@@ -1596,135 +1597,180 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
         </span>
       </div>
 
-      {/* Score strip — timeline zones + % global */}
-      <div className="px-5 sm:px-6 py-5 border-b border-gray-100 bg-gray-50/50">
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="text-[11px] uppercase tracking-widest text-gray-500 font-black whitespace-nowrap flex items-center gap-1.5">
-            <Cpu className="h-3.5 w-3.5 text-gray-400" />
-            <span className="hidden sm:inline">Textes suspects</span>
-            <span className="sm:hidden">Zones</span>
-          </div>
-          <div className="flex-1 h-8 relative bg-gray-200/60 rounded-full overflow-hidden">
-            {paragraphs.map((p, i) => {
-              if (p.risk === "low") return null;
-              const pos = (i / paragraphs.length) * 100;
-              const width = Math.max(0.4, (1 / paragraphs.length) * 100);
-              const color = p.risk === "high" ? "bg-red-500" : "bg-amber-400";
-              return (
-                <button
-                  key={p.index}
-                  onClick={() => {
-                    const flagIdx = flagged.findIndex((f) => f.index === p.index);
-                    if (flagIdx !== -1) goto(flagIdx);
-                  }}
-                  className={`absolute top-0 h-full ${color} hover:opacity-100 opacity-80 transition-opacity cursor-pointer`}
-                  style={{ left: `${pos}%`, width: `${width}%` }}
-                  title={`Paragraphe ${p.index + 1} · ${p.score}% IA`}
-                />
-              );
-            })}
-          </div>
-          <div className={`text-3xl sm:text-4xl font-black ${scoreColor} whitespace-nowrap`}>
-            {result.claudeScore}<span className="text-lg opacity-70">%</span>
-          </div>
+      {/* Score bar — % global + résumé chips */}
+      <div className="px-5 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Cpu className="h-4 w-4 text-gray-400" />
+          <span className="text-[11px] uppercase tracking-widest text-gray-500 font-black">
+            Score IA global
+          </span>
         </div>
-
-        {/* Nav paragraphes flaggués */}
-        {flagged.length > 0 && (
-          <div className="flex items-center justify-between mt-4 gap-3">
-            <button
-              onClick={() => goto(0)}
-              className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
-            >
-              ↥ Début
-            </button>
-            <div className="flex items-center gap-2 rounded-full bg-white border border-gray-200 px-3 py-1 shadow-sm">
-              <button
-                onClick={() => goto(currentIdx - 1)}
-                disabled={currentIdx === 0}
-                className="text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <ChevronUp className="h-3.5 w-3.5" />
-              </button>
-              <span className="text-[11px] font-bold text-gray-700 tabular-nums">
-                {currentIdx + 1} / {flagged.length}
-              </span>
-              <button
-                onClick={() => goto(currentIdx + 1)}
-                disabled={currentIdx === flagged.length - 1}
-                className="text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <button
-              onClick={() => goto(flagged.length - 1)}
-              className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
-            >
-              Fin ↧
-            </button>
-          </div>
+        <div className={`text-3xl font-black ${scoreColor}`}>
+          {result.claudeScore}<span className="text-base opacity-70">%</span>
+        </div>
+        <div className="flex-1" />
+        {highCount > 0 && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-[11px] font-bold text-red-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+            {highCount} élevé{highCount > 1 ? "es" : "e"}
+          </span>
+        )}
+        {mediumCount > 0 && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            {mediumCount} moyen{mediumCount > 1 ? "nes" : "ne"}
+          </span>
         )}
       </div>
 
-      {/* Reader — texte complet avec zones surlignées + badges numérotés */}
-      <div className="max-h-[640px] overflow-y-auto px-4 sm:px-6 py-6 bg-white">
-        <div className="space-y-3">
-          {paragraphs.map((p) => {
-            const flagIdx = flagged.findIndex((f) => f.index === p.index);
-            const isFlagged = flagIdx !== -1;
-            const isCurrent = isFlagged && flagIdx === currentIdx;
-
-            const bg =
-              p.risk === "high" ? "bg-red-50" :
-              p.risk === "medium" ? "bg-amber-50" :
-              "";
-            const border =
-              p.risk === "high" ? "border-l-red-400" :
-              p.risk === "medium" ? "border-l-amber-400" :
-              "border-l-transparent";
-            const badgeBg = p.risk === "high" ? "bg-red-500" : "bg-amber-500";
-
-            return (
-              <div
-                key={p.index}
-                id={`report-para-${p.index}`}
-                className="flex items-start gap-3 scroll-mt-6"
-              >
-                <div
-                  className={`flex-1 rounded-lg px-4 py-3 border-l-4 transition-all ${bg} ${border} ${
-                    isCurrent ? "ring-2 ring-orange-400 shadow-md" : ""
-                  }`}
-                >
-                  <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                    {p.text}
-                  </p>
-                </div>
-                {isFlagged && (
-                  <button
-                    onClick={() => goto(flagIdx)}
-                    className={`flex flex-col items-center gap-0.5 shrink-0 pt-2 group`}
-                    title={`Zone ${flagIdx + 1} · ${p.score}% IA`}
-                  >
-                    <div
-                      className={`h-9 w-9 rounded-lg ${badgeBg} flex items-center justify-center text-white text-xs font-black shadow-sm group-hover:scale-105 transition-transform ${
-                        isCurrent ? "ring-2 ring-orange-400 ring-offset-1" : ""
+      {/* Split view — sidebar (zones) + reader */}
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+        {/* Sidebar — liste des zones à risque cliquables */}
+        <div className="max-h-[300px] lg:max-h-[640px] overflow-y-auto bg-gray-50/40">
+          <div className="sticky top-0 z-10 bg-gray-100/80 backdrop-blur px-4 py-3 border-b border-gray-200">
+            <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black">
+              Zones à risque ({flagged.length})
+            </p>
+            <p className="text-[10px] text-gray-500 mt-0.5">Clique pour aller au passage</p>
+          </div>
+          {flagged.length === 0 ? (
+            <div className="px-4 py-6 text-center">
+              <div className="mx-auto h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              </div>
+              <p className="text-xs text-gray-600">Aucune zone à risque détectée</p>
+            </div>
+          ) : (
+            <ul>
+              {flagged.map((p, i) => {
+                const isCurrent = i === currentIdx;
+                const dot = p.risk === "high" ? "bg-red-500" : "bg-amber-500";
+                const badgeBg = p.risk === "high" ? "bg-red-500" : "bg-amber-500";
+                return (
+                  <li key={p.index}>
+                    <button
+                      onClick={() => goto(i)}
+                      className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-white transition-colors ${
+                        isCurrent ? "bg-white shadow-sm ring-2 ring-inset ring-orange-400" : ""
                       }`}
                     >
-                      {flagIdx + 1}
-                    </div>
-                    <div className="text-[9px] font-bold text-gray-500 tabular-nums">
-                      {p.score}%
-                    </div>
-                  </button>
-                )}
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className={`h-6 w-6 rounded-md ${badgeBg} flex items-center justify-center text-white text-[10px] font-black shrink-0`}>
+                          {i + 1}
+                        </div>
+                        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                          Zone {p.index + 1}
+                        </span>
+                        <span className="ml-auto text-[10px] font-black text-gray-700 tabular-nums">
+                          {p.score}%
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-700 leading-relaxed line-clamp-3">
+                        « {excerpt(p.text, 120)} »
+                      </p>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Reader — texte scrollable */}
+        <div className="max-h-[640px] overflow-y-auto bg-white">
+          {flagged.length > 0 && (
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+              <button
+                onClick={() => goto(0)}
+                className="text-[11px] font-semibold text-gray-500 hover:text-gray-900"
+              >
+                ↥ Début
+              </button>
+              <div className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1">
+                <button
+                  onClick={() => goto(currentIdx - 1)}
+                  disabled={currentIdx === 0}
+                  className="text-gray-500 hover:text-gray-900 disabled:opacity-30"
+                >
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+                <span className="text-[11px] font-bold text-gray-700 tabular-nums">
+                  {currentIdx + 1} / {flagged.length}
+                </span>
+                <button
+                  onClick={() => goto(currentIdx + 1)}
+                  disabled={currentIdx === flagged.length - 1}
+                  className="text-gray-500 hover:text-gray-900 disabled:opacity-30"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
               </div>
-            );
-          })}
+              <button
+                onClick={() => goto(flagged.length - 1)}
+                className="text-[11px] font-semibold text-gray-500 hover:text-gray-900"
+              >
+                Fin ↧
+              </button>
+            </div>
+          )}
+          <div className="px-5 py-5 space-y-3">
+            {paragraphs.map((p) => {
+              const flagIdx = flagged.findIndex((f) => f.index === p.index);
+              const isFlagged = flagIdx !== -1;
+              const isCurrent = isFlagged && flagIdx === currentIdx;
+
+              const bg =
+                p.risk === "high" ? "bg-red-50" :
+                p.risk === "medium" ? "bg-amber-50" :
+                "";
+              const border =
+                p.risk === "high" ? "border-l-red-400" :
+                p.risk === "medium" ? "border-l-amber-400" :
+                "border-l-transparent";
+              const badgeBg = p.risk === "high" ? "bg-red-500" : "bg-amber-500";
+
+              return (
+                <div
+                  key={p.index}
+                  id={`report-para-${p.index}`}
+                  className="flex items-start gap-2 scroll-mt-14"
+                >
+                  <div
+                    className={`flex-1 rounded-lg px-4 py-3 border-l-4 transition-all ${
+                      isFlagged ? bg + " " + border : "border-l-transparent"
+                    } ${isCurrent ? "ring-2 ring-orange-400 shadow-md" : ""}`}
+                  >
+                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                      {p.text}
+                    </p>
+                  </div>
+                  {isFlagged && (
+                    <button
+                      onClick={() => goto(flagIdx)}
+                      className="flex flex-col items-center gap-0.5 shrink-0 pt-2 group"
+                      title={`Zone ${flagIdx + 1} · ${p.score}% IA`}
+                    >
+                      <div
+                        className={`h-8 w-8 rounded-lg ${badgeBg} flex items-center justify-center text-white text-[11px] font-black shadow-sm group-hover:scale-105 transition-transform ${
+                          isCurrent ? "ring-2 ring-orange-400 ring-offset-1" : ""
+                        }`}
+                      >
+                        {flagIdx + 1}
+                      </div>
+                      <div className="text-[9px] font-bold text-gray-500 tabular-nums">
+                        {p.score}%
+                      </div>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Diagnostic Claude + top offenders en accordion en bas */}
+      {/* Diagnostic Claude + top offenders en pied de card */}
       {(result.claudeReasoning || (result.topOffenders && result.topOffenders.length > 0)) && (
         <div className="border-t border-gray-100 bg-gradient-to-br from-purple-50 to-fuchsia-50 px-5 sm:px-6 py-4">
           {result.claudeReasoning && (
@@ -1742,7 +1788,7 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
             <details className="text-xs">
               <summary className="cursor-pointer text-[10px] uppercase tracking-widest text-purple-800 font-black hover:text-purple-900 flex items-center gap-1.5">
                 <Flame className="h-3 w-3" />
-                Voir les {Math.min(5, result.topOffenders.length)} extraits les plus flaggués
+                Voir les {Math.min(5, result.topOffenders.length)} extraits les plus flaggués (Claude)
               </summary>
               <div className="space-y-1.5 mt-3">
                 {result.topOffenders.slice(0, 5).map((snippet, i) => (
