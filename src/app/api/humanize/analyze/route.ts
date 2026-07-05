@@ -6,10 +6,74 @@ import { rateLimit } from "@/lib/rate-limit";
 import {
   extractTextFromFile,
   detectAI,
-  detectByParagraph,
   claudeScoreText,
   Language,
 } from "@/lib/humanize-engine";
+import { callClaude } from "@/lib/claude-client";
+
+/**
+ * Score chaque chunk avec Claude Sonnet en batches parallèles.
+ * Retourne un tableau de scores 0-100 alignés sur l'index des chunks.
+ * Retombe silencieusement sur -1 si un batch échoue (le caller peut alors
+ * fallback sur l'heuristique).
+ */
+async function claudeScoreChunks(
+  chunks: string[],
+  language: Language
+): Promise<number[]> {
+  const BATCH_SIZE = 25;
+  const scores = new Array<number>(chunks.length).fill(-1);
+  if (chunks.length === 0) return scores;
+
+  const langHint = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";
+
+  const batches: { start: number; items: string[] }[] = [];
+  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+    batches.push({ start: i, items: chunks.slice(i, i + BATCH_SIZE) });
+  }
+
+  await Promise.all(
+    batches.map(async ({ start, items }) => {
+      const numbered = items
+        .map((t, k) => `[${k}] ${t.replace(/\s+/g, " ").slice(0, 900)}`)
+        .join("\n\n");
+      const prompt = `Détecteur IA Compilatio-grade. Ci-dessous ${items.length} passages numérotés d'un texte académique ${langHint}.
+
+Pour CHAQUE passage, donne un score 0-100 estimant la probabilité qu'il soit généré par IA.
+BARÈME : 0-15 humain sûr · 15-30 mixte · 30-50 moitié IA · 50-75 majoritairement IA · 75+ quasi 100% IA.
+
+SIGNAUX IA (+) : cascades énumératives, antithèses balancées ("n'est pas X c'est Y"), registre uniforme, nominalizations "l'identification des", connecteurs "par ailleurs / en outre", trios rhétoriques.
+SIGNAUX HUMAINS (-) : "franchement", "concrètement", "à mon niveau", "bon,", "en vrai", phrases courtes, registre variable, micro-imperfections.
+
+Réponds STRICTEMENT ce JSON, un objet par passage :
+{"scores":[{"i":0,"s":78},{"i":1,"s":34}, ...]}
+
+PASSAGES :
+${numbered}`;
+
+      try {
+        const raw = await callClaude(prompt, {
+          system: "Détecteur IA Compilatio-grade. Réponds uniquement JSON strict, sans commentaire ni backticks.",
+          model: "claude-sonnet-4-6",
+          timeoutMs: 75_000,
+        });
+        const m = raw.match(/\{[\s\S]*\}/);
+        if (!m) return;
+        const parsed = JSON.parse(m[0]) as { scores?: Array<{ i: number; s: number }> };
+        for (const entry of parsed.scores ?? []) {
+          const abs = start + entry.i;
+          if (abs < scores.length) {
+            scores[abs] = Math.max(0, Math.min(100, Math.round(entry.s)));
+          }
+        }
+      } catch {
+        // batch failed, keep -1 sentinel → caller will fallback
+      }
+    })
+  );
+
+  return scores;
+}
 
 /**
  * Découpe un texte en chunks de ~150-200 mots découpés proprement à la
@@ -171,36 +235,47 @@ export async function POST(req: NextRequest) {
           send("progress", { phase: "detecting", detail: `${originalText.split(/\s+/).length} mots extraits` });
           const heuristic = detectAI(originalText, language);
 
-          // On tente les paragraphes naturels d'abord ; si le PDF a été
-          // extrait sans sauts de ligne (fréquent), on retombe sur un
-          // chunker par phrases pour avoir des zones surlignables.
-          let paragraphs = detectByParagraph(originalText, language);
-          if (paragraphs.length < 6) {
-            const chunks = smartChunk(originalText, 170);
-            paragraphs = chunks.map((text, index) => {
-              const detailed = detectAI(text, language);
-              const score = detailed.overall;
-              const risk: "high" | "medium" | "low" =
-                score >= 60 ? "high" : score >= 30 ? "medium" : "low";
-              return {
-                index,
-                text,
-                score,
-                risk,
-                details: {
-                  perplexity: detailed.perplexity,
-                  burstiness: detailed.burstiness,
-                  homoglyphs: detailed.homoglyphs,
-                  connectors: detailed.connectors,
-                  formality: detailed.formality,
-                  parallelism: detailed.parallelism,
-                },
-              };
-            });
-          }
+          // Découpage : smartChunk toujours utilisé pour uniformité,
+          // sinon paragraphes trop hétérogènes en taille foutent le
+          // scoring en l'air (1 phrase vs 500 mots).
+          const chunkTexts = smartChunk(originalText, 170);
+          const heuristicByChunk = chunkTexts.map((t) => detectAI(t, language));
 
-          send("progress", { phase: "scoring", detail: "Analyse Claude Sonnet en cours (3 tranches)..." });
-          const claude = await claudeScoreText(originalText, language);
+          // Scoring Claude : global (3 tranches) + par-chunk (batches 25)
+          // en parallèle pour minimiser la latence.
+          send("progress", {
+            phase: "scoring",
+            detail: `Analyse Claude Sonnet : score global + ${chunkTexts.length} zones en parallèle…`,
+          });
+          const [claude, chunkClaudeScores] = await Promise.all([
+            claudeScoreText(originalText, language),
+            claudeScoreChunks(chunkTexts, language),
+          ]);
+
+          // Merge : score Claude par chunk quand dispo, sinon fallback
+          // heuristique. Seuils calibrés pour cohérence avec le score
+          // global : high ≥ 50, medium ≥ 25.
+          const paragraphs = chunkTexts.map((text, index) => {
+            const claudeScore = chunkClaudeScores[index];
+            const heuristicScore = heuristicByChunk[index].overall;
+            const score = claudeScore >= 0 ? claudeScore : heuristicScore;
+            const risk: "high" | "medium" | "low" =
+              score >= 50 ? "high" : score >= 25 ? "medium" : "low";
+            return {
+              index,
+              text,
+              score,
+              risk,
+              details: {
+                perplexity: heuristicByChunk[index].perplexity,
+                burstiness: heuristicByChunk[index].burstiness,
+                homoglyphs: heuristicByChunk[index].homoglyphs,
+                connectors: heuristicByChunk[index].connectors,
+                formality: heuristicByChunk[index].formality,
+                parallelism: heuristicByChunk[index].parallelism,
+              },
+            };
+          });
 
           const wordCount = originalText.trim().split(/\s+/).length;
 
