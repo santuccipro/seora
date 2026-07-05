@@ -101,10 +101,18 @@ export async function extractTextFromFile(
 async function extractPDF(buffer: Buffer): Promise<string> {
   // `unpdf` bundles a serverless-friendly pdfjs build — no subprocess, no
   // DOMMatrix polyfill, works on Vercel Node runtime.
+  //
+  // mergePages:false → une entrée par page ; on joint avec un double
+  // saut de ligne pour préserver au minimum la séparation entre pages
+  // et éviter le "gros bloc de texte" quand le PDF est extrait.
   const { extractText, getDocumentProxy } = await import("unpdf");
   const doc = await getDocumentProxy(new Uint8Array(buffer));
-  const { text } = await extractText(doc, { mergePages: true });
-  return Array.isArray(text) ? text.join("\n") : (text as string);
+  const { text } = await extractText(doc, { mergePages: false });
+  const pages = Array.isArray(text) ? text : [text as string];
+  return pages
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 async function extractDOCX(buffer: Buffer): Promise<string> {
@@ -884,7 +892,6 @@ export async function claudeScoreText(
   // which times out on 12k-word documents.
   const slices = sliceForScoring(text, 4_500);
   const langHint = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";
-  const heuristicFallback = detectAI(text, language).overall;
 
   const slicePrompt = (slice: string) => `Score Compilatio-grade IA (0-100) sur ce texte ${langHint} (${slice.split(/\s+/).length} mots).
 
@@ -902,30 +909,35 @@ TEXTE :
 ${slice}
 """`;
 
-  const results = await Promise.all(
-    slices.map((slice) =>
-      callClaude(slicePrompt(slice), {
+  // Retry par slice — 1 tentative + 1 retry avec un délai court, puis on
+  // laisse la slice tomber. Si TOUTES les slices tombent → throw pour
+  // que le caller déclenche un refund ; on n'affiche JAMAIS de score
+  // heuristique (le user perd confiance quand les valeurs ne collent
+  // pas au score global).
+  const callSlice = async (slice: string, attempt = 0): Promise<{ overall: number; reasoning?: string; topOffenders?: string[] } | null> => {
+    try {
+      const raw = await callClaude(slicePrompt(slice), {
         system: "Détecteur IA Compilatio-grade. Réponds uniquement JSON valide.",
         model: "claude-sonnet-4-6",
         timeoutMs: 75_000,
-      })
-        .then((raw) => {
-          const m = raw.match(/\{[\s\S]*\}/);
-          if (!m) return null;
-          return JSON.parse(m[0]) as { overall: number; reasoning?: string; topOffenders?: string[] };
-        })
-        .catch(() => null)
-    )
-  );
+      });
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("no JSON");
+      return JSON.parse(m[0]) as { overall: number; reasoning?: string; topOffenders?: string[] };
+    } catch {
+      if (attempt < 1) {
+        await new Promise((r) => setTimeout(r, 800));
+        return callSlice(slice, attempt + 1);
+      }
+      return null;
+    }
+  };
+
+  const results = await Promise.all(slices.map((slice) => callSlice(slice)));
   const valid = results.filter(Boolean) as Array<{ overall: number; reasoning?: string; topOffenders?: string[] }>;
 
   if (valid.length === 0) {
-    // All slices failed — fall back to heuristic so the loop still runs
-    return {
-      overall: heuristicFallback,
-      reasoning: "Score Claude indisponible — bascule vers heuristique.",
-      topOffenders: [],
-    };
+    throw new Error("Le scoring Claude Sonnet est indisponible (tunnel Mac-mini injoignable). Réessaie dans quelques secondes.");
   }
 
   // Median score across slices (robust to outliers)
@@ -935,12 +947,8 @@ ${slice}
     ? Math.round((scores[mid - 1] + scores[mid]) / 2)
     : scores[mid];
 
-  // Extra safety: if Claude returned an implausibly low score but the
-  // heuristic (which is now pattern-aware) says >40, trust the heuristic.
-  const overall = median < 15 && heuristicFallback > 40 ? heuristicFallback : median;
-
   return {
-    overall,
+    overall: median,
     reasoning: valid.map((v) => v.reasoning).filter(Boolean).join(" · "),
     topOffenders: valid.flatMap((v) => v.topOffenders ?? []).slice(0, 5),
   };

@@ -14,8 +14,9 @@ import { callClaude } from "@/lib/claude-client";
 /**
  * Score chaque chunk avec Claude Sonnet en batches parallèles.
  * Retourne un tableau de scores 0-100 alignés sur l'index des chunks.
- * Retombe silencieusement sur -1 si un batch échoue (le caller peut alors
- * fallback sur l'heuristique).
+ * Chaque batch fait 1 retry en cas d'échec. Si un batch échoue toujours,
+ * on THROW (aucun fallback heuristique — le user perd confiance quand
+ * les scores des zones ne collent pas avec le score global).
  */
 async function claudeScoreChunks(
   chunks: string[],
@@ -32,12 +33,15 @@ async function claudeScoreChunks(
     batches.push({ start: i, items: chunks.slice(i, i + BATCH_SIZE) });
   }
 
-  await Promise.all(
-    batches.map(async ({ start, items }) => {
-      const numbered = items
-        .map((t, k) => `[${k}] ${t.replace(/\s+/g, " ").slice(0, 900)}`)
-        .join("\n\n");
-      const prompt = `Détecteur IA Compilatio-grade. Ci-dessous ${items.length} passages numérotés d'un texte académique ${langHint}.
+  const runBatch = async (
+    batch: { start: number; items: string[] },
+    attempt = 0
+  ): Promise<void> => {
+    const { start, items } = batch;
+    const numbered = items
+      .map((t, k) => `[${k}] ${t.replace(/\s+/g, " ").slice(0, 900)}`)
+      .join("\n\n");
+    const prompt = `Détecteur IA Compilatio-grade. Ci-dessous ${items.length} passages numérotés d'un texte académique ${langHint}.
 
 Pour CHAQUE passage, donne un score 0-100 estimant la probabilité qu'il soit généré par IA.
 BARÈME : 0-15 humain sûr · 15-30 mixte · 30-50 moitié IA · 50-75 majoritairement IA · 75+ quasi 100% IA.
@@ -51,61 +55,105 @@ Réponds STRICTEMENT ce JSON, un objet par passage :
 PASSAGES :
 ${numbered}`;
 
-      try {
-        const raw = await callClaude(prompt, {
-          system: "Détecteur IA Compilatio-grade. Réponds uniquement JSON strict, sans commentaire ni backticks.",
-          model: "claude-sonnet-4-6",
-          timeoutMs: 75_000,
-        });
-        const m = raw.match(/\{[\s\S]*\}/);
-        if (!m) return;
-        const parsed = JSON.parse(m[0]) as { scores?: Array<{ i: number; s: number }> };
-        for (const entry of parsed.scores ?? []) {
-          const abs = start + entry.i;
-          if (abs < scores.length) {
-            scores[abs] = Math.max(0, Math.min(100, Math.round(entry.s)));
-          }
+    try {
+      const raw = await callClaude(prompt, {
+        system: "Détecteur IA Compilatio-grade. Réponds uniquement JSON strict, sans commentaire ni backticks.",
+        model: "claude-sonnet-4-6",
+        timeoutMs: 75_000,
+      });
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("no JSON");
+      const parsed = JSON.parse(m[0]) as { scores?: Array<{ i: number; s: number }> };
+      for (const entry of parsed.scores ?? []) {
+        const abs = start + entry.i;
+        if (abs < scores.length) {
+          scores[abs] = Math.max(0, Math.min(100, Math.round(entry.s)));
         }
-      } catch {
-        // batch failed, keep -1 sentinel → caller will fallback
       }
-    })
-  );
+    } catch (err) {
+      if (attempt < 1) {
+        await new Promise((r) => setTimeout(r, 800));
+        return runBatch(batch, attempt + 1);
+      }
+      throw err;
+    }
+  };
 
+  await Promise.all(batches.map((b) => runBatch(b)));
+
+  // Si un chunk n'a pas de score (batch dropped un item), on considère
+  // que le batch est incomplet → throw pour cohérence.
+  if (scores.some((s) => s < 0)) {
+    throw new Error("Scoring Claude Sonnet incomplet (batch tronqué). Réessaie.");
+  }
   return scores;
 }
 
 /**
- * Découpe un texte en chunks de ~150-200 mots découpés proprement à la
- * fin d'une phrase. Utilisé quand le PDF n'a pas de sauts de paragraphes
- * naturels — sans ça, tout le texte est vu comme "un seul paragraphe"
- * et le rapport ne peut pas surligner les zones à risque proprement.
+ * Découpe un texte en chunks de ~targetWords mots en PRÉSERVANT la
+ * structure originale (sauts de ligne, paragraphes). Chaque chunk peut
+ * contenir plusieurs paragraphes séparés par \n\n, et les sauts de
+ * ligne simples à l'intérieur d'un paragraphe sont conservés.
+ *
+ * Le UI utilise `whitespace-pre-wrap` sur le rendu de p.text, donc le
+ * texte s'affiche comme dans le PDF d'origine.
  */
 function smartChunk(text: string, targetWords = 170): string[] {
-  const cleaned = text.replace(/\s+/g, " ").trim();
-  if (!cleaned) return [];
+  const trimmed = text.trim();
+  if (!trimmed) return [];
 
-  // Split en phrases (heuristique simple : . ! ? suivis d'un espace + majuscule)
-  const sentences = cleaned
-    .split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý])/)
-    .map((s) => s.trim())
+  // Split par paragraphe (double saut de ligne).
+  const paras = trimmed
+    .split(/\n\s*\n+/)
+    .map((p) => p.trim())
     .filter(Boolean);
 
   const chunks: string[] = [];
   let buf: string[] = [];
   let bufWords = 0;
 
-  for (const s of sentences) {
-    const w = s.split(/\s+/).length;
-    if (bufWords + w > targetWords && buf.length > 0) {
-      chunks.push(buf.join(" "));
+  const flush = () => {
+    if (buf.length > 0) {
+      chunks.push(buf.join("\n\n"));
       buf = [];
       bufWords = 0;
     }
-    buf.push(s);
+  };
+
+  const wc = (s: string) => s.split(/\s+/).filter(Boolean).length;
+
+  for (const para of paras) {
+    const w = wc(para);
+
+    // Paragraphe trop gros → sous-découpe en phrases sans casser les
+    // sauts de ligne internes (on garde la structure du paragraphe).
+    if (w > targetWords * 1.4) {
+      flush();
+      const sentences = para.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý])/);
+      let sBuf: string[] = [];
+      let sBufWords = 0;
+      for (const s of sentences) {
+        const sw = wc(s);
+        if (sBufWords + sw > targetWords && sBuf.length > 0) {
+          chunks.push(sBuf.join(" "));
+          sBuf = [];
+          sBufWords = 0;
+        }
+        sBuf.push(s);
+        sBufWords += sw;
+      }
+      if (sBuf.length > 0) chunks.push(sBuf.join(" "));
+      continue;
+    }
+
+    if (bufWords + w > targetWords && buf.length > 0) {
+      flush();
+    }
+    buf.push(para);
     bufWords += w;
   }
-  if (buf.length > 0) chunks.push(buf.join(" "));
+  flush();
+
   return chunks;
 }
 
@@ -235,14 +283,13 @@ export async function POST(req: NextRequest) {
           send("progress", { phase: "detecting", detail: `${originalText.split(/\s+/).length} mots extraits` });
           const heuristic = detectAI(originalText, language);
 
-          // Découpage : smartChunk toujours utilisé pour uniformité,
-          // sinon paragraphes trop hétérogènes en taille foutent le
-          // scoring en l'air (1 phrase vs 500 mots).
+          // Découpage : smartChunk préserve les paragraphes et sauts de
+          // ligne du PDF d'origine (le UI utilise whitespace-pre-wrap).
           const chunkTexts = smartChunk(originalText, 170);
-          const heuristicByChunk = chunkTexts.map((t) => detectAI(t, language));
 
           // Scoring Claude : global (3 tranches) + par-chunk (batches 25)
-          // en parallèle pour minimiser la latence.
+          // en parallèle pour minimiser la latence. Si Claude fail on
+          // throw et le token est refund — jamais de fallback heuristique.
           send("progress", {
             phase: "scoring",
             detail: `Analyse Claude Sonnet : score global + ${chunkTexts.length} zones en parallèle…`,
@@ -252,29 +299,13 @@ export async function POST(req: NextRequest) {
             claudeScoreChunks(chunkTexts, language),
           ]);
 
-          // Merge : score Claude par chunk quand dispo, sinon fallback
-          // heuristique. Seuils calibrés pour cohérence avec le score
-          // global : high ≥ 50, medium ≥ 25.
+          // Merge : score Claude par chunk (garanti dispo, sinon throw
+          // plus haut). Seuils calibrés cohérence avec le score global.
           const paragraphs = chunkTexts.map((text, index) => {
-            const claudeScore = chunkClaudeScores[index];
-            const heuristicScore = heuristicByChunk[index].overall;
-            const score = claudeScore >= 0 ? claudeScore : heuristicScore;
+            const score = chunkClaudeScores[index];
             const risk: "high" | "medium" | "low" =
               score >= 50 ? "high" : score >= 25 ? "medium" : "low";
-            return {
-              index,
-              text,
-              score,
-              risk,
-              details: {
-                perplexity: heuristicByChunk[index].perplexity,
-                burstiness: heuristicByChunk[index].burstiness,
-                homoglyphs: heuristicByChunk[index].homoglyphs,
-                connectors: heuristicByChunk[index].connectors,
-                formality: heuristicByChunk[index].formality,
-                parallelism: heuristicByChunk[index].parallelism,
-              },
-            };
+            return { index, text, score, risk };
           });
 
           const wordCount = originalText.trim().split(/\s+/).length;
