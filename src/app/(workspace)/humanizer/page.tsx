@@ -1197,25 +1197,14 @@ export default function HumanizerPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                <div className="text-center">
-                  <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
-                    Score IA (Claude Sonnet)
-                  </p>
-                  <ScoreRing value={analyzeOnlyResult.claudeScore} kind="before" />
-                  <p className="mt-3 text-sm font-medium text-gray-600">
-                    Estimation Compilatio-grade
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
-                    Score heuristique
-                  </p>
-                  <ScoreRing value={analyzeOnlyResult.heuristicScore} kind="before" />
-                  <p className="mt-3 text-sm font-medium text-gray-600">
-                    Patterns + statistiques
-                  </p>
-                </div>
+              <div className="flex flex-col items-center mb-6">
+                <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
+                  Score IA (Claude Sonnet)
+                </p>
+                <ScoreRing value={analyzeOnlyResult.claudeScore} kind="before" />
+                <p className="mt-3 text-sm font-medium text-gray-600">
+                  Estimation Compilatio-grade
+                </p>
               </div>
 
               {analyzeOnlyResult.claudeReasoning && (
