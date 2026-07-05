@@ -33,6 +33,9 @@ import {
   Feather,
   Scale,
   FileSearch,
+  ChevronUp,
+  ChevronDown,
+  Cpu,
 } from "lucide-react";
 
 type Mode = "basic" | "balanced" | "aggressive" | "compilatio-proof";
@@ -1183,101 +1186,8 @@ export default function HumanizerPage() {
         {/* Résultat de l'analyse-only (avant humanisation) */}
         {!analyzingOnly && !analyzing && !result && analyzeOnlyResult && (
           <div className="space-y-5 mb-6">
-            {/* Score global */}
-            <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Résultat de l&apos;analyse</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {analyzeOnlyResult.fileName} · {analyzeOnlyResult.wordCount} mots
-                  </p>
-                </div>
-                <span className="text-[10px] uppercase tracking-widest font-bold text-orange-600 bg-orange-50 rounded-full px-3 py-1">
-                  Aucune réécriture
-                </span>
-              </div>
-
-              <div className="flex flex-col items-center mb-6">
-                <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
-                  Score IA (Claude Sonnet)
-                </p>
-                <ScoreRing value={analyzeOnlyResult.claudeScore} kind="before" />
-                <p className="mt-3 text-sm font-medium text-gray-600">
-                  Estimation Compilatio-grade
-                </p>
-              </div>
-
-              {analyzeOnlyResult.claudeReasoning && (
-                <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4">
-                  <p className="text-[10px] uppercase tracking-widest text-purple-800 font-black mb-1">
-                    Diagnostic Claude
-                  </p>
-                  <p className="text-xs text-purple-900/80 italic leading-relaxed">
-                    « {analyzeOnlyResult.claudeReasoning} »
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Top patterns détectés */}
-            {analyzeOnlyResult.topOffenders && analyzeOnlyResult.topOffenders.length > 0 && (
-              <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
-                <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-red-500" />
-                  Passages les plus flaggués
-                </h3>
-                <div className="space-y-2">
-                  {analyzeOnlyResult.topOffenders.slice(0, 5).map((snippet, i) => (
-                    <div key={i} className="rounded-xl bg-red-50/60 border border-red-100 p-3">
-                      <p className="text-xs text-gray-800 italic leading-relaxed">« {snippet} »</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Zones par paragraphe */}
-            {analyzeOnlyResult.paragraphs && analyzeOnlyResult.paragraphs.length > 0 && (
-              <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-orange-500" />
-                    Zones à risque paragraphe par paragraphe
-                  </h3>
-                  <div className="flex items-center gap-3 text-[10px] font-semibold">
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Faible</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Moyen</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Élevé</span>
-                  </div>
-                </div>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                  {analyzeOnlyResult.paragraphs.map((p) => {
-                    const bg = p.risk === "high" ? "bg-red-50/60 border-red-200" :
-                               p.risk === "medium" ? "bg-amber-50/60 border-amber-200" :
-                               "bg-emerald-50/40 border-emerald-100";
-                    const dot = p.risk === "high" ? "bg-red-500" :
-                                p.risk === "medium" ? "bg-amber-500" :
-                                "bg-emerald-500";
-                    return (
-                      <div key={p.index} className={`rounded-xl border p-3 ${bg}`}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className={`h-2 w-2 rounded-full ${dot}`} />
-                            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
-                              Paragraphe {p.index + 1}
-                            </p>
-                          </div>
-                          <span className="text-[10px] font-bold text-gray-600">
-                            {p.score}% IA
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-800 leading-relaxed">{p.text}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Rapport unifié façon Compilatio */}
+            <AnalysisReport result={analyzeOnlyResult} />
 
             {/* CTA Humaniser */}
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
@@ -1640,6 +1550,210 @@ export default function HumanizerPage() {
           topRiskZones={claudeReport.topRiskZones}
           onClose={() => setShowClaudeReport(false)}
         />
+      )}
+    </div>
+  );
+}
+
+function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
+  const paragraphs = result.paragraphs ?? [];
+  const flagged = paragraphs.filter((p) => p.risk === "high" || p.risk === "medium");
+  const [currentIdx, setCurrentIdx] = useState(0);
+
+  const scoreColor =
+    result.claudeScore >= 50 ? "text-red-500" :
+    result.claudeScore >= 30 ? "text-amber-500" :
+    "text-emerald-500";
+  const trackColor =
+    result.claudeScore >= 50 ? "border-red-500" :
+    result.claudeScore >= 30 ? "border-amber-500" :
+    "border-emerald-500";
+
+  const goto = (idx: number) => {
+    if (flagged.length === 0) return;
+    const clamped = Math.max(0, Math.min(flagged.length - 1, idx));
+    setCurrentIdx(clamped);
+    const target = flagged[clamped];
+    const el = document.getElementById(`report-para-${target.index}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  return (
+    <div className="rounded-3xl bg-white shadow-xl border border-orange-100 overflow-hidden">
+      {/* Header — fichier + badge "Aucune réécriture" */}
+      <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-5 sm:px-6 py-4 text-white flex items-center gap-3">
+        <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+          <FileText className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold truncate">{result.fileName}</p>
+          <p className="text-[10px] opacity-80">
+            {result.wordCount.toLocaleString("fr-FR")} mots · {paragraphs.length} paragraphes · {flagged.length} zones à risque
+          </p>
+        </div>
+        <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-black bg-white/15 rounded-full px-3 py-1">
+          Aucune réécriture
+        </span>
+      </div>
+
+      {/* Score strip — timeline zones + % global */}
+      <div className="px-5 sm:px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+        <div className="flex items-center gap-4 sm:gap-6">
+          <div className="text-[11px] uppercase tracking-widest text-gray-500 font-black whitespace-nowrap flex items-center gap-1.5">
+            <Cpu className="h-3.5 w-3.5 text-gray-400" />
+            <span className="hidden sm:inline">Textes suspects</span>
+            <span className="sm:hidden">Zones</span>
+          </div>
+          <div className="flex-1 h-8 relative bg-gray-200/60 rounded-full overflow-hidden">
+            {paragraphs.map((p, i) => {
+              if (p.risk === "low") return null;
+              const pos = (i / paragraphs.length) * 100;
+              const width = Math.max(0.4, (1 / paragraphs.length) * 100);
+              const color = p.risk === "high" ? "bg-red-500" : "bg-amber-400";
+              return (
+                <button
+                  key={p.index}
+                  onClick={() => {
+                    const flagIdx = flagged.findIndex((f) => f.index === p.index);
+                    if (flagIdx !== -1) goto(flagIdx);
+                  }}
+                  className={`absolute top-0 h-full ${color} hover:opacity-100 opacity-80 transition-opacity cursor-pointer`}
+                  style={{ left: `${pos}%`, width: `${width}%` }}
+                  title={`Paragraphe ${p.index + 1} · ${p.score}% IA`}
+                />
+              );
+            })}
+          </div>
+          <div className={`text-3xl sm:text-4xl font-black ${scoreColor} whitespace-nowrap`}>
+            {result.claudeScore}<span className="text-lg opacity-70">%</span>
+          </div>
+        </div>
+
+        {/* Nav paragraphes flaggués */}
+        {flagged.length > 0 && (
+          <div className="flex items-center justify-between mt-4 gap-3">
+            <button
+              onClick={() => goto(0)}
+              className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
+            >
+              ↥ Début
+            </button>
+            <div className="flex items-center gap-2 rounded-full bg-white border border-gray-200 px-3 py-1 shadow-sm">
+              <button
+                onClick={() => goto(currentIdx - 1)}
+                disabled={currentIdx === 0}
+                className="text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <span className="text-[11px] font-bold text-gray-700 tabular-nums">
+                {currentIdx + 1} / {flagged.length}
+              </span>
+              <button
+                onClick={() => goto(currentIdx + 1)}
+                disabled={currentIdx === flagged.length - 1}
+                className="text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <button
+              onClick={() => goto(flagged.length - 1)}
+              className="text-[11px] font-semibold text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
+            >
+              Fin ↧
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Reader — texte complet avec zones surlignées + badges numérotés */}
+      <div className="max-h-[640px] overflow-y-auto px-4 sm:px-6 py-6 bg-white">
+        <div className="space-y-3">
+          {paragraphs.map((p) => {
+            const flagIdx = flagged.findIndex((f) => f.index === p.index);
+            const isFlagged = flagIdx !== -1;
+            const isCurrent = isFlagged && flagIdx === currentIdx;
+
+            const bg =
+              p.risk === "high" ? "bg-red-50" :
+              p.risk === "medium" ? "bg-amber-50" :
+              "";
+            const border =
+              p.risk === "high" ? "border-l-red-400" :
+              p.risk === "medium" ? "border-l-amber-400" :
+              "border-l-transparent";
+            const badgeBg = p.risk === "high" ? "bg-red-500" : "bg-amber-500";
+
+            return (
+              <div
+                key={p.index}
+                id={`report-para-${p.index}`}
+                className="flex items-start gap-3 scroll-mt-6"
+              >
+                <div
+                  className={`flex-1 rounded-lg px-4 py-3 border-l-4 transition-all ${bg} ${border} ${
+                    isCurrent ? "ring-2 ring-orange-400 shadow-md" : ""
+                  }`}
+                >
+                  <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                    {p.text}
+                  </p>
+                </div>
+                {isFlagged && (
+                  <button
+                    onClick={() => goto(flagIdx)}
+                    className={`flex flex-col items-center gap-0.5 shrink-0 pt-2 group`}
+                    title={`Zone ${flagIdx + 1} · ${p.score}% IA`}
+                  >
+                    <div
+                      className={`h-9 w-9 rounded-lg ${badgeBg} flex items-center justify-center text-white text-xs font-black shadow-sm group-hover:scale-105 transition-transform ${
+                        isCurrent ? "ring-2 ring-orange-400 ring-offset-1" : ""
+                      }`}
+                    >
+                      {flagIdx + 1}
+                    </div>
+                    <div className="text-[9px] font-bold text-gray-500 tabular-nums">
+                      {p.score}%
+                    </div>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Diagnostic Claude + top offenders en accordion en bas */}
+      {(result.claudeReasoning || (result.topOffenders && result.topOffenders.length > 0)) && (
+        <div className="border-t border-gray-100 bg-gradient-to-br from-purple-50 to-fuchsia-50 px-5 sm:px-6 py-4">
+          {result.claudeReasoning && (
+            <div className="mb-3">
+              <p className="text-[10px] uppercase tracking-widest text-purple-800 font-black mb-1 flex items-center gap-1.5">
+                <Shield className="h-3 w-3" />
+                Diagnostic Claude Sonnet
+              </p>
+              <p className="text-xs text-purple-900/80 italic leading-relaxed">
+                « {result.claudeReasoning} »
+              </p>
+            </div>
+          )}
+          {result.topOffenders && result.topOffenders.length > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-[10px] uppercase tracking-widest text-purple-800 font-black hover:text-purple-900 flex items-center gap-1.5">
+                <Flame className="h-3 w-3" />
+                Voir les {Math.min(5, result.topOffenders.length)} extraits les plus flaggués
+              </summary>
+              <div className="space-y-1.5 mt-3">
+                {result.topOffenders.slice(0, 5).map((snippet, i) => (
+                  <p key={i} className="text-xs text-gray-800 italic leading-relaxed pl-3 border-l-2 border-red-300">
+                    « {snippet} »
+                  </p>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
       )}
     </div>
   );
