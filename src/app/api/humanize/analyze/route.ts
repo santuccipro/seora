@@ -20,9 +20,14 @@ import { callClaude } from "@/lib/claude-client";
  */
 async function claudeScoreChunks(
   chunks: string[],
-  language: Language
+  language: Language,
+  onBatchProgress?: (done: number, total: number) => void | Promise<void>
 ): Promise<number[]> {
-  const BATCH_SIZE = 25;
+  // Batches plus petits (18 max) + séquentiels → prompts courts, temps
+  // par batch réduit, et on ne sature pas le runner Mac-mini avec des
+  // appels concurrents (aux dernières mesures il tenait 5 concurrent
+  // mais avec latence cumulée qui claquait le timeout).
+  const BATCH_SIZE = 18;
   const scores = new Array<number>(chunks.length).fill(-1);
   if (chunks.length === 0) return scores;
 
@@ -59,32 +64,44 @@ ${numbered}`;
       const raw = await callClaude(prompt, {
         system: "Détecteur IA Compilatio-grade. Réponds uniquement JSON strict, sans commentaire ni backticks.",
         model: "claude-sonnet-4-6",
-        timeoutMs: 75_000,
+        timeoutMs: 90_000,
       });
       const m = raw.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error("no JSON");
+      if (!m) throw new Error("no JSON in Claude response");
       const parsed = JSON.parse(m[0]) as { scores?: Array<{ i: number; s: number }> };
+      const gotIndexes = new Set<number>();
       for (const entry of parsed.scores ?? []) {
         const abs = start + entry.i;
         if (abs < scores.length) {
           scores[abs] = Math.max(0, Math.min(100, Math.round(entry.s)));
+          gotIndexes.add(abs);
         }
+      }
+      // Si le batch a droppé des items on retry pour les rattraper
+      const missing = items
+        .map((_, k) => start + k)
+        .filter((abs) => !gotIndexes.has(abs));
+      if (missing.length > 0 && attempt < 1) {
+        throw new Error(`batch incomplete: ${missing.length}/${items.length} missing`);
       }
     } catch (err) {
       if (attempt < 1) {
-        await new Promise((r) => setTimeout(r, 800));
+        await new Promise((r) => setTimeout(r, 1200));
         return runBatch(batch, attempt + 1);
       }
       throw err;
     }
   };
 
-  await Promise.all(batches.map((b) => runBatch(b)));
+  // Batches en SÉQUENTIEL — évite de saturer le runner qui gère mal
+  // 6+ appels concurrents (retour empty ou timeout).
+  for (let i = 0; i < batches.length; i++) {
+    await runBatch(batches[i]);
+    await onBatchProgress?.(i + 1, batches.length);
+  }
 
-  // Si un chunk n'a pas de score (batch dropped un item), on considère
-  // que le batch est incomplet → throw pour cohérence.
   if (scores.some((s) => s < 0)) {
-    throw new Error("Scoring Claude Sonnet incomplet (batch tronqué). Réessaie.");
+    throw new Error("Scoring Claude Sonnet incomplet — certains passages n'ont pas de score. Réessaie.");
   }
   return scores;
 }
@@ -287,17 +304,32 @@ export async function POST(req: NextRequest) {
           // ligne du PDF d'origine (le UI utilise whitespace-pre-wrap).
           const chunkTexts = smartChunk(originalText, 170);
 
-          // Scoring Claude : global (3 tranches) + par-chunk (batches 25)
-          // en parallèle pour minimiser la latence. Si Claude fail on
-          // throw et le token est refund — jamais de fallback heuristique.
+          // Scoring Claude en SÉQUENTIEL pour éviter que le runner Mac
+          // mini se prenne 6+ appels concurrents et fail silencieusement :
+          //  a) score global (3 slices parallèles internes)
+          //  b) score par chunk (batches séquentiels)
           send("progress", {
             phase: "scoring",
-            detail: `Analyse Claude Sonnet : score global + ${chunkTexts.length} zones en parallèle…`,
+            detail: "Score global Claude Sonnet…",
           });
-          const [claude, chunkClaudeScores] = await Promise.all([
-            claudeScoreText(originalText, language),
-            claudeScoreChunks(chunkTexts, language),
-          ]);
+          const claude = await claudeScoreText(originalText, language);
+
+          send("progress", {
+            phase: "scoring",
+            detail: `Analyse de ${chunkTexts.length} zones (batch 1)…`,
+          });
+          const chunkClaudeScores = await claudeScoreChunks(
+            chunkTexts,
+            language,
+            async (done, total) => {
+              if (done < total) {
+                send("progress", {
+                  phase: "scoring",
+                  detail: `Analyse des zones (batch ${done + 1}/${total})…`,
+                });
+              }
+            }
+          );
 
           // Merge : score Claude par chunk (garanti dispo, sinon throw
           // plus haut). Seuils calibrés cohérence avec le score global.
