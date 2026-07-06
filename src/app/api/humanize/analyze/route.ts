@@ -93,11 +93,20 @@ ${numbered}`;
     }
   };
 
-  // Batches en SÉQUENTIEL — évite de saturer le runner qui gère mal
-  // 6+ appels concurrents (retour empty ou timeout).
-  for (let i = 0; i < batches.length; i++) {
-    await runBatch(batches[i]);
-    await onBatchProgress?.(i + 1, batches.length);
+  // Batches en PARALLÈLE contrôlé (2 concurrent max) — divise le temps
+  // total par ~2 pour tenir dans le maxDuration 300s Vercel, sans saturer
+  // le runner Claude (qui gère mal 6+ concurrents mais tient 2 sans souci).
+  const CONCURRENCY = 2;
+  let done = 0;
+  for (let i = 0; i < batches.length; i += CONCURRENCY) {
+    const slice = batches.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      slice.map(async (b) => {
+        await runBatch(b);
+        done += 1;
+        await onBatchProgress?.(done, batches.length);
+      })
+    );
   }
 
   if (scores.some((s) => s < 0)) {
