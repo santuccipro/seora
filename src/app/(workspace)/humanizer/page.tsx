@@ -1719,18 +1719,18 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
               const flagIdx = flagged.findIndex((f) => f.index === p.index);
               const isFlagged = flagIdx !== -1;
               const isCurrent = isFlagged && flagIdx === currentIdx;
-              const bg = isFlagged
-                ? p.risk === "high"
-                  ? "bg-cyan-100"
-                  : "bg-cyan-50"
-                : "";
+              // Surlignage réservé aux zones HIGH (≥50% IA) — les medium
+              // restent en texte neutre et sont juste signalées par le
+              // badge dans la marge droite. Sinon le rapport est illisible.
+              const isHighlighted = isFlagged && p.risk === "high";
+              const bg = isHighlighted ? "bg-cyan-100" : "";
 
               return (
                 <Fragment key={p.index}>
                   <p
                     id={`report-para-${p.index}`}
                     className={`text-[15px] text-gray-800 leading-[1.85] scroll-mt-6 rounded-md transition-all whitespace-pre-wrap ${bg} ${
-                      isFlagged ? "px-2 -mx-2 py-1" : ""
+                      isHighlighted ? "px-2 -mx-2 py-1" : ""
                     } ${isCurrent ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-white shadow-sm" : ""}`}
                   >
                     {p.text}
