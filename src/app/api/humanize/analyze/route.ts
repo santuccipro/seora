@@ -23,11 +23,11 @@ async function claudeScoreChunks(
   language: Language,
   onBatchProgress?: (done: number, total: number) => void | Promise<void>
 ): Promise<number[]> {
-  // Batches plus petits (18 max) + séquentiels → prompts courts, temps
-  // par batch réduit, et on ne sature pas le runner Mac-mini avec des
-  // appels concurrents (aux dernières mesures il tenait 5 concurrent
-  // mais avec latence cumulée qui claquait le timeout).
-  const BATCH_SIZE = 18;
+  // Batches de 40 items : les items sont maintenant des PHRASES courtes
+  // (20-40 mots) au lieu de chunks de 170 mots, donc on peut en mettre
+  // plus par prompt sans exploser la longueur. Combiné avec CONCURRENCY=2
+  // ci-dessous, un DPP de 12k mots (~800 phrases) analyse en ~1 min.
+  const BATCH_SIZE = 40;
   const scores = new Array<number>(chunks.length).fill(-1);
   if (chunks.length === 0) return scores;
 
@@ -124,6 +124,27 @@ ${numbered}`;
  * Le UI utilise `whitespace-pre-wrap` sur le rendu de p.text, donc le
  * texte s'affiche comme dans le PDF d'origine.
  */
+/**
+ * Découpe un paragraphe en phrases, en préservant l'exact séparateur (espace
+ * ou ponctuation résiduelle) après chaque phrase, pour permettre au UI de
+ * reconstruire fidèlement le texte original en concaténant text + tail.
+ */
+function splitIntoSentences(text: string): Array<{ text: string; tail: string }> {
+  const out: Array<{ text: string; tail: string }> = [];
+  const regex = /([^.!?…]+[.!?…]+["»)']*)(\s+|$)/g;
+  let lastEnd = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    out.push({ text: m[1].trim(), tail: m[2] || " " });
+    lastEnd = regex.lastIndex;
+  }
+  if (lastEnd < text.length) {
+    const trailing = text.slice(lastEnd).trim();
+    if (trailing) out.push({ text: trailing, tail: "" });
+  }
+  return out.filter((s) => s.text.length > 0);
+}
+
 function smartChunk(text: string, targetWords = 170): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
@@ -309,14 +330,19 @@ export async function POST(req: NextRequest) {
           send("progress", { phase: "detecting", detail: `${originalText.split(/\s+/).length} mots extraits` });
           const heuristic = detectAI(originalText, language);
 
-          // Découpage : smartChunk préserve les paragraphes et sauts de
-          // ligne du PDF d'origine (le UI utilise whitespace-pre-wrap).
+          // Découpage à deux niveaux :
+          //  • smartChunk pour la structure paragraphe (rendu UI)
+          //  • splitIntoSentences pour scorer PHRASE PAR PHRASE dans chaque
+          //    chunk — le user veut voir quelles phrases précises sont IA,
+          //    pas un pavé bleu de 200 mots.
           const chunkTexts = smartChunk(originalText, 170);
+          const sentencesPerChunk = chunkTexts.map((c) => splitIntoSentences(c));
+          const flatSentences = sentencesPerChunk.flatMap((sList) => sList.map((s) => s.text));
 
           // Scoring Claude en SÉQUENTIEL pour éviter que le runner Mac
           // mini se prenne 6+ appels concurrents et fail silencieusement :
           //  a) score global (3 slices parallèles internes)
-          //  b) score par chunk (batches séquentiels)
+          //  b) score par phrase (batches de 40 en parallèle 2-à-2)
           send("progress", {
             phase: "scoring",
             detail: "Score global Claude Sonnet…",
@@ -325,28 +351,35 @@ export async function POST(req: NextRequest) {
 
           send("progress", {
             phase: "scoring",
-            detail: `Analyse de ${chunkTexts.length} zones (batch 1)…`,
+            detail: `Analyse de ${flatSentences.length} phrases (batch 1)…`,
           });
-          const chunkClaudeScores = await claudeScoreChunks(
-            chunkTexts,
+          const sentenceScores = await claudeScoreChunks(
+            flatSentences,
             language,
             async (done, total) => {
               if (done < total) {
                 send("progress", {
                   phase: "scoring",
-                  detail: `Analyse des zones (batch ${done + 1}/${total})…`,
+                  detail: `Analyse des phrases (batch ${done + 1}/${total})…`,
                 });
               }
             }
           );
 
-          // Merge : score Claude par chunk (garanti dispo, sinon throw
-          // plus haut). Seuils calibrés cohérence avec le score global.
+          // Réagrégation : pour chaque chunk (= paragraph), attacher les
+          // scores individuels des phrases qu'il contient. Le risk global
+          // du paragraph = max des scores de ses phrases.
+          let cursor = 0;
           const paragraphs = chunkTexts.map((text, index) => {
-            const score = chunkClaudeScores[index];
+            const sList = sentencesPerChunk[index];
+            const sentences = sList.map((s) => {
+              const sc = sentenceScores[cursor++] ?? 0;
+              return { text: s.text, tail: s.tail, score: sc };
+            });
+            const maxScore = sentences.reduce((mx, s) => (s.score > mx ? s.score : mx), 0);
             const risk: "high" | "medium" | "low" =
-              score >= 50 ? "high" : score >= 25 ? "medium" : "low";
-            return { index, text, score, risk };
+              maxScore >= 50 ? "high" : maxScore >= 25 ? "medium" : "low";
+            return { index, text, sentences, score: maxScore, risk };
           });
 
           const wordCount = originalText.trim().split(/\s+/).length;

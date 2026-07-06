@@ -71,11 +71,18 @@ type Analysis = {
   diff?: Array<{ before: string; after: string; changed: boolean; similarity: number }>;
 };
 
+type SentenceScore = {
+  text: string;
+  tail: string;
+  score: number;
+};
+
 type ParagraphScore = {
   index: number;
   text: string;
   score: number;
   risk: "high" | "medium" | "low";
+  sentences?: SentenceScore[];
   details?: Record<string, number>;
 };
 
@@ -1719,21 +1726,37 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
               const flagIdx = flagged.findIndex((f) => f.index === p.index);
               const isFlagged = flagIdx !== -1;
               const isCurrent = isFlagged && flagIdx === currentIdx;
-              // Surlignage réservé aux zones HIGH (≥50% IA) — les medium
-              // restent en texte neutre et sont juste signalées par le
-              // badge dans la marge droite. Sinon le rapport est illisible.
-              const isHighlighted = isFlagged && p.risk === "high";
-              const bg = isHighlighted ? "bg-cyan-100" : "";
+
+              // Surlignage PHRASE PAR PHRASE : chaque phrase du paragraphe
+              // a son propre score. On ne surligne que les phrases high
+                // (≥50% IA), les autres restent en texte neutre — c'est le
+              // seul moyen que le user voie précisément ce qui est louche.
+              const sentences = p.sentences && p.sentences.length > 0
+                ? p.sentences
+                : [{ text: p.text, tail: "", score: p.score }];
 
               return (
                 <Fragment key={p.index}>
                   <p
                     id={`report-para-${p.index}`}
-                    className={`text-[15px] text-gray-800 leading-[1.85] scroll-mt-6 rounded-md transition-all whitespace-pre-wrap ${bg} ${
-                      isHighlighted ? "px-2 -mx-2 py-1" : ""
-                    } ${isCurrent ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-white shadow-sm" : ""}`}
+                    className={`text-[15px] text-gray-800 leading-[1.85] scroll-mt-6 rounded-md transition-all whitespace-pre-wrap ${
+                      isCurrent ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-white shadow-sm px-2 -mx-2 py-1" : ""
+                    }`}
                   >
-                    {p.text}
+                    {sentences.map((s, si) => (
+                      <Fragment key={si}>
+                        <span
+                          className={
+                            s.score >= 50
+                              ? "bg-cyan-100 px-1 py-0.5 rounded"
+                              : ""
+                          }
+                        >
+                          {s.text}
+                        </span>
+                        {s.tail || " "}
+                      </Fragment>
+                    ))}
                   </p>
                   <div className="flex items-start justify-center pt-1">
                     {isFlagged && (
