@@ -44,6 +44,10 @@ async function claudeScoreChunks(
     attempt = 0
   ): Promise<void> => {
     const { start, items } = batch;
+    // 07/07 (Orsu) — logging temporaire pour tracer les fails d'analyse
+    const batchLabel = `[analyze-batch start=${start} n=${items.length} attempt=${attempt}]`;
+    const t0 = Date.now();
+    console.log(`${batchLabel} START`);
     const numbered = items
       .map((t, k) => `[${k}] ${t.replace(/\s+/g, " ").slice(0, 900)}`)
       .join("\n\n");
@@ -88,7 +92,11 @@ ${numbered}`;
       if (missing.length > 0 && attempt < 2) {
         throw new Error(`batch incomplete: ${missing.length}/${items.length} missing`);
       }
+      console.log(`${batchLabel} OK (${Date.now() - t0}ms, scored=${gotIndexes.size})`);
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const errName = err instanceof Error ? err.name : "Unknown";
+      console.error(`${batchLabel} FAIL (${Date.now() - t0}ms) — ${errName}: ${errMsg.slice(0, 300)}`);
       // 07/07 (Orsu) — 2 retries au lieu de 1, backoff progressif (1.2s → 3s)
       if (attempt < 2) {
         await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
