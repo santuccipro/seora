@@ -1092,6 +1092,79 @@ ${sample}
   }
 }
 
+/**
+ * 07/07 (Orsu) — Score global du texte sur 4 dimensions structurelles :
+ * STRUCTURE, REGISTRE, ANTITHESES, LANGUE. Renvoyé au user pour un rendu
+ * "4 critères en rouge" qui pousse à humaniser TOUT le doc.
+ */
+export type DimensionScores = {
+  structure: number;
+  registre: number;
+  antitheses: number;
+  langue: number;
+};
+
+export async function claudeScoreDimensions(
+  text: string,
+  language: Language = "fr"
+): Promise<DimensionScores> {
+  if (!text || text.length < 400) {
+    return { structure: 0, registre: 0, antitheses: 0, langue: 0 };
+  }
+  const langHint = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";
+  // On score sur 1 slice représentatif du milieu du doc (max 5k mots) —
+  // 4 dimensions structurelles se voient sur un extrait large, pas besoin
+  // de scanner tout le doc.
+  const words = text.split(/\s+/);
+  const midStart = Math.max(0, Math.floor((words.length - 800) / 2));
+  const slice = words.slice(midStart, midStart + Math.min(1200, words.length)).join(" ");
+
+  const prompt = `Score IA sur 4 dimensions distinctes, texte ${langHint}.
+
+BARÈME (chaque dimension, 0-100) : 0-20 zéro trace · 20-40 léger · 40-60 marqué · 60-80 flagrant · 80+ omniprésent.
+
+Dimensions à noter INDÉPENDAMMENT :
+
+1. **STRUCTURE** — cascades énumératives ("d'une part... d'autre part... enfin"), triades rhétoriques, listes tripartites explicites ("trois enjeux", "quatre axes"), architectures 1./2./3. répétées.
+
+2. **REGISTRE** — uniformité stylistique parfaite (zéro burstiness), aucune rupture familière/oral, aucune variation de niveau de langue, aucune micro-imperfection humaine.
+
+3. **ANTITHESES** — patterns balancés stéréotypés ("n'est pas X, c'est Y", "à la fois X et Y", "non pas X mais Y", "certes X, cependant Y"), oppositions symétriques trop propres.
+
+4. **LANGUE** — nominalizations denses ("l'identification des", "la mise en œuvre de"), connecteurs académiques ("par ailleurs", "en outre", "il convient de"), tournures impersonnelles à la chaîne.
+
+Sois SÉVÈRE : un texte académique poli qui utilise ces patterns doit être noté élevé, même s'il est cohérent.
+
+Réponds STRICTEMENT ce JSON, sans commentaire ni backticks :
+{"structure": <int>, "registre": <int>, "antitheses": <int>, "langue": <int>}
+
+TEXTE :
+"""
+${slice}
+"""`;
+
+  try {
+    const raw = await callClaude(prompt, {
+      system: "Détecteur IA multi-dimensions. Réponds uniquement JSON valide.",
+      model: "claude-sonnet-4-6",
+      timeoutMs: 60_000,
+    });
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("no JSON");
+    const parsed = JSON.parse(m[0]) as Partial<DimensionScores>;
+    const clamp = (n: unknown) => Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+    return {
+      structure: clamp(parsed.structure),
+      registre: clamp(parsed.registre),
+      antitheses: clamp(parsed.antitheses),
+      langue: clamp(parsed.langue),
+    };
+  } catch (err) {
+    console.error("[claudeScoreDimensions] failed:", err);
+    return { structure: 0, registre: 0, antitheses: 0, langue: 0 };
+  }
+}
+
 function buildPrompt(text: string, language: Language, mode: HumanizeMode): string {
   const intensity =
     mode === "compilatio-proof" ? "COMPILATIO-PROOF (maximum)" :

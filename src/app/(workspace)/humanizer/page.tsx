@@ -36,6 +36,7 @@ import {
   ChevronUp,
   ChevronDown,
   Cpu,
+  BarChart3,
 } from "lucide-react";
 
 type Mode = "basic" | "balanced" | "aggressive" | "compilatio-proof";
@@ -98,6 +99,14 @@ type AnalyzeOnlyResult = {
   claudeReasoning: string;
   topOffenders: string[];
   paragraphs: ParagraphScore[];
+  // 07/07 (Orsu) — 4 dimensions IA affichées en top du rapport pour
+  // convaincre le user d'humaniser TOUT le doc au lieu de patcher 3 phrases.
+  dimensions?: {
+    structure: number;
+    registre: number;
+    antitheses: number;
+    langue: number;
+  };
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -1623,6 +1632,48 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
         )}
       </div>
 
+      {/* 07/07 (Orsu) — 4 dimensions IA en cartes. Sépare le score global
+          en 4 axes que le user visualise vite : plusieurs axes rouges =
+          humanisation globale nécessaire (pas patch de 3 phrases). */}
+      {result.dimensions && (
+        <div className="px-5 sm:px-6 py-5 border-b border-gray-100 bg-gradient-to-br from-gray-50 to-white">
+          <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black mb-4 flex items-center gap-1.5">
+            <BarChart3 className="h-3 w-3 text-cyan-600" />
+            4 dimensions d'analyse IA
+          </p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { key: "structure", label: "Structure", desc: "Cascades, triades, listes tripartites", score: result.dimensions.structure },
+              { key: "registre", label: "Registre", desc: "Uniformité, zéro burstiness", score: result.dimensions.registre },
+              { key: "antitheses", label: "Antithèses", desc: "«n’est pas X c’est Y», balancing", score: result.dimensions.antitheses },
+              { key: "langue", label: "Langue", desc: "Nominalisations, connecteurs académiques", score: result.dimensions.langue },
+            ].map((d) => {
+              const tone = d.score >= 70 ? "high" : d.score >= 40 ? "medium" : "low";
+              const barColor = tone === "high" ? "bg-red-500" : tone === "medium" ? "bg-amber-500" : "bg-emerald-500";
+              const textColor = tone === "high" ? "text-red-600" : tone === "medium" ? "text-amber-600" : "text-emerald-600";
+              const chip = tone === "high" ? "Critique" : tone === "medium" ? "Marqué" : "Léger";
+              const chipBg = tone === "high" ? "bg-red-100 text-red-700" : tone === "medium" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700";
+              return (
+                <div key={d.key} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-xs font-black text-gray-900 uppercase tracking-wide">{d.label}</p>
+                    <span className={`text-[9px] font-black uppercase tracking-widest ${chipBg} rounded-full px-2 py-0.5`}>{chip}</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 mb-2">
+                    <span className={`text-3xl font-black tabular-nums ${textColor}`}>{d.score}</span>
+                    <span className={`text-sm font-bold ${textColor} opacity-70`}>%</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-2">
+                    <div className={`h-full ${barColor} transition-all`} style={{ width: `${d.score}%` }} />
+                  </div>
+                  <p className="text-[10px] text-gray-500 leading-snug">{d.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Analyse globale Claude */}
       {result.claudeReasoning && (
         <div className="px-5 sm:px-6 py-4 border-b border-gray-100 bg-gradient-to-br from-purple-50 to-fuchsia-50">
@@ -1731,22 +1782,8 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
                         </Fragment>
                       ))}
                     </p>
-                    {/* 07/07 (Orsu) — pourquoi cette zone est IA (topReasons) */}
-                    {isFlagged && p.topReasons && p.topReasons.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="text-[10px] uppercase tracking-widest font-black text-cyan-700 mr-1 mt-0.5">
-                          Pourquoi IA ?
-                        </span>
-                        {p.topReasons.map((r, ri) => (
-                          <span
-                            key={ri}
-                            className="text-[11px] bg-cyan-50 text-cyan-800 border border-cyan-200 rounded-full px-2 py-0.5 font-medium"
-                          >
-                            {r}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    {/* 07/07 (Orsu) — topReasons retirées (patron veut pousser
+                        vers humanisation globale, pas fix par zone). */}
                   </div>
                   <div className="flex items-start justify-center pt-1">
                     {isFlagged && (

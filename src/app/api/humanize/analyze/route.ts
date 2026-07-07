@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import {
   extractTextFromFile,
   claudeScoreText,
+  claudeScoreDimensions,
   Language,
 } from "@/lib/humanize-engine";
 import { callClaude } from "@/lib/claude-client";
@@ -56,6 +57,9 @@ async function claudeScoreChunks(
     const numbered = items
       .map((t, k) => `[${k}] ${t.replace(/\s+/g, " ").slice(0, 900)}`)
       .join("\n\n");
+    // 07/07 (Orsu) — retour au prompt simple sans "why". Le patron ne veut
+    // plus donner d'indices actionnable par zone (le user réparerait 3 phrases
+    // et se croirait sauvé). Feedback IA → 4 scores globaux + reasoning global.
     const prompt = `Détecteur IA Compilatio-grade. Ci-dessous ${items.length} passages numérotés d'un texte académique ${langHint}.
 
 Pour CHAQUE passage, donne un score 0-100 estimant la probabilité qu'il soit généré par IA.
@@ -64,16 +68,8 @@ BARÈME : 0-15 humain sûr · 15-30 mixte · 30-50 moitié IA · 50-75 majoritai
 SIGNAUX IA (+) : cascades énumératives, antithèses balancées ("n'est pas X c'est Y"), registre uniforme, nominalizations "l'identification des", connecteurs "par ailleurs / en outre", trios rhétoriques.
 SIGNAUX HUMAINS (-) : "franchement", "concrètement", "à mon niveau", "bon,", "en vrai", phrases courtes, registre variable, micro-imperfections.
 
-**IMPORTANT** — pour CHAQUE passage dont le score est ≥ 50, ajoute un champ "why" court (≤ 15 mots) qui cite LE marqueur IA le plus flagrant dans cette phrase précise (pas générique). Pour les passages < 50, mets "why": "".
-
-Exemples de bon "why" :
-- "triade rhétorique + connecteur 'par ailleurs'"
-- "nominalisation dense 'l'identification des'"
-- "antithèse balancée 'n'est pas X c'est Y'"
-- "registre soutenu uniforme, zéro burstiness"
-
-Réponds STRICTEMENT ce JSON :
-{"scores":[{"i":0,"s":78,"why":"triade rhétorique explicite"},{"i":1,"s":12,"why":""}, ...]}
+Réponds STRICTEMENT ce JSON, un objet par passage :
+{"scores":[{"i":0,"s":78},{"i":1,"s":34}, ...]}
 
 PASSAGES :
 ${numbered}`;
@@ -88,13 +84,12 @@ ${numbered}`;
       });
       const m = raw.match(/\{[\s\S]*\}/);
       if (!m) throw new Error("no JSON in Claude response");
-      const parsed = JSON.parse(m[0]) as { scores?: Array<{ i: number; s: number; why?: string }> };
+      const parsed = JSON.parse(m[0]) as { scores?: Array<{ i: number; s: number }> };
       const gotIndexes = new Set<number>();
       for (const entry of parsed.scores ?? []) {
         const abs = start + entry.i;
         if (abs < scores.length) {
           scores[abs] = Math.max(0, Math.min(100, Math.round(entry.s)));
-          reasons[abs] = (entry.why ?? "").toString().slice(0, 120);
           gotIndexes.add(abs);
         }
       }
@@ -382,7 +377,13 @@ export async function POST(req: NextRequest) {
             phase: "scoring",
             detail: "Score global Claude Sonnet…",
           });
-          const claude = await claudeScoreText(originalText, language);
+          // 07/07 (Orsu) — score global + 4 dimensions en parallèle. Les 4
+          // dimensions (STRUCTURE, REGISTRE, ANTITHESES, LANGUE) donnent au
+          // user 4 axes visibles en haut du rapport → pousse à humaniser tout.
+          const [claude, dimensions] = await Promise.all([
+            claudeScoreText(originalText, language),
+            claudeScoreDimensions(originalText, language),
+          ]);
 
           send("progress", {
             phase: "scoring",
@@ -461,6 +462,7 @@ export async function POST(req: NextRequest) {
                 claudeScoreBefore: claude.overall,
                 claudeReasoning: claude.reasoning,
                 topOffenders: claude.topOffenders,
+                dimensions,
                 paragraphs,
                 language,
               }),
@@ -476,6 +478,7 @@ export async function POST(req: NextRequest) {
             claudeScore: claude.overall,
             claudeReasoning: claude.reasoning,
             topOffenders: claude.topOffenders,
+            dimensions,
             paragraphs,
           });
         } catch (err) {
