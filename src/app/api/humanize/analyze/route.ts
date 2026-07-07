@@ -23,11 +23,12 @@ async function claudeScoreChunks(
   language: Language,
   onBatchProgress?: (done: number, total: number) => void | Promise<void>
 ): Promise<number[]> {
-  // Batches de 40 items : les items sont maintenant des PHRASES courtes
-  // (20-40 mots) au lieu de chunks de 170 mots, donc on peut en mettre
-  // plus par prompt sans exploser la longueur. Combiné avec CONCURRENCY=2
-  // ci-dessous, un DPP de 12k mots (~800 phrases) analyse en ~1 min.
-  const BATCH_SIZE = 40;
+  // 07/07 (Orsu) — BATCH_SIZE baissé 40→25 pour réduire le risque de timeout
+  // par batch (Claude Sonnet met parfois >90s sur 40 phrases si surcharge).
+  // Plus de batches mais plus petits = plus prévisible + tolère mieux les
+  // flares Anthropic. DPP 12k mots (~800 phrases) : 32 batches × ~15s / 2 concurrents
+  // = ~4 min (vs ~1 min avant), toujours dans le maxDuration 300s.
+  const BATCH_SIZE = 25;
   const scores = new Array<number>(chunks.length).fill(-1);
   if (chunks.length === 0) return scores;
 
@@ -64,7 +65,9 @@ ${numbered}`;
       const raw = await callClaude(prompt, {
         system: "Détecteur IA Compilatio-grade. Réponds uniquement JSON strict, sans commentaire ni backticks.",
         model: "claude-sonnet-4-6",
-        timeoutMs: 90_000,
+        // 07/07 (Orsu) — timeout 90s→120s : Claude Sonnet peut mettre 60-90s
+        // sur 25 phrases quand l'API est chargée. 120s laisse une marge safe.
+        timeoutMs: 120_000,
       });
       const m = raw.match(/\{[\s\S]*\}/);
       if (!m) throw new Error("no JSON in Claude response");
@@ -81,12 +84,14 @@ ${numbered}`;
       const missing = items
         .map((_, k) => start + k)
         .filter((abs) => !gotIndexes.has(abs));
-      if (missing.length > 0 && attempt < 1) {
+      // 07/07 (Orsu) — 2 retries au lieu de 1 (attempt < 2)
+      if (missing.length > 0 && attempt < 2) {
         throw new Error(`batch incomplete: ${missing.length}/${items.length} missing`);
       }
     } catch (err) {
-      if (attempt < 1) {
-        await new Promise((r) => setTimeout(r, 1200));
+      // 07/07 (Orsu) — 2 retries au lieu de 1, backoff progressif (1.2s → 3s)
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
         return runBatch(batch, attempt + 1);
       }
       throw err;
