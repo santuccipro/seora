@@ -797,7 +797,7 @@ export default function Home() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-base sm:text-lg font-extrabold text-white leading-tight">Analyser mon mémoire / DPP</p>
-                    <p className="text-[11px] sm:text-xs text-white/70 mt-1">Score IA (Compilatio, GPTZero) + humanisation pour passer sous 15%</p>
+                    <p className="text-[11px] sm:text-xs text-white/70 mt-1">Score IA Claude Sonnet + humanisation pour passer sous 15%</p>
                     <div className="mt-2 flex items-center gap-3 text-[10px] sm:text-[11px] text-white/60">
                       <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Score IA en 30s</span>
                       <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Humanisation auto</span>

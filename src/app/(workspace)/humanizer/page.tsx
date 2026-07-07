@@ -90,7 +90,6 @@ type AnalyzeOnlyResult = {
   id: string;
   fileName: string;
   wordCount: number;
-  heuristicScore: number;
   claudeScore: number;
   claudeReasoning: string;
   topOffenders: string[];
@@ -1418,7 +1417,7 @@ export default function HumanizerPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { n: 1, title: "Extraction", desc: "On lit ton PDF/DOCX (jusqu'à 15 Mo) et on extrait le texte brut." },
-                  { n: 2, title: "Détection 4 moteurs", desc: "Score IA calculé sur 4 dimensions inspirées de Compilatio, GPTZero, Sapling et Originality." },
+                  { n: 2, title: "Scoring Claude Sonnet", desc: "Chaque phrase est scorée individuellement par Claude Sonnet 4.6 — verdict IA nuancé, phrase par phrase." },
                   { n: 3, title: "Nettoyage caché", desc: "On retire les homoglyphes cyrilliques cachés, les cadratins et les connecteurs académiques." },
                   { n: 4, title: "Reformulation Claude", desc: "Chaque paragraphe repassé dans Claude Opus 4.8 avec un prompt étudiant Master 2 (few-shot examples calibrés)." },
                   { n: 5, title: "Zones préservées", desc: "Les citations légales, IBAN, URLs et phrases que tu marques restent intactes." },

@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   extractTextFromFile,
-  detectAI,
   claudeScoreText,
   Language,
 } from "@/lib/humanize-engine";
@@ -235,8 +234,9 @@ const ANALYZE_TOKEN_COST = 1;
  * POST /api/humanize/analyze
  *
  * Analyse-only endpoint : extrait le texte, calcule le score IA global
- * (heuristique + Claude Sonnet 4.6) et scoresPar-paragraphe, sans jamais
- * appeler Opus pour réécrire. Coût : 1 token.
+ * (Claude Sonnet 4.6) et scores par-paragraphe, sans jamais appeler
+ * Opus pour réécrire. Coût : 1 token. 07/07 (Orsu) : ancienne détection
+ * heuristique retirée — le patron veut uniquement le score Claude.
  *
  * Répond en Server-Sent Events pour éviter le timeout browser sur les
  * documents lourds (les appels Sonnet peuvent prendre 30-60s au total).
@@ -248,7 +248,7 @@ const ANALYZE_TOKEN_COST = 1;
  *
  * Events SSE:
  *   event: progress   data: {phase, detail?, analysisId?}
- *   event: done       data: {id, wordCount, heuristicScore, claudeScore, ...}
+ *   event: done       data: {id, wordCount, claudeScore, claudeReasoning, topOffenders, paragraphs}
  *   event: error      data: {message}
  */
 export async function POST(req: NextRequest) {
@@ -353,7 +353,6 @@ export async function POST(req: NextRequest) {
           }
 
           send("progress", { phase: "detecting", detail: `${originalText.split(/\s+/).length} mots extraits` });
-          const heuristic = detectAI(originalText, language);
 
           // Découpage à deux niveaux :
           //  • smartChunk pour la structure paragraphe (rendu UI)
@@ -426,13 +425,15 @@ export async function POST(req: NextRequest) {
 
           const wordCount = originalText.trim().split(/\s+/).length;
 
+          // 07/07 (Orsu) — patron veut plus voir de score heuristique. On stocke
+          // uniquement le score Claude Sonnet en aiScoreBefore. Le detectAI reste
+          // calculé côté serveur pour usage interne éventuel mais n'est plus renvoyé.
           await prisma.humanizerAnalysis.update({
             where: { id: analysis.id },
             data: {
               originalText,
-              aiScoreBefore: heuristic.overall,
+              aiScoreBefore: claude.overall,
               scoreDetails: JSON.stringify({
-                before: heuristic,
                 claudeScoreBefore: claude.overall,
                 claudeReasoning: claude.reasoning,
                 topOffenders: claude.topOffenders,
@@ -448,7 +449,6 @@ export async function POST(req: NextRequest) {
             id: analysis.id,
             fileName: file.name,
             wordCount,
-            heuristicScore: heuristic.overall,
             claudeScore: claude.overall,
             claudeReasoning: claude.reasoning,
             topOffenders: claude.topOffenders,

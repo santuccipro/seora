@@ -1219,9 +1219,11 @@ export async function runFullHumanize(
   let workingText = detResult.text;
 
   // Step 5 — LLM rewrite (with retry).
-  // For "compilatio-proof" mode we score via Claude Sonnet instead of the
-  // heuristic — that's what Compilatio-grade requires.
-  const useClaudeScoring = options.useClaudeScoring ?? mode === "compilatio-proof";
+  // 07/07 (Orsu) — Patron a demandé de virer l'heuristique du produit.
+  // Claude Sonnet est maintenant utilisé pour TOUS les modes, plus juste
+  // "compilatio-proof". L'heuristique reste calculée en interne pour la
+  // boucle de scoring des paragraphes mais n'est plus renvoyée à l'UI.
+  const useClaudeScoring = true;
   let passesApplied = 0;
   let scoreAfter = detectAI(restorePreservation(workingText, preservation.map), language);
   let claudeScoreBefore: number | undefined;

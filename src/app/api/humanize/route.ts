@@ -154,8 +154,8 @@ export async function POST(req: NextRequest) {
               data: {
                 originalText: result.originalText,
                 humanizedText: result.humanizedText,
-                aiScoreBefore: result.scoreBefore.overall,
-                aiScoreAfter: result.scoreAfter.overall,
+                aiScoreBefore: result.claudeScoreBefore ?? result.scoreBefore.overall,
+                aiScoreAfter: result.claudeScoreAfter ?? result.scoreAfter.overall,
                 scoreDetails: JSON.stringify({
                   before: result.scoreBefore,
                   after: result.scoreAfter,
@@ -175,10 +175,8 @@ export async function POST(req: NextRequest) {
 
             send("done", {
               id: analysis.id,
-              aiScoreBefore: result.scoreBefore.overall,
-              aiScoreAfter: result.scoreAfter.overall,
-              claudeScoreBefore: result.claudeScoreBefore,
-              claudeScoreAfter: result.claudeScoreAfter,
+              aiScoreBefore: result.claudeScoreBefore ?? result.scoreBefore.overall,
+              aiScoreAfter: result.claudeScoreAfter ?? result.scoreAfter.overall,
               claudeReasoning: result.claudeReasoning,
               passesApplied: result.passesApplied,
               wordCount: result.wordCount,
@@ -231,8 +229,8 @@ export async function POST(req: NextRequest) {
         data: {
           originalText: result.originalText,
           humanizedText: result.humanizedText,
-          aiScoreBefore: result.scoreBefore.overall,
-          aiScoreAfter: result.scoreAfter.overall,
+          aiScoreBefore: result.claudeScoreBefore ?? result.scoreBefore.overall,
+          aiScoreAfter: result.claudeScoreAfter ?? result.scoreAfter.overall,
           scoreDetails: JSON.stringify({
             before: result.scoreBefore,
             after: result.scoreAfter,
