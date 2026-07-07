@@ -21,8 +21,13 @@ import { callClaude } from "@/lib/claude-client";
 async function claudeScoreChunks(
   chunks: string[],
   language: Language,
-  onBatchProgress?: (done: number, total: number) => void | Promise<void>
+  onBatchProgress?: (done: number, total: number) => void | Promise<void>,
+  traceBuffer?: string[]
 ): Promise<number[]> {
+  const trace = (line: string) => {
+    console.log(line);
+    if (traceBuffer) traceBuffer.push(line);
+  };
   // 07/07 (Orsu) — BATCH_SIZE baissé 40→25 pour réduire le risque de timeout
   // par batch (Claude Sonnet met parfois >90s sur 40 phrases si surcharge).
   // Plus de batches mais plus petits = plus prévisible + tolère mieux les
@@ -47,7 +52,7 @@ async function claudeScoreChunks(
     // 07/07 (Orsu) — logging temporaire pour tracer les fails d'analyse
     const batchLabel = `[analyze-batch start=${start} n=${items.length} attempt=${attempt}]`;
     const t0 = Date.now();
-    console.log(`${batchLabel} START`);
+    trace(`${batchLabel} START`);
     const numbered = items
       .map((t, k) => `[${k}] ${t.replace(/\s+/g, " ").slice(0, 900)}`)
       .join("\n\n");
@@ -92,11 +97,11 @@ ${numbered}`;
       if (missing.length > 0 && attempt < 2) {
         throw new Error(`batch incomplete: ${missing.length}/${items.length} missing`);
       }
-      console.log(`${batchLabel} OK (${Date.now() - t0}ms, scored=${gotIndexes.size})`);
+      trace(`${batchLabel} OK (${Date.now() - t0}ms, scored=${gotIndexes.size})`);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       const errName = err instanceof Error ? err.name : "Unknown";
-      console.error(`${batchLabel} FAIL (${Date.now() - t0}ms) — ${errName}: ${errMsg.slice(0, 300)}`);
+      trace(`${batchLabel} FAIL (${Date.now() - t0}ms) — ${errName}: ${errMsg.slice(0, 300)}`);
       // 07/07 (Orsu) — 2 retries au lieu de 1, backoff progressif (1.2s → 3s)
       if (attempt < 2) {
         await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
@@ -332,6 +337,9 @@ export async function POST(req: NextRequest) {
           }
         }, 10_000);
 
+        // 07/07 (Orsu) — hoisted hors du try pour être accessible dans le catch
+        const traceBuffer: string[] = [];
+
         try {
           send("progress", { phase: "extracting", analysisId: analysis.id });
 
@@ -366,6 +374,7 @@ export async function POST(req: NextRequest) {
             phase: "scoring",
             detail: `Analyse de ${flatSentences.length} phrases (batch 1)…`,
           });
+          // 07/07 (Orsu) — traceBuffer déclaré plus haut, passé ici à claudeScoreChunks.
           const sentenceScores = await claudeScoreChunks(
             flatSentences,
             language,
@@ -376,7 +385,8 @@ export async function POST(req: NextRequest) {
                   detail: `Analyse des phrases (batch ${done + 1}/${total})…`,
                 });
               }
-            }
+            },
+            traceBuffer
           );
 
           // Réagrégation : pour chaque chunk (= paragraph), attacher les
@@ -427,6 +437,12 @@ export async function POST(req: NextRequest) {
           });
         } catch (err) {
           // Rembourse le token en cas d'échec
+          const errText = err instanceof Error ? err.message : "Erreur inconnue";
+          // 07/07 (Orsu) — écrit traceBuffer (si présent) dans errorMessage
+          // pour debug post-mortem via Prisma Mac mini.
+          const bufferedTrace = traceBuffer.length > 0
+            ? `\n---TRACE---\n${traceBuffer.join("\n")}`
+            : "";
           try {
             await prisma.user.update({
               where: { id: user.id },
@@ -436,7 +452,7 @@ export async function POST(req: NextRequest) {
               where: { id: analysis.id },
               data: {
                 status: "failed",
-                errorMessage: err instanceof Error ? err.message : "Erreur inconnue",
+                errorMessage: `${errText}${bufferedTrace}`.slice(0, 4000),
               },
             });
           } catch {
