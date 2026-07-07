@@ -224,9 +224,10 @@ function smartChunk(text: string, targetWords = 170): string[] {
 }
 
 export const runtime = "nodejs";
-// 07/07 (Orsu) — Vercel Pro autorise jusqu'à 800s. Simulé sur DPP 12k mots :
-// analyse totale ~467s avec CONCURRENCY=3. 800s = marge safe.
-export const maxDuration = 800;
+// 07/07 (Orsu) — Test réel end-to-end sur DPP 12k mots : analyse a fait 798.3s
+// (tous les 19 batches OK) mais Vercel a coupé PILE 2s avant que le "done"
+// soit envoyé. Passage à 900s pour 2 min de marge sur l'aggregation + save DB.
+export const maxDuration = 900;
 
 const ANALYZE_TOKEN_COST = 1;
 
