@@ -374,7 +374,10 @@ export async function POST(req: NextRequest) {
             phase: "scoring",
             detail: `Analyse de ${flatSentences.length} phrases (batch 1)…`,
           });
-          // 07/07 (Orsu) — traceBuffer déclaré plus haut, passé ici à claudeScoreChunks.
+          // 07/07 (Orsu) — Vercel Function crash sans catch → on persiste
+          // errorMessage en DB AU FIL DE L'EAU (après chaque batch) pour que
+          // même en kill brutal, la DB reflète le dernier batch bougé.
+          const t0 = Date.now();
           const sentenceScores = await claudeScoreChunks(
             flatSentences,
             language,
@@ -384,6 +387,18 @@ export async function POST(req: NextRequest) {
                   phase: "scoring",
                   detail: `Analyse des phrases (batch ${done + 1}/${total})…`,
                 });
+              }
+              // Persist DB checkpoint every batch
+              try {
+                await prisma.humanizerAnalysis.update({
+                  where: { id: analysis.id },
+                  data: {
+                    status: done < total ? "scoring" : "scoring-done",
+                    errorMessage: `[in-progress] batch ${done}/${total} · ${Math.round((Date.now() - t0) / 1000)}s · trace: ${traceBuffer.slice(-6).join(" | ").slice(0, 800)}`,
+                  },
+                });
+              } catch {
+                // best-effort
               }
             },
             traceBuffer

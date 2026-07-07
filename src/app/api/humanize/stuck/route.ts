@@ -6,7 +6,9 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const NON_TERMINAL = ["extracting", "detecting-before", "cleaning-deterministic", "rewriting-llm", "detecting-after", "retrying", "restoring", "pending"];
+// 07/07 (Orsu) — ajout "scoring" + "scoring-done" + "detecting" pour couvrir
+// les checkpoints intermédiaires de l'analyze route en cas de crash Vercel Fn.
+const NON_TERMINAL = ["extracting", "detecting", "detecting-before", "cleaning-deterministic", "rewriting-llm", "detecting-after", "retrying", "restoring", "pending", "scoring", "scoring-done"];
 
 /**
  * GET /api/humanize/stuck
