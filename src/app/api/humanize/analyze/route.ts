@@ -111,11 +111,11 @@ ${numbered}`;
     }
   };
 
-  // 07/07 (Orsu) — passage à 3 concurrents. Simulé sur DPP 12k mots :
-  // 20 batches × ~70s Sonnet / 3 = ~467s. Combiné avec maxDuration 800s
-  // (Vercel Pro), on a une marge safe de 5+ min pour finir sans être
-  // kill par la fenêtre serverless.
-  const CONCURRENCY = 3;
+  // 07/07 (Orsu) — RETOUR à 2 concurrents. Sim CONCURRENCY=3 sur DPP 12k :
+  // le CLI claude --print sur usage_server saturait (7/20 batches timeout).
+  // Structurel : Claude Max CLI gère mal 3+ appels concurrents. Retour
+  // à 2 : sim de 716s wall-clock, safe sous les 800s Vercel Pro.
+  const CONCURRENCY = 2;
   let done = 0;
   for (let i = 0; i < batches.length; i += CONCURRENCY) {
     const slice = batches.slice(i, i + CONCURRENCY);
