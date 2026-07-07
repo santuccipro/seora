@@ -109,10 +109,79 @@ async function extractPDF(buffer: Buffer): Promise<string> {
   const doc = await getDocumentProxy(new Uint8Array(buffer));
   const { text } = await extractText(doc, { mergePages: false });
   const pages = Array.isArray(text) ? text : [text as string];
-  return pages
+  const rawPages = pages
     .map((p) => (p ?? "").trim())
-    .filter(Boolean)
-    .join("\n\n");
+    .filter(Boolean);
+  // 07/07 (Orsu) — reflowPdfText fusionne les sauts de ligne intra-paragraphe
+  // introduits par pdfjs. Sans ça on avait des mots seuls sur des lignes
+  // ("School", "de", "patrimoine,") qui cassaient la mise en page du rapport.
+  return rawPages.map(reflowPdfText).join("\n\n");
+}
+
+/**
+ * Post-processe le texte extrait d'un PDF page-par-page pour recoller les
+ * paragraphes coupés par les retours à la ligne du layout.
+ *
+ * Règles :
+ *  - Mot césuré en fin de ligne ("qual-\ité") → recolle sans espace + rejoint.
+ *  - Ligne qui finit par ponctuation faible (,;:) OU sans ponctuation, et
+ *    ligne suivante commence par minuscule / signe faible / mot court → même
+ *    paragraphe, join avec un espace.
+ *  - Ligne qui finit par ponctuation forte (.!?…) ET ligne suivante commence
+ *    par majuscule ou puce → nouveau paragraphe (\n\n).
+ *  - Ligne vide (blanc pur) → séparateur de paragraphe.
+ */
+function reflowPdfText(pageText: string): string {
+  const lines = pageText.split(/\r?\n/).map((l) => l.trim());
+  const out: string[] = [];
+  let buffer = "";
+  const flush = () => {
+    const trimmed = buffer.trim();
+    if (trimmed) out.push(trimmed);
+    buffer = "";
+  };
+  const startsLikeContinuation = (line: string) => {
+    if (!line) return false;
+    const first = line[0];
+    // Continuation si commence par minuscule, chiffre suivant une lettre, ou
+    // caractères qui trahissent une suite (guillemets, parenthèses fermantes,
+    // ponctuation de rupture faible).
+    return /^[a-zàâäéèêëïîôöùûüÿçœæ0-9,;:)\]»"'\-]/.test(first);
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) {
+      // Ligne vide : ne flush QUE si le buffer se termine par ponctuation
+      // forte (vrai break de paragraphe). Sinon on ignore — probablement
+      // artefact de layout PDF (colonne, titre isolé, cellule de tableau).
+      const last = buffer[buffer.length - 1] ?? "";
+      if (/[.!?…]/.test(last)) {
+        flush();
+      }
+      continue;
+    }
+    if (buffer === "") {
+      buffer = line;
+      continue;
+    }
+    // Mot césuré en fin de ligne : "qual-" + "ité" → "qualité"
+    if (buffer.endsWith("-") && /^[a-zàâäéèêëïîôöùûüÿçœæ]/.test(line)) {
+      buffer = buffer.slice(0, -1) + line;
+      continue;
+    }
+    const lastChar = buffer[buffer.length - 1];
+    const endsSentence = /[.!?…]/.test(lastChar);
+    // Fin de phrase + majuscule sur la suivante → nouveau paragraphe.
+    if (endsSentence && !startsLikeContinuation(line)) {
+      flush();
+      buffer = line;
+      continue;
+    }
+    // Sinon on considère que c'est une continuation du même paragraphe.
+    buffer += " " + line;
+  }
+  flush();
+  return out.join("\n\n");
 }
 
 async function extractDOCX(buffer: Buffer): Promise<string> {

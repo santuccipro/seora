@@ -75,6 +75,7 @@ type SentenceScore = {
   text: string;
   tail: string;
   score: number;
+  why?: string;
 };
 
 type ParagraphScore = {
@@ -84,6 +85,9 @@ type ParagraphScore = {
   risk: "high" | "medium" | "low";
   sentences?: SentenceScore[];
   details?: Record<string, number>;
+  // 07/07 (Orsu) — 2-3 raisons courtes citant les marqueurs IA repérés
+  // dans les phrases HIGH de cette zone. Affiché dans l'UI zone-report.
+  topReasons?: string[];
 };
 
 type AnalyzeOnlyResult = {
@@ -1704,27 +1708,46 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
 
               return (
                 <Fragment key={p.index}>
-                  <p
+                  <div
                     id={`report-para-${p.index}`}
-                    className={`text-[15px] text-gray-800 leading-[1.85] scroll-mt-6 rounded-md transition-all whitespace-pre-wrap ${
+                    className={`scroll-mt-6 rounded-md transition-all ${
                       isCurrent ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-white shadow-sm px-2 -mx-2 py-1" : ""
                     }`}
                   >
-                    {sentences.map((s, si) => (
-                      <Fragment key={si}>
-                        <span
-                          className={
-                            s.score >= 50
-                              ? "bg-cyan-100 px-1 py-0.5 rounded"
-                              : ""
-                          }
-                        >
-                          {s.text}
+                    <p className="text-[15px] text-gray-800 leading-[1.85] whitespace-pre-wrap">
+                      {sentences.map((s, si) => (
+                        <Fragment key={si}>
+                          <span
+                            className={
+                              s.score >= 50
+                                ? "bg-cyan-100 px-1 py-0.5 rounded"
+                                : ""
+                            }
+                            title={s.why || undefined}
+                          >
+                            {s.text}
+                          </span>
+                          {s.tail || " "}
+                        </Fragment>
+                      ))}
+                    </p>
+                    {/* 07/07 (Orsu) — pourquoi cette zone est IA (topReasons) */}
+                    {isFlagged && p.topReasons && p.topReasons.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="text-[10px] uppercase tracking-widest font-black text-cyan-700 mr-1 mt-0.5">
+                          Pourquoi IA ?
                         </span>
-                        {s.tail || " "}
-                      </Fragment>
-                    ))}
-                  </p>
+                        {p.topReasons.map((r, ri) => (
+                          <span
+                            key={ri}
+                            className="text-[11px] bg-cyan-50 text-cyan-800 border border-cyan-200 rounded-full px-2 py-0.5 font-medium"
+                          >
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-start justify-center pt-1">
                     {isFlagged && (
                       <button

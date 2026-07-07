@@ -22,7 +22,7 @@ async function claudeScoreChunks(
   language: Language,
   onBatchProgress?: (done: number, total: number) => void | Promise<void>,
   traceBuffer?: string[]
-): Promise<number[]> {
+): Promise<{ scores: number[]; reasons: string[] }> {
   const trace = (line: string) => {
     console.log(line);
     if (traceBuffer) traceBuffer.push(line);
@@ -34,7 +34,10 @@ async function claudeScoreChunks(
   // = ~4 min (vs ~1 min avant), toujours dans le maxDuration 300s.
   const BATCH_SIZE = 25;
   const scores = new Array<number>(chunks.length).fill(-1);
-  if (chunks.length === 0) return scores;
+  // 07/07 (Orsu) — reasons align avec scores : raison courte pour chaque phrase
+  // à score >= 50 (les zones flaggées). Vide pour les phrases classées humaines.
+  const reasons = new Array<string>(chunks.length).fill("");
+  if (chunks.length === 0) return { scores, reasons };
 
   const langHint = language === "fr" ? "français" : language === "en" ? "anglais" : "espagnol";
 
@@ -63,8 +66,16 @@ BARÈME : 0-15 humain sûr · 15-30 mixte · 30-50 moitié IA · 50-75 majoritai
 SIGNAUX IA (+) : cascades énumératives, antithèses balancées ("n'est pas X c'est Y"), registre uniforme, nominalizations "l'identification des", connecteurs "par ailleurs / en outre", trios rhétoriques.
 SIGNAUX HUMAINS (-) : "franchement", "concrètement", "à mon niveau", "bon,", "en vrai", phrases courtes, registre variable, micro-imperfections.
 
-Réponds STRICTEMENT ce JSON, un objet par passage :
-{"scores":[{"i":0,"s":78},{"i":1,"s":34}, ...]}
+**IMPORTANT** — pour CHAQUE passage dont le score est ≥ 50, ajoute un champ "why" court (≤ 15 mots) qui cite LE marqueur IA le plus flagrant dans cette phrase précise (pas générique). Pour les passages < 50, mets "why": "".
+
+Exemples de bon "why" :
+- "triade rhétorique + connecteur 'par ailleurs'"
+- "nominalisation dense 'l'identification des'"
+- "antithèse balancée 'n'est pas X c'est Y'"
+- "registre soutenu uniforme, zéro burstiness"
+
+Réponds STRICTEMENT ce JSON :
+{"scores":[{"i":0,"s":78,"why":"triade rhétorique explicite"},{"i":1,"s":12,"why":""}, ...]}
 
 PASSAGES :
 ${numbered}`;
@@ -79,12 +90,13 @@ ${numbered}`;
       });
       const m = raw.match(/\{[\s\S]*\}/);
       if (!m) throw new Error("no JSON in Claude response");
-      const parsed = JSON.parse(m[0]) as { scores?: Array<{ i: number; s: number }> };
+      const parsed = JSON.parse(m[0]) as { scores?: Array<{ i: number; s: number; why?: string }> };
       const gotIndexes = new Set<number>();
       for (const entry of parsed.scores ?? []) {
         const abs = start + entry.i;
         if (abs < scores.length) {
           scores[abs] = Math.max(0, Math.min(100, Math.round(entry.s)));
+          reasons[abs] = (entry.why ?? "").toString().slice(0, 120);
           gotIndexes.add(abs);
         }
       }
@@ -130,7 +142,7 @@ ${numbered}`;
   if (scores.some((s) => s < 0)) {
     throw new Error("Scoring Claude Sonnet incomplet — certains passages n'ont pas de score. Réessaie.");
   }
-  return scores;
+  return { scores, reasons };
 }
 
 /**
@@ -381,7 +393,7 @@ export async function POST(req: NextRequest) {
           // errorMessage en DB AU FIL DE L'EAU (après chaque batch) pour que
           // même en kill brutal, la DB reflète le dernier batch bougé.
           const t0 = Date.now();
-          const sentenceScores = await claudeScoreChunks(
+          const { scores: sentenceScores, reasons: sentenceReasons } = await claudeScoreChunks(
             flatSentences,
             language,
             async (done, total) => {
@@ -410,17 +422,30 @@ export async function POST(req: NextRequest) {
           // Réagrégation : pour chaque chunk (= paragraph), attacher les
           // scores individuels des phrases qu'il contient. Le risk global
           // du paragraph = max des scores de ses phrases.
+          // 07/07 (Orsu) — pour chaque zone flagée, on remonte les 2-3 raisons
+          // les plus explicites (why cité par Claude sur les phrases high) et
+          // on les concatène en "topReasons" au niveau paragraph, pour que
+          // l'UI puisse expliquer POURQUOI la zone est classée IA.
           let cursor = 0;
           const paragraphs = chunkTexts.map((text, index) => {
             const sList = sentencesPerChunk[index];
             const sentences = sList.map((s) => {
-              const sc = sentenceScores[cursor++] ?? 0;
-              return { text: s.text, tail: s.tail, score: sc };
+              const abs = cursor++;
+              const sc = sentenceScores[abs] ?? 0;
+              const why = sentenceReasons[abs] ?? "";
+              return { text: s.text, tail: s.tail, score: sc, why };
             });
             const maxScore = sentences.reduce((mx, s) => (s.score > mx ? s.score : mx), 0);
             const risk: "high" | "medium" | "low" =
               maxScore >= 50 ? "high" : maxScore >= 25 ? "medium" : "low";
-            return { index, text, sentences, score: maxScore, risk };
+            // Dédupliqué, on garde les whys les plus flagrants (phrases score DESC)
+            const topReasons = sentences
+              .filter((s) => s.score >= 50 && s.why)
+              .sort((a, b) => b.score - a.score)
+              .map((s) => s.why)
+              .filter((w, i, arr) => arr.indexOf(w) === i)
+              .slice(0, 3);
+            return { index, text, sentences, score: maxScore, risk, topReasons };
           });
 
           const wordCount = originalText.trim().split(/\s+/).length;
