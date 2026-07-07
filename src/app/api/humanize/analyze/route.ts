@@ -233,10 +233,11 @@ function smartChunk(text: string, targetWords = 170): string[] {
 }
 
 export const runtime = "nodejs";
-// 07/07 (Orsu) — Test réel end-to-end sur DPP 12k mots : analyse a fait 798.3s
-// (tous les 19 batches OK) mais Vercel a coupé PILE 2s avant que le "done"
-// soit envoyé. Passage à 900s pour 2 min de marge sur l'aggregation + save DB.
-export const maxDuration = 900;
+// 07/07 (Orsu) — Passage à 1200s. Le nouveau prompt "why par phrase" alourdit
+// la réponse Claude, le total wall-clock dépasse 900s sur DPP 12k mots. Vercel
+// Pro autorise jusqu'à 1800s en extended max duration (beta), 1200 laisse
+// une marge safe.
+export const maxDuration = 1200;
 
 const ANALYZE_TOKEN_COST = 1;
 
