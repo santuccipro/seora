@@ -27,12 +27,10 @@ async function claudeScoreChunks(
     console.log(line);
     if (traceBuffer) traceBuffer.push(line);
   };
-  // 07/07 (Orsu) — BATCH_SIZE baissé 40→25 pour réduire le risque de timeout
-  // par batch (Claude Sonnet met parfois >90s sur 40 phrases si surcharge).
-  // Plus de batches mais plus petits = plus prévisible + tolère mieux les
-  // flares Anthropic. DPP 12k mots (~800 phrases) : 32 batches × ~15s / 2 concurrents
-  // = ~4 min (vs ~1 min avant), toujours dans le maxDuration 300s.
-  const BATCH_SIZE = 25;
+  // 07/07 (Orsu) — BATCH_SIZE 25→15. Le nouveau prompt "why par phrase" alourdit
+  // la réponse Claude : certains batches de 25 dépassaient les 100s de timeout
+  // Cloudflare (504 gateway timeout). Batches de 15 tiennent sous 60-70s.
+  const BATCH_SIZE = 15;
   const scores = new Array<number>(chunks.length).fill(-1);
   // 07/07 (Orsu) — reasons align avec scores : raison courte pour chaque phrase
   // à score >= 50 (les zones flaggées). Vide pour les phrases classées humaines.
