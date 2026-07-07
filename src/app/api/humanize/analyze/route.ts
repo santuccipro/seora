@@ -111,10 +111,11 @@ ${numbered}`;
     }
   };
 
-  // Batches en PARALLÈLE contrôlé (2 concurrent max) — divise le temps
-  // total par ~2 pour tenir dans le maxDuration 300s Vercel, sans saturer
-  // le runner Claude (qui gère mal 6+ concurrents mais tient 2 sans souci).
-  const CONCURRENCY = 2;
+  // 07/07 (Orsu) — passage à 3 concurrents. Simulé sur DPP 12k mots :
+  // 20 batches × ~70s Sonnet / 3 = ~467s. Combiné avec maxDuration 800s
+  // (Vercel Pro), on a une marge safe de 5+ min pour finir sans être
+  // kill par la fenêtre serverless.
+  const CONCURRENCY = 3;
   let done = 0;
   for (let i = 0; i < batches.length; i += CONCURRENCY) {
     const slice = batches.slice(i, i + CONCURRENCY);
@@ -223,7 +224,9 @@ function smartChunk(text: string, targetWords = 170): string[] {
 }
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+// 07/07 (Orsu) — Vercel Pro autorise jusqu'à 800s. Simulé sur DPP 12k mots :
+// analyse totale ~467s avec CONCURRENCY=3. 800s = marge safe.
+export const maxDuration = 800;
 
 const ANALYZE_TOKEN_COST = 1;
 
