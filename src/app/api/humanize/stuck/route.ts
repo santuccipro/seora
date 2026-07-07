@@ -11,10 +11,11 @@ const NON_TERMINAL = ["extracting", "detecting-before", "cleaning-deterministic"
 /**
  * GET /api/humanize/stuck
  *
- * Lists the current user's humanizer analyses that are stuck in a
- * non-terminal state for more than 5 minutes — probably killed by a
- * serverless timeout. The client uses this to prompt a one-click
- * "Refund + retry".
+ * 07/07 (Orsu) — refonte : AUTO-REFUND direct au lieu de renvoyer la
+ * liste au client. Le patron ne veut plus voir "clique pour rembourser".
+ * Toute analyse coincée >5min → tokens remboursés + status=failed dans
+ * la même transaction. Le client n'a rien à faire, on retourne juste le
+ * nombre remboursé pour un éventuel toast discret.
  */
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -29,9 +30,28 @@ export async function GET() {
       status: { in: NON_TERMINAL },
       createdAt: { lt: fiveMinAgo },
     },
-    select: { id: true, fileName: true, status: true, tokensUsed: true, createdAt: true },
-    orderBy: { createdAt: "desc" },
-    take: 10,
+    select: { id: true, tokensUsed: true },
+    take: 20,
   });
-  return NextResponse.json({ stuck });
+
+  if (stuck.length === 0) {
+    return NextResponse.json({ ok: true, autoRefunded: 0, tokens: 0 });
+  }
+
+  const totalTokens = stuck.reduce((sum, s) => sum + (s.tokensUsed ?? 0), 0);
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { tokens: { increment: totalTokens } },
+    }),
+    prisma.humanizerAnalysis.updateMany({
+      where: { id: { in: stuck.map((s) => s.id) } },
+      data: {
+        status: "failed",
+        errorMessage: "Interrompu — tokens remboursés automatiquement.",
+      },
+    }),
+  ]);
+
+  return NextResponse.json({ ok: true, autoRefunded: stuck.length, tokens: totalTokens });
 }

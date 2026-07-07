@@ -157,31 +157,23 @@ export default function HumanizerPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeOnlyResult, setAnalyzeOnlyResult] = useState<AnalyzeOnlyResult | null>(null);
   const [analyzingOnly, setAnalyzingOnly] = useState(false);
-  const [stuckAnalyses, setStuckAnalyses] = useState<Array<{ id: string; fileName: string; tokensUsed: number; createdAt: string }>>([]);
-
-  const refreshStuck = useCallback(async () => {
+  // 07/07 (Orsu) — auto-refund silencieux au boot de la page.
+  // Ancien bandeau "N analyses coincées — clique pour rembourser" supprimé
+  // (patron veut zéro friction : si un truc plante, on rembourse auto).
+  const autoRefundStuck = useCallback(async () => {
     try {
       const res = await fetch("/api/humanize/stuck");
       if (!res.ok) return;
       const data = await res.json();
-      setStuckAnalyses(data.stuck ?? []);
-    } catch { /* ignore */ }
+      if (data.autoRefunded > 0 && data.tokens > 0) {
+        toast.success(`On t'a rendu ${data.tokens} token${data.tokens > 1 ? "s" : ""} — désolé pour le hoquet 🙏`);
+      }
+    } catch { /* silent */ }
   }, []);
 
   useEffect(() => {
-    refreshStuck();
-  }, [refreshStuck]);
-
-  const cleanupStuck = async (id: string) => {
-    try {
-      const res = await fetch(`/api/humanize/${id}/cleanup`, { method: "POST" });
-      const data = await res.json();
-      if (data.ok) {
-        toast.success(`Tokens remboursés (${data.refunded ?? 0}).`);
-        refreshStuck();
-      }
-    } catch { /* ignore */ }
-  };
+    autoRefundStuck();
+  }, [autoRefundStuck]);
   const [phase, setPhase] = useState<string>("extracting");
   const [pass, setPass] = useState(0);
   const [totalPasses, setTotalPasses] = useState(0);
@@ -373,7 +365,10 @@ export default function HumanizerPage() {
       }
 
       if (!done && !sawError) {
-        throw new Error("Analyse interrompue avant la fin. Ton token a été remboursé.");
+        // 07/07 (Orsu) — message adouci + auto-refund via /api/humanize/stuck au refresh
+        // Le user n'a rien à faire, le token est déjà remboursé côté serveur.
+        await fetch("/api/humanize/stuck").catch(() => {});
+        throw new Error("Petit hoquet côté serveur. Ton token t'a été rendu, tu peux retenter direct 🙏");
       }
       if (done) {
         setAnalyzeOnlyResult(done);
@@ -454,13 +449,14 @@ export default function HumanizerPage() {
 
       // Stream ended without "done" and without "error" → Vercel or CF killed
       // the request mid-flight. Clean up + refund the analysis on the server.
+      // 07/07 (Orsu) — message adouci, plus de jargon "timeout serveur".
       if (!sawDone && !sawError && startedId) {
         try {
           await fetch(`/api/humanize/${startedId}/cleanup`, { method: "POST" });
         } catch {
           // best-effort
         }
-        throw new Error("Analyse interrompue par le timeout serveur — tokens remboursés. Réessaie avec un extrait plus court ou passe en mode Basique.");
+        throw new Error("Petit hoquet côté serveur. Tes tokens t'ont été rendus, retente-moi ça 🙏");
       }
 
       if (doneId) {
@@ -637,34 +633,6 @@ export default function HumanizerPage() {
       )}
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12">
-        {/* Stuck-analysis banner */}
-        {stuckAnalyses.length > 0 && (
-          <div className="mb-6 rounded-2xl bg-amber-50 border border-amber-300 p-4 sm:p-5">
-            <p className="text-sm font-bold text-amber-900 mb-2">
-              ⚠️ {stuckAnalyses.length} analyse{stuckAnalyses.length > 1 ? "s" : ""} coincée{stuckAnalyses.length > 1 ? "s" : ""} en cours
-            </p>
-            <p className="text-xs text-amber-800 mb-3">
-              Interrompue{stuckAnalyses.length > 1 ? "s" : ""} par un timeout serveur — clique pour rembourser tes tokens.
-            </p>
-            <div className="space-y-2">
-              {stuckAnalyses.map((s) => (
-                <div key={s.id} className="flex items-center justify-between gap-2 bg-white rounded-xl px-3 py-2 border border-amber-200">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-900 truncate">{s.fileName}</p>
-                    <p className="text-[10px] text-gray-500">{new Date(s.createdAt).toLocaleString("fr-FR")}</p>
-                  </div>
-                  <button
-                    onClick={() => cleanupStuck(s.id)}
-                    className="rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 shrink-0"
-                  >
-                    Rembourser {s.tokensUsed}t
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="flex items-center justify-between mb-6">
           <Link
             href="/app"
