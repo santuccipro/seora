@@ -28,13 +28,15 @@ async function claudeScoreChunks(
     console.log(line);
     if (traceBuffer) traceBuffer.push(line);
   };
-  // 07/07 (Orsu) — BATCH_SIZE 25→15. Le nouveau prompt "why par phrase" alourdit
-  // la réponse Claude : certains batches de 25 dépassaient les 100s de timeout
-  // Cloudflare (504 gateway timeout). Batches de 15 tiennent sous 60-70s.
-  const BATCH_SIZE = 15;
+  // 08/07 (Orsu) — passage au scoring par PARAGRAPHE (pas par phrase).
+  // Le score par phrase (780 items sur DPP 12k) prenait ~15 min. Le score
+  // par paragraphe (~100 items) tient en 4 batches × 30 items × concurrence 2
+  // = ~3 min. Trade-off UX : surlignage cyan au niveau paragraphe entier au
+  // lieu de la phrase précise, mais le user voit toujours les zones IA.
+  const BATCH_SIZE = 30;
   const scores = new Array<number>(chunks.length).fill(-1);
-  // 07/07 (Orsu) — reasons align avec scores : raison courte pour chaque phrase
-  // à score >= 50 (les zones flaggées). Vide pour les phrases classées humaines.
+  // reasons gardé pour compat de signature mais reste vide (patron a viré
+  // les pills "Pourquoi IA ?" du rendu, cf commit précédent).
   const reasons = new Array<string>(chunks.length).fill("");
   if (chunks.length === 0) return { scores, reasons };
 
@@ -54,8 +56,10 @@ async function claudeScoreChunks(
     const batchLabel = `[analyze-batch start=${start} n=${items.length} attempt=${attempt}]`;
     const t0 = Date.now();
     trace(`${batchLabel} START`);
+    // 08/07 (Orsu) — items sont maintenant des PARAGRAPHES (~170 mots)
+    // au lieu de phrases (~25 mots). On tronque plus large (1400 chars).
     const numbered = items
-      .map((t, k) => `[${k}] ${t.replace(/\s+/g, " ").slice(0, 900)}`)
+      .map((t, k) => `[${k}] ${t.replace(/\s+/g, " ").slice(0, 1400)}`)
       .join("\n\n");
     // 07/07 (Orsu) — retour au prompt simple sans "why". Le patron ne veut
     // plus donner d'indices actionnable par zone (le user réparerait 3 phrases
@@ -361,13 +365,10 @@ export async function POST(req: NextRequest) {
           send("progress", { phase: "detecting", detail: `${originalText.split(/\s+/).length} mots extraits` });
 
           // Découpage à deux niveaux :
-          //  • smartChunk pour la structure paragraphe (rendu UI)
-          //  • splitIntoSentences pour scorer PHRASE PAR PHRASE dans chaque
-          //    chunk — le user veut voir quelles phrases précises sont IA,
-          //    pas un pavé bleu de 200 mots.
+          //  • smartChunk pour la structure paragraphe (rendu UI + scoring)
+          //  08/07 (Orsu) : plus de split par phrase. Le scoring est fait
+          //  directement au niveau du paragraphe pour gagner ~90% du temps.
           const chunkTexts = smartChunk(originalText, 170);
-          const sentencesPerChunk = chunkTexts.map((c) => splitIntoSentences(c));
-          const flatSentences = sentencesPerChunk.flatMap((sList) => sList.map((s) => s.text));
 
           // Scoring Claude en SÉQUENTIEL pour éviter que le runner Mac
           // mini se prenne 6+ appels concurrents et fail silencieusement :
@@ -391,20 +392,21 @@ export async function POST(req: NextRequest) {
 
           send("progress", {
             phase: "scoring",
-            detail: `Analyse de ${flatSentences.length} phrases (batch 1)…`,
+            detail: `Analyse de ${chunkTexts.length} zones (batch 1)…`,
           });
-          // 07/07 (Orsu) — Vercel Function crash sans catch → on persiste
-          // errorMessage en DB AU FIL DE L'EAU (après chaque batch) pour que
-          // même en kill brutal, la DB reflète le dernier batch bougé.
+          // 08/07 (Orsu) — scoring par PARAGRAPHE (pas par phrase). ~100 items
+          // au lieu de 780 → temps total tombe de ~15 min à ~3 min. Le user
+          // voit encore les zones à risque, mais surlignage au niveau du
+          // paragraphe entier plutôt que phrase par phrase (option 2 patron).
           const t0 = Date.now();
-          const { scores: sentenceScores, reasons: sentenceReasons } = await claudeScoreChunks(
-            flatSentences,
+          const { scores: paragraphScores } = await claudeScoreChunks(
+            chunkTexts,
             language,
             async (done, total) => {
               if (done < total) {
                 send("progress", {
                   phase: "scoring",
-                  detail: `Analyse des phrases (batch ${done + 1}/${total})…`,
+                  detail: `Analyse des zones (batch ${done + 1}/${total})…`,
                 });
               }
               // Persist DB checkpoint every batch
@@ -423,33 +425,22 @@ export async function POST(req: NextRequest) {
             traceBuffer
           );
 
-          // Réagrégation : pour chaque chunk (= paragraph), attacher les
-          // scores individuels des phrases qu'il contient. Le risk global
-          // du paragraph = max des scores de ses phrases.
+          // Réagrégation : chaque paragraph reçoit son score direct (plus de
+          // score par phrase). Le rendu UI surligne le paragraphe entier en cyan
+          // s'il est classé HIGH.
           // 07/07 (Orsu) — pour chaque zone flagée, on remonte les 2-3 raisons
           // les plus explicites (why cité par Claude sur les phrases high) et
           // on les concatène en "topReasons" au niveau paragraph, pour que
           // l'UI puisse expliquer POURQUOI la zone est classée IA.
-          let cursor = 0;
+          // 08/07 (Orsu) — plus de sentences par paragraphe. Chaque paragraph
+          // reçoit son score direct. Le rendu UI surligne le paragraph entier
+          // en cyan quand HIGH (fallback existant sur { text, score } quand
+          // p.sentences est absent).
           const paragraphs = chunkTexts.map((text, index) => {
-            const sList = sentencesPerChunk[index];
-            const sentences = sList.map((s) => {
-              const abs = cursor++;
-              const sc = sentenceScores[abs] ?? 0;
-              const why = sentenceReasons[abs] ?? "";
-              return { text: s.text, tail: s.tail, score: sc, why };
-            });
-            const maxScore = sentences.reduce((mx, s) => (s.score > mx ? s.score : mx), 0);
+            const score = paragraphScores[index] ?? 0;
             const risk: "high" | "medium" | "low" =
-              maxScore >= 50 ? "high" : maxScore >= 25 ? "medium" : "low";
-            // Dédupliqué, on garde les whys les plus flagrants (phrases score DESC)
-            const topReasons = sentences
-              .filter((s) => s.score >= 50 && s.why)
-              .sort((a, b) => b.score - a.score)
-              .map((s) => s.why)
-              .filter((w, i, arr) => arr.indexOf(w) === i)
-              .slice(0, 3);
-            return { index, text, sentences, score: maxScore, risk, topReasons };
+              score >= 50 ? "high" : score >= 25 ? "medium" : "low";
+            return { index, text, score, risk };
           });
 
           const wordCount = originalText.trim().split(/\s+/).length;
