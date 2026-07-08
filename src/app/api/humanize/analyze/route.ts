@@ -28,12 +28,10 @@ async function claudeScoreChunks(
     console.log(line);
     if (traceBuffer) traceBuffer.push(line);
   };
-  // 08/07 (Orsu) — passage au scoring par PARAGRAPHE (pas par phrase).
-  // Le score par phrase (780 items sur DPP 12k) prenait ~15 min. Le score
-  // par paragraphe (~100 items) tient en 4 batches × 30 items × concurrence 2
-  // = ~3 min. Trade-off UX : surlignage cyan au niveau paragraphe entier au
-  // lieu de la phrase précise, mais le user voit toujours les zones IA.
-  const BATCH_SIZE = 30;
+  // 08/07 (Orsu) — scoring par PARAGRAPHE. BATCH_SIZE 30→20 : batches de 30
+  // paragraphes×170mots faisaient un prompt de 5k mots → Claude prenait
+  // ~110s → 504 CF gateway timeout à 100s. Batches de 20 tiennent en 60-80s.
+  const BATCH_SIZE = 20;
   const scores = new Array<number>(chunks.length).fill(-1);
   // reasons gardé pour compat de signature mais reste vide (patron a viré
   // les pills "Pourquoi IA ?" du rendu, cf commit précédent).
