@@ -1160,8 +1160,30 @@ ${slice}
       langue: clamp(parsed.langue),
     };
   } catch (err) {
-    console.error("[claudeScoreDimensions] failed:", err);
-    return { structure: 0, registre: 0, antitheses: 0, langue: 0 };
+    // 08/07 (Orsu) — retry sync 1× avec délai court avant de renoncer.
+    // Sinon un flare tunnel/Anthropic tombe direct dans "0/0/0/0" chelou.
+    console.error("[claudeScoreDimensions] first attempt failed:", err instanceof Error ? err.message : err);
+    try {
+      await new Promise((r) => setTimeout(r, 1500));
+      const raw = await callClaude(prompt, {
+        system: "Détecteur IA multi-dimensions. Réponds uniquement JSON valide.",
+        model: "claude-sonnet-4-6",
+        timeoutMs: 60_000,
+      });
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("no JSON (retry)");
+      const parsed = JSON.parse(m[0]) as Partial<DimensionScores>;
+      const clamp = (n: unknown) => Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+      return {
+        structure: clamp(parsed.structure),
+        registre: clamp(parsed.registre),
+        antitheses: clamp(parsed.antitheses),
+        langue: clamp(parsed.langue),
+      };
+    } catch (err2) {
+      console.error("[claudeScoreDimensions] retry also failed:", err2 instanceof Error ? err2.message : err2);
+      return { structure: 0, registre: 0, antitheses: 0, langue: 0 };
+    }
   }
 }
 

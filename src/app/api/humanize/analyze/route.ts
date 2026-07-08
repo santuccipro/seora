@@ -377,13 +377,17 @@ export async function POST(req: NextRequest) {
             phase: "scoring",
             detail: "Score global Claude Sonnet…",
           });
-          // 07/07 (Orsu) — score global + 4 dimensions en parallèle. Les 4
-          // dimensions (STRUCTURE, REGISTRE, ANTITHESES, LANGUE) donnent au
-          // user 4 axes visibles en haut du rapport → pousse à humaniser tout.
-          const [claude, dimensions] = await Promise.all([
-            claudeScoreText(originalText, language),
-            claudeScoreDimensions(originalText, language),
-          ]);
+          // 08/07 (Orsu) — SÉQUENTIEL (pas Promise.all). claudeScoreText fait
+          // déjà 3 slices concurrent, + claudeScoreDimensions = 4 appels
+          // simultanés → sature le runner (Claude CLI Max ne tient pas >2-3
+          // concurrent). Résultat observé : les dimensions renvoyaient 0/0/0/0
+          // (catch silencieux dans humanize-engine.ts).
+          const claude = await claudeScoreText(originalText, language);
+          send("progress", {
+            phase: "scoring",
+            detail: "Score des 4 dimensions IA…",
+          });
+          const dimensions = await claudeScoreDimensions(originalText, language);
 
           send("progress", {
             phase: "scoring",
