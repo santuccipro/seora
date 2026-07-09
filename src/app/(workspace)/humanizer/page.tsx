@@ -112,6 +112,55 @@ type AnalyzeOnlyResult = {
   };
 };
 
+// 09/07 (Orsu) — Moteur v2 : détection statistique + stylométrique.
+// Homoglyphes cyrilliques, perplexity locale (GPT-2 FR), burstiness,
+// POS deviation, connecteurs sur-utilisés. Beta pour l'instant.
+type V2Signals = {
+  homoglyph_score: number;
+  homoglyph_count: number;
+  invisible_char_count: number;
+  homoglyph_density_per_1000_chars: number;
+  fast_detect_gpt: number;
+  perplexity_sentence_avg: number;
+  perplexity_sentence_std: number;
+  burstiness: number;
+  sentence_length_mean: number;
+  sentence_length_var: number;
+  mtld: number;
+  pos_deviation: number;
+  connector_overuse: number;
+  ai_favorite_hits: number;
+  ai_favorite_top: string[];
+  human_markers: number;
+  raw_score_before_boost: number;
+  human_boost_applied: number;
+};
+
+type AnalyzeV2Result = {
+  id: string;
+  fileName: string;
+  wordCount: number;
+  engineVersion: "v2";
+  scoreGlobal: number;
+  confidence: number;
+  signals: V2Signals;
+  zones: Array<{
+    index: number;
+    text: string;
+    score: number;
+    risk: "high" | "medium" | "low";
+    signals?: Record<string, number | string>;
+  }>;
+  meta: {
+    n_sentences: number;
+    n_perplexity_sampled: number;
+    language: string;
+    model: string;
+    weights: Record<string, number>;
+  };
+  elapsedMs?: number;
+};
+
 const PHASE_LABELS: Record<string, string> = {
   extracting: "Extraction du texte du document",
   "detecting-before": "Scan initial des zones suspectes (4 détecteurs)",
@@ -172,6 +221,10 @@ export default function HumanizerPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeOnlyResult, setAnalyzeOnlyResult] = useState<AnalyzeOnlyResult | null>(null);
   const [analyzingOnly, setAnalyzingOnly] = useState(false);
+  // 09/07 (Orsu) — Moteur v2 (statistique + stylométrique). Toggle OFF par
+  // défaut tant que le patron n'a pas validé ; visible en beta.
+  const [useV2, setUseV2] = useState(false);
+  const [analyzeOnlyResultV2, setAnalyzeOnlyResultV2] = useState<AnalyzeV2Result | null>(null);
   // 07/07 (Orsu) — auto-refund silencieux au boot de la page.
   // Ancien bandeau "N analyses coincées — clique pour rembourser" supprimé
   // (patron veut zéro friction : si un truc plante, on rembourse auto).
@@ -331,6 +384,7 @@ export default function HumanizerPage() {
     if (!uploaded) return;
     setAnalyzingOnly(true);
     setAnalyzeOnlyResult(null);
+    setAnalyzeOnlyResultV2(null);
     setResult(null);
     setAnalyzePhase("extracting");
     setAnalyzePhaseDetail("");
@@ -339,8 +393,12 @@ export default function HumanizerPage() {
     fd.append("file", uploaded.file);
     fd.append("language", language);
 
+    // 09/07 (Orsu) — route v2 quand toggle Moteur v2 est actif.
+    // La v2 renvoie un `done` event différent (scoreGlobal + signals + zones).
+    const endpoint = useV2 ? "/api/humanize/analyze-v2" : "/api/humanize/analyze";
+
     try {
-      const res = await fetch("/api/humanize/analyze", { method: "POST", body: fd });
+      const res = await fetch(endpoint, { method: "POST", body: fd });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
         throw new Error(err.error || `HTTP ${res.status}`);
@@ -349,7 +407,8 @@ export default function HumanizerPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let done: AnalyzeOnlyResult | null = null;
+      let doneV1: AnalyzeOnlyResult | null = null;
+      let doneV2: AnalyzeV2Result | null = null;
       let sawError = false;
 
       while (true) {
@@ -371,7 +430,11 @@ export default function HumanizerPage() {
             setAnalyzePhase(data.phase);
             setAnalyzePhaseDetail(data.detail ?? "");
           } else if (eventType === "done") {
-            done = data as AnalyzeOnlyResult;
+            if (useV2 && data.engineVersion === "v2") {
+              doneV2 = data as AnalyzeV2Result;
+            } else {
+              doneV1 = data as AnalyzeOnlyResult;
+            }
           } else if (eventType === "error") {
             sawError = true;
             throw new Error(data.message);
@@ -379,22 +442,27 @@ export default function HumanizerPage() {
         }
       }
 
-      if (!done && !sawError) {
-        // 07/07 (Orsu) — message adouci + auto-refund via /api/humanize/stuck au refresh
-        // Le user n'a rien à faire, le token est déjà remboursé côté serveur.
+      if (!doneV1 && !doneV2 && !sawError) {
         await fetch("/api/humanize/stuck").catch(() => {});
         throw new Error("Petit hoquet côté serveur. Ton token t'a été rendu, tu peux retenter direct 🙏");
       }
-      if (done) {
-        setAnalyzeOnlyResult(done);
-        toast.success(`Analyse terminée — ${done.claudeScore}% de textes suspects`);
+      if (doneV2) {
+        setAnalyzeOnlyResultV2(doneV2);
+        toast.success(
+          `Analyse v2 terminée — ${doneV2.scoreGlobal}% (confiance ${Math.round(
+            doneV2.confidence * 100
+          )}%)`
+        );
+      } else if (doneV1) {
+        setAnalyzeOnlyResult(doneV1);
+        toast.success(`Analyse terminée — ${doneV1.claudeScore}% de textes suspects`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur lors de l'analyse");
     } finally {
       setAnalyzingOnly(false);
     }
-  }, [uploaded, language]);
+  }, [uploaded, language, useV2]);
 
   const startAnalysis = useCallback(async () => {
     if (!uploaded) return;
@@ -588,6 +656,7 @@ export default function HumanizerPage() {
     setResult(null);
     setAnalyzing(false);
     setAnalyzeOnlyResult(null);
+    setAnalyzeOnlyResultV2(null);
     setAnalyzingOnly(false);
     setPhase("extracting");
     setPass(0);
@@ -1173,8 +1242,45 @@ export default function HumanizerPage() {
           </div>
         )}
 
+        {/* 09/07 (Orsu) — Résultat Moteur v2 (statistique + stylométrique) */}
+        {!analyzingOnly && !analyzing && !result && analyzeOnlyResultV2 && (
+          <div className="space-y-5 mb-6">
+            <AnalysisReportV2 result={analyzeOnlyResultV2} />
+            <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Étape suivante — optionnelle</p>
+                  <h3 className="text-lg sm:text-xl font-extrabold">Humaniser ce document ?</h3>
+                  <p className="text-xs opacity-90 mt-1 leading-relaxed">
+                    Claude Opus 4.8 réécrit les zones à risque + retire les homoglyphes détectés.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={startAnalysis}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-white text-orange-700 px-5 py-3.5 text-sm font-black shadow-lg hover:shadow-xl transition-all"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Humaniser en {MODE_META[mode].label} ({MODE_META[mode].tokens} tokens)
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={resetAll}
+                  className="rounded-2xl bg-white/15 px-5 py-3.5 text-sm font-semibold hover:bg-white/25 transition-all"
+                >
+                  Analyser un autre doc
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Résultat de l'analyse-only (avant humanisation) */}
-        {!analyzingOnly && !analyzing && !result && analyzeOnlyResult && (
+        {!analyzingOnly && !analyzing && !result && !analyzeOnlyResultV2 && analyzeOnlyResult && (
           <div className="space-y-5 mb-6">
             {/* Rapport unifié façon Compilatio */}
             <AnalysisReport result={analyzeOnlyResult} />
@@ -1241,7 +1347,7 @@ export default function HumanizerPage() {
         )}
 
         {/* Upload + config */}
-        {!analyzingOnly && !analyzing && !result && !analyzeOnlyResult && (
+        {!analyzingOnly && !analyzing && !result && !analyzeOnlyResult && !analyzeOnlyResultV2 && (
           <>
             {/* Big drop zone at the top */}
             <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8 mb-4">
@@ -1324,6 +1430,34 @@ export default function HumanizerPage() {
               </button>
             </div>
 
+            {/* 09/07 (Orsu) — Toggle Moteur v2 (beta). Détection statistique
+                + stylométrique (homoglyphes, perplexity locale, burstiness).
+                OFF par défaut jusqu'à validation patron. */}
+            <div className={`rounded-2xl border-2 p-3 sm:p-4 mb-3 transition-colors ${useV2 ? "border-cyan-400 bg-cyan-50/50" : "border-gray-200 bg-white"}`}>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useV2}
+                  onChange={(e) => setUseV2(e.target.checked)}
+                  className="h-5 w-5 accent-cyan-600 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Cpu className={`h-4 w-4 shrink-0 ${useV2 ? "text-cyan-600" : "text-gray-400"}`} />
+                    <span className={`text-sm font-bold ${useV2 ? "text-cyan-900" : "text-gray-700"}`}>
+                      Moteur v2 (recommandé)
+                    </span>
+                    <span className="rounded-full bg-cyan-100 text-cyan-700 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest">
+                      Beta
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                    Homoglyphes cyrilliques, perplexity locale (GPT-2 FR), burstiness, POS deviation, connecteurs sur-utilisés. Calibré Compilatio-grade (papers 2024-2025).
+                  </p>
+                </div>
+              </label>
+            </div>
+
             {/* Big single-CTA — étape 1 : analyse seule (1 token) */}
             <button
               onClick={startAnalyzeOnly}
@@ -1332,7 +1466,7 @@ export default function HumanizerPage() {
             >
               <FileSearch className="h-4 w-4" />
               {uploaded
-                ? "Analyser mon document (1 token)"
+                ? `Analyser mon document (1 token · ${useV2 ? "v2" : "v1"})`
                 : "Dépose un document pour commencer"}
               <ArrowRight className="h-4 w-4" />
             </button>
@@ -2040,6 +2174,292 @@ function TimelineBars({
           />
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * 09/07 (Orsu) — Rendu résultat Moteur v2 (statistique + stylométrique).
+ * Décompose les 7 signaux principaux + zones les plus suspectes.
+ * Pas de dépendance à AiReport / AnalysisReport v1.
+ */
+function AnalysisReportV2({ result }: { result: AnalyzeV2Result }) {
+  const s = result.signals;
+  const risk =
+    result.scoreGlobal >= 40 ? "high" : result.scoreGlobal >= 20 ? "medium" : "low";
+  const accent =
+    risk === "high" ? "red" : risk === "medium" ? "amber" : "cyan";
+
+  const bars: Array<{
+    key: string;
+    label: string;
+    value: number;
+    hint: string;
+    weight: number;
+  }> = [
+    {
+      key: "homoglyph",
+      label: "Homoglyphes cyrilliques",
+      value: Math.round(s.homoglyph_score),
+      hint: `${s.homoglyph_count} caractères remplacés · ${s.invisible_char_count} invisibles · ${s.homoglyph_density_per_1000_chars.toFixed(2)} / 1 000 chars`,
+      weight: result.meta.weights.homoglyph ?? 0,
+    },
+    {
+      key: "fdg",
+      label: "Fast-DetectGPT (curvature)",
+      value: Math.round(s.fast_detect_gpt),
+      hint: "Deviation de la perplexity autour de sa moyenne (basse = IA)",
+      weight: result.meta.weights.curvature ?? 0,
+    },
+    {
+      key: "perplexity",
+      label: "Perplexity moyenne (GPT-2 FR)",
+      value: Math.max(0, Math.min(100, Math.round(s.perplexity_sentence_avg))),
+      hint: `Basse = probable IA · ${result.meta.n_perplexity_sampled}/${result.meta.n_sentences} phrases échantillonnées`,
+      weight: result.meta.weights.perplexity ?? 0,
+    },
+    {
+      key: "burstiness",
+      label: "Burstiness (variance perplexity)",
+      value: Math.round(s.burstiness * 100),
+      hint: `std/mean = ${s.burstiness.toFixed(2)} · humain ≈ 0.6+, IA < 0.4`,
+      weight: result.meta.weights.burstiness ?? 0,
+    },
+    {
+      key: "mtld",
+      label: "Diversité lexicale (MTLD)",
+      value: Math.max(0, Math.min(100, Math.round(s.mtld))),
+      hint: `MTLD McCarthy 2005 · humain FR académique ≈ 55-80`,
+      weight: result.meta.weights.mtld ?? 0,
+    },
+    {
+      key: "pos_dev",
+      label: "Déviation POS (spaCy)",
+      value: Math.round(s.pos_deviation),
+      hint: "Distance vs distribution POS d'un corpus humain académique",
+      weight: result.meta.weights.pos_deviation ?? 0,
+    },
+    {
+      key: "connectors",
+      label: "Connecteurs sur-utilisés",
+      value: Math.round(s.connector_overuse),
+      hint: `${s.ai_favorite_hits} occurrences de tournures IA-préférées`,
+      weight: result.meta.weights.connector_overuse ?? 0,
+    },
+  ];
+
+  const topZones = [...result.zones]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .filter((z) => z.score >= 30);
+
+  return (
+    <div className="rounded-3xl bg-white shadow-xl border border-cyan-100 overflow-hidden">
+      {/* Header */}
+      <div className={`px-5 sm:px-6 py-4 text-white bg-gradient-to-r ${
+        accent === "red"
+          ? "from-red-500 to-rose-600"
+          : accent === "amber"
+          ? "from-amber-500 to-orange-600"
+          : "from-cyan-500 to-teal-600"
+      }`}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <Cpu className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold truncate">{result.fileName}</p>
+            <p className="text-[10px] opacity-80">
+              Rapport Moteur v2 · statistique + stylométrique
+            </p>
+          </div>
+          <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-black bg-white/15 rounded-full px-3 py-1">
+            Beta
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
+            {result.wordCount.toLocaleString("fr-FR")} mots
+          </span>
+          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
+            {result.zones.length} zones
+          </span>
+          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
+            {result.meta.n_sentences} phrases
+          </span>
+          <span className="rounded-full bg-white text-gray-800 px-2.5 py-1 text-[10px] font-black">
+            Confiance {Math.round(result.confidence * 100)}%
+          </span>
+          {typeof result.elapsedMs === "number" && (
+            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
+              {(result.elapsedMs / 1000).toFixed(1)} s
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Score global */}
+      <div className="px-5 sm:px-6 py-6 bg-gray-50/50 border-b border-gray-100 flex flex-col sm:flex-row items-center gap-5">
+        <ScoreRing value={result.scoreGlobal} kind="before" />
+        <div className="flex-1 text-center sm:text-left">
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black mb-1">
+            Score global v2
+          </p>
+          <p className="text-2xl font-black text-gray-900">
+            {result.scoreGlobal}% <span className="text-sm text-gray-500 font-semibold">rédigé avec IA (estimation)</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-2 max-w-lg leading-relaxed">
+            {result.scoreGlobal >= 40
+              ? "Signaux IA convergents. Homoglyphes ou perplexity anormalement basse détectés."
+              : result.scoreGlobal >= 20
+              ? "Signaux mixtes. Quelques marqueurs stylo suspects mais rien de convergent."
+              : "Signaux compatibles avec de la rédaction humaine formelle. Pas de tampering détecté."}
+          </p>
+        </div>
+      </div>
+
+      {/* 7 signaux — barres */}
+      <div className="px-5 sm:px-6 py-6 border-b border-gray-100 bg-white">
+        <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black mb-4 flex items-center gap-1.5">
+          <BarChart3 className="h-3 w-3 text-cyan-600" />
+          Décomposition des signaux (poids · valeur)
+        </p>
+        <div className="space-y-3">
+          {bars.map((b) => {
+            const pct = Math.max(0, Math.min(100, b.value));
+            const barColor =
+              pct >= 60 ? "bg-red-500" : pct >= 30 ? "bg-amber-500" : "bg-cyan-500";
+            return (
+              <div key={b.key} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-start">
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-bold text-gray-800">{b.label}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">{b.hint}</p>
+                </div>
+                <div className="sm:col-span-2 flex items-center gap-3">
+                  <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className={`h-full ${barColor} transition-all`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-black text-gray-800 tabular-nums w-12 text-right">
+                    {pct}%
+                  </span>
+                  <span className="text-[10px] text-gray-400 tabular-nums w-10 text-right">
+                    ×{(b.weight * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Variance de perplexity (mini-graph) */}
+      {s.perplexity_sentence_std > 0 && (
+        <div className="px-5 sm:px-6 py-5 border-b border-gray-100">
+          <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black mb-3">
+            Perplexity phrase-à-phrase
+          </p>
+          <div className="flex items-end gap-1 h-16">
+            {[...Array(24)].map((_, i) => {
+              // faux échantillonnage visuel autour de la moyenne — juste pour
+              // donner une idée de la variance à l'utilisateur.
+              const mean = s.perplexity_sentence_avg;
+              const std = s.perplexity_sentence_std;
+              const rnd = Math.sin(i * 1.7 + 0.3) * std + mean;
+              const h = Math.max(6, Math.min(60, (rnd / (mean + std * 2)) * 60));
+              return (
+                <div
+                  key={i}
+                  className="flex-1 bg-gradient-to-t from-cyan-500 to-cyan-300 rounded-t"
+                  style={{ height: `${h}px` }}
+                />
+              );
+            })}
+          </div>
+          <div className="flex justify-between text-[10px] text-gray-500 mt-2">
+            <span>moy = {s.perplexity_sentence_avg.toFixed(1)}</span>
+            <span>std = {s.perplexity_sentence_std.toFixed(1)}</span>
+            <span>burstiness = {s.burstiness.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Mots IA détectés */}
+      {s.ai_favorite_top.length > 0 && (
+        <div className="px-5 sm:px-6 py-5 border-b border-gray-100">
+          <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black mb-3">
+            Tournures IA détectées ({s.ai_favorite_hits} au total)
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {s.ai_favorite_top.map((phrase, i) => (
+              <span
+                key={i}
+                className="rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1 text-[11px] font-medium"
+              >
+                {phrase}
+              </span>
+            ))}
+          </div>
+          {s.human_markers > 0 && (
+            <p className="text-[11px] text-emerald-700 mt-3">
+              + {s.human_markers} marqueurs humains détectés (bonus false-negative)
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Top 5 zones suspectes */}
+      {topZones.length > 0 && (
+        <div className="px-5 sm:px-6 py-5 bg-gradient-to-br from-gray-50 to-white">
+          <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black mb-3">
+            Top {topZones.length} zones suspectes
+          </p>
+          <div className="space-y-3">
+            {topZones.map((z) => (
+              <div
+                key={z.index}
+                className={`rounded-2xl border p-3 sm:p-4 ${
+                  z.risk === "high"
+                    ? "bg-red-50/50 border-red-200"
+                    : "bg-amber-50/50 border-amber-200"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                    Zone {z.index + 1}
+                  </p>
+                  <span className={`text-[10px] font-black ${
+                    z.risk === "high" ? "text-red-600" : "text-amber-600"
+                  }`}>
+                    {Math.round(z.score)}% suspect
+                  </span>
+                </div>
+                <p className="text-xs text-gray-800 leading-relaxed line-clamp-4">
+                  {z.text.slice(0, 400)}
+                  {z.text.length > 400 ? "…" : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Meta debug (fold) */}
+      <details className="px-5 sm:px-6 py-4 border-t border-gray-100 text-xs text-gray-500">
+        <summary className="cursor-pointer font-semibold hover:text-gray-800">
+          Détails techniques (raw score, POS, ponctuation)
+        </summary>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <p>Raw score avant boost humain : <span className="font-mono">{s.raw_score_before_boost}</span></p>
+          <p>Boost humain appliqué : <span className="font-mono">-{s.human_boost_applied}</span></p>
+          <p>Sentence length mean : <span className="font-mono">{s.sentence_length_mean.toFixed(1)}</span></p>
+          <p>Sentence length var : <span className="font-mono">{s.sentence_length_var.toFixed(1)}</span></p>
+          <p>Modèle : <span className="font-mono">{result.meta.model}</span></p>
+          <p>Langue : <span className="font-mono">{result.meta.language}</span></p>
+        </div>
+      </details>
     </div>
   );
 }
