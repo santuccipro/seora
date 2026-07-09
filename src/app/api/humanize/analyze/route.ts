@@ -437,33 +437,62 @@ export async function POST(req: NextRequest) {
           // Réagrégation : chaque paragraph reçoit son score direct (plus de
           // score par phrase). Le rendu UI surligne le paragraphe entier en cyan
           // s'il est classé HIGH.
-          // 07/07 (Orsu) — pour chaque zone flagée, on remonte les 2-3 raisons
-          // les plus explicites (why cité par Claude sur les phrases high) et
-          // on les concatène en "topReasons" au niveau paragraph, pour que
-          // l'UI puisse expliquer POURQUOI la zone est classée IA.
-          // 08/07 (Orsu) — plus de sentences par paragraphe. Chaque paragraph
-          // reçoit son score direct. Le rendu UI surligne le paragraph entier
-          // en cyan quand HIGH (fallback existant sur { text, score } quand
-          // p.sentences est absent).
+          // 09/07 (Orsu) — RECALIBRATION Compilatio-grade :
+          //   • Seuil HIGH remonté 50→60 (zone "à risque" seulement si
+          //     Claude est vraiment convaincu que c'est IA).
+          //   • Seuil MEDIUM remonté 25→40.
+          //   Effet : moins de zones surlignées, meilleur alignement avec
+          //   Compilatio qui annonce <1% de false-positives (choix design
+          //   assumé de sous-signaler plutôt que de sur-alerter).
           const paragraphs = chunkTexts.map((text, index) => {
             const score = paragraphScores[index] ?? 0;
             const risk: "high" | "medium" | "low" =
-              score >= 50 ? "high" : score >= 25 ? "medium" : "low";
+              score >= 60 ? "high" : score >= 40 ? "medium" : "low";
             return { index, text, score, risk };
           });
 
           const wordCount = originalText.trim().split(/\s+/).length;
 
+          // 09/07 (Orsu) — RECALIBRATION du score global (Compilatio-grade).
+          //
+          // Contexte : sur le DPP réel de Marius (12k mots), Compilatio
+          // annonce 9% IA, Seora annonçait 37% (4× trop sévère). La deep
+          // research Compilatio montre que leur design assume <1% de
+          // faux-positifs et positionne la détection comme "indication
+          // de zones suspectes, PAS preuve". On aligne notre calibration
+          // sur cette philosophie.
+          //
+          // Formule :
+          //   • Base = moyenne(REGISTRE, LANGUE) — on RETIRE STRUCTURE
+          //     (cascades/triades/listes tripartites = patterns humains
+          //     naturels, pas IA-only) et ANTITHÈSES ("n'est pas X c'est Y"
+          //     = tournure courante en français académique honnête).
+          //   • Fallback : si dims n'ont pas répondu (0/0), on prend
+          //     claude.overall brut compressé × 0.4.
+          //   • Facteur de tolérance × 0.5 sur la base → bias false-negative.
+          //
+          // Cible chiffrée : DPP à Compilatio 9% doit tomber à 12-15%
+          //   côté Seora (Compilatio + 5 pts marge safe).
+          const dimBase = (dimensions.registre + dimensions.langue) / 2;
+          const rawGlobal = claude.overall;
+          const compressedGlobal = Math.max(0, Math.min(100, Math.round(
+            (dimBase > 0 ? dimBase * 0.5 : rawGlobal * 0.4)
+          )));
+
           // 07/07 (Orsu) — patron veut plus voir de score heuristique. On stocke
           // uniquement le score Claude Sonnet en aiScoreBefore. Le detectAI reste
           // calculé côté serveur pour usage interne éventuel mais n'est plus renvoyé.
+          // 09/07 (Orsu) — on stocke le score COMPRESSÉ (Compilatio-grade)
+          // en aiScoreBefore. Le rawGlobal est gardé dans scoreDetails pour
+          // debug/telemetry mais jamais montré au user.
           await prisma.humanizerAnalysis.update({
             where: { id: analysis.id },
             data: {
               originalText,
-              aiScoreBefore: claude.overall,
+              aiScoreBefore: compressedGlobal,
               scoreDetails: JSON.stringify({
-                claudeScoreBefore: claude.overall,
+                claudeScoreBefore: compressedGlobal,
+                claudeRawGlobal: rawGlobal,
                 claudeReasoning: claude.reasoning,
                 topOffenders: claude.topOffenders,
                 dimensions,
@@ -479,7 +508,11 @@ export async function POST(req: NextRequest) {
             id: analysis.id,
             fileName: file.name,
             wordCount,
-            claudeScore: claude.overall,
+            // 09/07 (Orsu) — claudeScore = score COMPRESSÉ Compilatio-grade
+            // (registre+langue avg × 0.5, bias false-negative). Le rawGlobal
+            // remonté à côté pour transparence interne (dev-tools console).
+            claudeScore: compressedGlobal,
+            claudeRawGlobal: rawGlobal,
             claudeReasoning: claude.reasoning,
             topOffenders: claude.topOffenders,
             dimensions,
