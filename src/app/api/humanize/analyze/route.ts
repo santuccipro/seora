@@ -31,7 +31,12 @@ async function claudeScoreChunks(
   // 08/07 (Orsu) — scoring par PARAGRAPHE. BATCH_SIZE 30→20 : batches de 30
   // paragraphes×170mots faisaient un prompt de 5k mots → Claude prenait
   // ~110s → 504 CF gateway timeout à 100s. Batches de 20 tiennent en 60-80s.
-  const BATCH_SIZE = 20;
+  // 09/07 (Orsu) — perf : 20→10. Batches plus petits = chaque call Claude
+  // termine en ~30-40s au lieu de 60-80s. Combiné avec CONCURRENCY 2→4
+  // (usage_server timeout bumpé à 90s côté runner), on divise le wall-clock
+  // par ~3 (cible 10min → 2-3min sur DPP 15k mots). Trade-off : plus de
+  // round-trips, mais chaque round est court et safe sous les 100s CF.
+  const BATCH_SIZE = 10;
   const scores = new Array<number>(chunks.length).fill(-1);
   // reasons gardé pour compat de signature mais reste vide (patron a viré
   // les pills "Pourquoi IA ?" du rendu, cf commit précédent).
@@ -121,7 +126,13 @@ ${numbered}`;
   // le CLI claude --print sur usage_server saturait (7/20 batches timeout).
   // Structurel : Claude Max CLI gère mal 3+ appels concurrents. Retour
   // à 2 : sim de 716s wall-clock, safe sous les 800s Vercel Pro.
-  const CONCURRENCY = 2;
+  // 09/07 (Orsu) — 2→4. Le timeout usage_server a été bumpé à 90s côté runner,
+  // ce qui absorbe la latence supplémentaire quand Claude CLI a plusieurs
+  // subprocess en vol. Avec BATCH_SIZE 10 (batches légers ~35s), 4 concurrents
+  // tiennent — chaque subprocess reste sous 60s même avec 3 voisins. Reste
+  // prudent (4 au lieu du 5 patron) parce que 34a2f9f a montré que CONCURRENCY=3
+  // saturait ; si 4 tient sur un vrai DPP, on montera à 5 dans un prochain patch.
+  const CONCURRENCY = 4;
   let done = 0;
   for (let i = 0; i < batches.length; i += CONCURRENCY) {
     const slice = batches.slice(i, i + CONCURRENCY);
