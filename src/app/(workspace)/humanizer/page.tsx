@@ -96,11 +96,14 @@ type AnalyzeOnlyResult = {
   fileName: string;
   wordCount: number;
   claudeScore: number;
+  // 09/07 (Orsu) — remonté pour debug interne, jamais affiché.
+  claudeRawGlobal?: number;
   claudeReasoning: string;
   topOffenders: string[];
   paragraphs: ParagraphScore[];
-  // 07/07 (Orsu) — 4 dimensions IA affichées en top du rapport pour
-  // convaincre le user d'humaniser TOUT le doc au lieu de patcher 3 phrases.
+  // 09/07 (Orsu) — dimensions gardées côté payload pour compat descendante,
+  // mais on n'affiche plus que REGISTRE + LANGUE (STRUCTURE + ANTITHÈSES
+  // sont des patterns humains normaux, cf recalibration Compilatio-grade).
   dimensions?: {
     structure: number;
     registre: number;
@@ -1544,8 +1547,43 @@ export default function HumanizerPage() {
 
 function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
   const paragraphs = result.paragraphs ?? [];
-  const flagged = paragraphs.filter((p) => p.risk === "high" || p.risk === "medium");
+
+  // 09/07 (Orsu) — Refonte UX Magister+ (deep-research Compilatio) :
+  // ignoré-state client-side, recalcul global sans nouvel API call.
+  const [ignoredIndexes, setIgnoredIndexes] = useState<Set<number>>(new Set());
   const [currentIdx, setCurrentIdx] = useState(0);
+
+  const flagged = paragraphs.filter(
+    (p) => (p.risk === "high" || p.risk === "medium") && !ignoredIndexes.has(p.index)
+  );
+
+  // Recompute score client-side quand des zones sont ignorées.
+  // Cohérent avec la compression serveur (× 0.5 sur registre+langue avg),
+  // mais dérivé de la moyenne des paragraphes non-ignorés.
+  const activeParagraphs = paragraphs.filter((p) => !ignoredIndexes.has(p.index));
+  const recomputedRawAvg =
+    activeParagraphs.length > 0
+      ? activeParagraphs.reduce((s, p) => s + p.score, 0) / activeParagraphs.length
+      : 0;
+  const recomputedIA = Math.max(0, Math.round(recomputedRawAvg * 0.5));
+  const displayedIA =
+    ignoredIndexes.size === 0 ? result.claudeScore : recomputedIA;
+
+  const toggleIgnore = (index: number) => {
+    setIgnoredIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+    // Reset curseur pour éviter d'être hors-bornes
+    setCurrentIdx(0);
+  };
+
+  const resetIgnored = () => {
+    setIgnoredIndexes(new Set());
+    setCurrentIdx(0);
+  };
 
   const goto = (idx: number) => {
     if (flagged.length === 0) return;
@@ -1556,31 +1594,88 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  // 3 axes Magister+ (au lieu des 4 dimensions).
+  // Similitudes + Texte non-reconnu = placeholders (pas encore implémentés
+  // côté Seora — on assume "<1%" et "0%" pour rester cohérent avec la
+  // philosophie Compilatio "indication, pas preuve").
+  const axes = [
+    {
+      key: "similitudes",
+      label: "Similitudes",
+      value: "< 1%",
+      subtitle: "Aucune correspondance externe détectée",
+      accent: "emerald",
+      placeholder: true,
+    },
+    {
+      key: "redaction-ia",
+      label: "Rédaction par IA",
+      value: `${displayedIA}%`,
+      subtitle:
+        ignoredIndexes.size > 0
+          ? `Recalculé sans ${ignoredIndexes.size} zone${ignoredIndexes.size > 1 ? "s" : ""} ignorée${ignoredIndexes.size > 1 ? "s" : ""}`
+          : "Indication de rédaction assistée",
+      accent: displayedIA >= 40 ? "red" : displayedIA >= 20 ? "amber" : "cyan",
+      placeholder: false,
+    },
+    {
+      key: "texte-non-reconnu",
+      label: "Texte non-reconnu",
+      value: "0%",
+      subtitle: "Structures atypiques absentes",
+      accent: "gray",
+      placeholder: true,
+    },
+  ];
+
   return (
     <div className="rounded-3xl bg-white shadow-xl border border-orange-100 overflow-hidden">
-      {/* Header orange — filename */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-5 sm:px-6 py-4 text-white flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-          <FileText className="h-4 w-4" />
+      {/* Header — filename + 4 badges (Magister+ style) */}
+      <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-5 sm:px-6 py-4 text-white">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <FileText className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold truncate">{result.fileName}</p>
+            <p className="text-[10px] opacity-80">Rapport d'analyse</p>
+          </div>
+          <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-black bg-white/15 rounded-full px-3 py-1">
+            Textes suspects
+          </span>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold truncate">{result.fileName}</p>
-          <p className="text-[10px] opacity-80">
-            {result.wordCount.toLocaleString("fr-FR")} mots · {paragraphs.length} zones analysées · {flagged.length} à risque IA
-          </p>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
+            {result.wordCount.toLocaleString("fr-FR")} mots
+          </span>
+          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
+            {paragraphs.length} zones analysées
+          </span>
+          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
+            {flagged.length} zone{flagged.length > 1 ? "s" : ""} suspecte{flagged.length > 1 ? "s" : ""}
+          </span>
+          <span className="rounded-full bg-white text-orange-700 px-2.5 py-1 text-[10px] font-black">
+            {displayedIA}% suspects
+          </span>
+          {ignoredIndexes.size > 0 && (
+            <button
+              onClick={resetIgnored}
+              className="rounded-full bg-white/25 hover:bg-white/40 px-2.5 py-1 text-[10px] font-bold transition-colors"
+              title="Restaurer les zones ignorées"
+            >
+              ↺ {ignoredIndexes.size} ignorée{ignoredIndexes.size > 1 ? "s" : ""}
+            </button>
+          )}
         </div>
-        <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-black bg-white/15 rounded-full px-3 py-1">
-          Détection IA
-        </span>
       </div>
 
-      {/* Score + timeline bâtonnets */}
+      {/* Timeline horizontale numérotée + score */}
       <div className="px-5 sm:px-6 py-6 bg-gray-50/50 border-b border-gray-100">
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-2 shrink-0">
             <Cpu className="h-4 w-4 text-cyan-600" />
             <span className="text-[11px] uppercase tracking-widest text-gray-500 font-black hidden sm:inline">
-              Détection IA
+              Textes suspects
             </span>
           </div>
           <TimelineBars
@@ -1590,7 +1685,7 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
             onSelect={goto}
           />
           <div className="text-4xl font-black text-cyan-500 shrink-0 tabular-nums">
-            {result.claudeScore}<span className="text-base opacity-70">%</span>
+            {displayedIA}<span className="text-base opacity-70">%</span>
           </div>
         </div>
 
@@ -1612,11 +1707,11 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
                 <ChevronUp className="h-4 w-4 text-gray-600" />
               </button>
               <span className="font-bold text-gray-700 tabular-nums min-w-[3.5rem] text-center">
-                {currentIdx + 1} / {flagged.length}
+                {Math.min(currentIdx + 1, flagged.length)} / {flagged.length}
               </span>
               <button
                 onClick={() => goto(currentIdx + 1)}
-                disabled={currentIdx === flagged.length - 1}
+                disabled={currentIdx >= flagged.length - 1}
                 className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronDown className="h-4 w-4 text-gray-600" />
@@ -1632,47 +1727,53 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
         )}
       </div>
 
-      {/* 07/07 (Orsu) — 4 dimensions IA en cartes. Sépare le score global
-          en 4 axes que le user visualise vite : plusieurs axes rouges =
-          humanisation globale nécessaire (pas patch de 3 phrases). */}
-      {result.dimensions && (
-        <div className="px-5 sm:px-6 py-5 border-b border-gray-100 bg-gradient-to-br from-gray-50 to-white">
-          <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black mb-4 flex items-center gap-1.5">
-            <BarChart3 className="h-3 w-3 text-cyan-600" />
-            4 dimensions d'analyse IA
-          </p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { key: "structure", label: "Structure", desc: "Cascades, triades, listes tripartites", score: result.dimensions.structure },
-              { key: "registre", label: "Registre", desc: "Uniformité, zéro burstiness", score: result.dimensions.registre },
-              { key: "antitheses", label: "Antithèses", desc: "«n’est pas X c’est Y», balancing", score: result.dimensions.antitheses },
-              { key: "langue", label: "Langue", desc: "Nominalisations, connecteurs académiques", score: result.dimensions.langue },
-            ].map((d) => {
-              const tone = d.score >= 70 ? "high" : d.score >= 40 ? "medium" : "low";
-              const barColor = tone === "high" ? "bg-red-500" : tone === "medium" ? "bg-amber-500" : "bg-emerald-500";
-              const textColor = tone === "high" ? "text-red-600" : tone === "medium" ? "text-amber-600" : "text-emerald-600";
-              const chip = tone === "high" ? "Critique" : tone === "medium" ? "Marqué" : "Léger";
-              const chipBg = tone === "high" ? "bg-red-100 text-red-700" : tone === "medium" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700";
-              return (
-                <div key={d.key} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-xs font-black text-gray-900 uppercase tracking-wide">{d.label}</p>
-                    <span className={`text-[9px] font-black uppercase tracking-widest ${chipBg} rounded-full px-2 py-0.5`}>{chip}</span>
-                  </div>
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span className={`text-3xl font-black tabular-nums ${textColor}`}>{d.score}</span>
-                    <span className={`text-sm font-bold ${textColor} opacity-70`}>%</span>
-                  </div>
-                  <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-2">
-                    <div className={`h-full ${barColor} transition-all`} style={{ width: `${d.score}%` }} />
-                  </div>
-                  <p className="text-[10px] text-gray-500 leading-snug">{d.desc}</p>
+      {/* 3 axes Magister+ — Similitudes / Rédaction IA / Texte non-reconnu */}
+      <div className="px-5 sm:px-6 py-5 border-b border-gray-100 bg-gradient-to-br from-gray-50 to-white">
+        <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black mb-4 flex items-center gap-1.5">
+          <BarChart3 className="h-3 w-3 text-cyan-600" />
+          Décomposition du diagnostic
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {axes.map((axe) => {
+            const textColor =
+              axe.accent === "red" ? "text-red-600" :
+              axe.accent === "amber" ? "text-amber-600" :
+              axe.accent === "cyan" ? "text-cyan-600" :
+              axe.accent === "emerald" ? "text-emerald-600" :
+              "text-gray-400";
+            const chipBg =
+              axe.accent === "red" ? "bg-red-100 text-red-700" :
+              axe.accent === "amber" ? "bg-amber-100 text-amber-700" :
+              axe.accent === "cyan" ? "bg-cyan-100 text-cyan-700" :
+              axe.accent === "emerald" ? "bg-emerald-100 text-emerald-700" :
+              "bg-gray-100 text-gray-500";
+            return (
+              <div
+                key={axe.key}
+                className={`rounded-2xl border p-4 shadow-sm ${
+                  axe.placeholder ? "bg-gray-50/50 border-gray-200" : "bg-white border-gray-200"
+                }`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-xs font-black text-gray-900 uppercase tracking-wide">{axe.label}</p>
+                  {axe.placeholder && (
+                    <span className={`text-[9px] font-black uppercase tracking-widest ${chipBg} rounded-full px-2 py-0.5`}>
+                      Non-mesuré
+                    </span>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className={`text-3xl font-black tabular-nums ${textColor}`}>{axe.value}</span>
+                </div>
+                <p className="text-[10px] text-gray-500 leading-snug">{axe.subtitle}</p>
+              </div>
+            );
+          })}
         </div>
-      )}
+        <p className="text-[10px] text-gray-400 mt-3 leading-relaxed">
+          Ce diagnostic est une <strong className="font-bold text-gray-500">indication</strong>, pas une preuve. Complète-le d'un échange oral si nécessaire.
+        </p>
+      </div>
 
       {/* Analyse globale Claude */}
       {result.claudeReasoning && (
@@ -1688,21 +1789,29 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
       )}
 
       {/* Split : sidebar zones (gauche) + reader fluide (droite) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
-        {/* Sidebar — liste des zones à risque cliquables */}
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+        {/* Sidebar — liste des zones suspectes */}
         <div className="max-h-[320px] lg:max-h-[720px] overflow-y-auto bg-gray-50/60">
           <div className="sticky top-0 z-10 bg-gray-100/90 backdrop-blur px-4 py-3 border-b border-gray-200">
             <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black">
-              Zones à risque ({flagged.length})
+              Zones suspectes ({flagged.length})
             </p>
-            <p className="text-[10px] text-gray-500 mt-0.5">Clique pour aller au passage</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">Clique pour aller au passage · Ignore une zone que tu revendiques</p>
           </div>
           {flagged.length === 0 ? (
             <div className="px-4 py-6 text-center">
               <div className="mx-auto h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
               </div>
-              <p className="text-xs text-gray-600">Aucune zone à risque détectée</p>
+              <p className="text-xs text-gray-600">Aucune zone suspecte</p>
+              {ignoredIndexes.size > 0 && (
+                <button
+                  onClick={resetIgnored}
+                  className="mt-3 text-[11px] font-semibold text-orange-600 hover:text-orange-800"
+                >
+                  Restaurer les zones ignorées ({ignoredIndexes.size})
+                </button>
+              )}
             </div>
           ) : (
             <ul>
@@ -1710,30 +1819,42 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
                 const isCurrent = i === currentIdx;
                 return (
                   <li key={p.index}>
-                    <button
-                      onClick={() => goto(i)}
-                      className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-white transition-colors ${
-                        isCurrent ? "bg-white shadow-sm ring-2 ring-inset ring-orange-400" : ""
+                    <div
+                      className={`px-4 py-3 border-b border-gray-100 transition-colors ${
+                        isCurrent ? "bg-white shadow-sm ring-2 ring-inset ring-orange-400" : "hover:bg-white"
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <div className={`h-6 w-6 rounded-md flex items-center justify-center text-white text-[10px] font-black shrink-0 ${
-                          isCurrent ? "bg-orange-500" : "bg-cyan-500"
-                        }`}>
-                          {i + 1}
+                      <button
+                        onClick={() => goto(i)}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className={`h-6 w-6 rounded-md flex items-center justify-center text-white text-[10px] font-black shrink-0 ${
+                            isCurrent ? "bg-orange-500" : "bg-cyan-500"
+                          }`}>
+                            {i + 1}
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                            Zone {p.index + 1}
+                          </span>
+                          <span className="ml-auto text-[10px] font-black text-gray-700 tabular-nums">
+                            {p.score}%
+                          </span>
                         </div>
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                          Zone {p.index + 1}
-                        </span>
-                        <span className="ml-auto text-[10px] font-black text-gray-700 tabular-nums">
-                          {p.score}%
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-gray-700 leading-relaxed line-clamp-3">
-                        « {p.text.replace(/\s+/g, " ").trim().slice(0, 120)}
-                        {p.text.length > 120 ? "…" : ""} »
-                      </p>
-                    </button>
+                        <p className="text-[11px] text-gray-700 leading-relaxed line-clamp-3">
+                          « {p.text.replace(/\s+/g, " ").trim().slice(0, 120)}
+                          {p.text.length > 120 ? "…" : ""} »
+                        </p>
+                      </button>
+                      <button
+                        onClick={() => toggleIgnore(p.index)}
+                        className="mt-2 text-[10px] font-semibold text-gray-500 hover:text-orange-600 transition-colors inline-flex items-center gap-1"
+                        title="Retirer cette zone du calcul global (indication, pas preuve)"
+                      >
+                        <XIcon className="h-3 w-3" />
+                        Ignorer cette zone
+                      </button>
+                    </div>
                   </li>
                 );
               })}
@@ -1741,18 +1862,16 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
           )}
         </div>
 
-        {/* Reader — flux du texte avec surlignage inline + badges à droite */}
+        {/* Reader — flux du texte avec surlignage + badges numérotés */}
         <div className="max-h-[720px] overflow-y-auto bg-white">
-          <div className="px-5 sm:px-8 py-6 grid grid-cols-[1fr_60px] gap-x-3 gap-y-2">
+          <div className="px-5 sm:px-8 py-6 grid grid-cols-[1fr_72px] gap-x-3 gap-y-2">
             {paragraphs.map((p) => {
               const flagIdx = flagged.findIndex((f) => f.index === p.index);
               const isFlagged = flagIdx !== -1;
+              const isIgnored = ignoredIndexes.has(p.index);
               const isCurrent = isFlagged && flagIdx === currentIdx;
 
-              // Surlignage PHRASE PAR PHRASE : chaque phrase du paragraphe
-              // a son propre score. On ne surligne que les phrases high
-                // (≥50% IA), les autres restent en texte neutre — c'est le
-              // seul moyen que le user voie précisément ce qui est louche.
+              // Surlignage par zone : cyan si suspect, gris barré si ignoré.
               const sentences = p.sentences && p.sentences.length > 0
                 ? p.sentences
                 : [{ text: p.text, tail: "", score: p.score }];
@@ -1763,16 +1882,20 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
                     id={`report-para-${p.index}`}
                     className={`scroll-mt-6 rounded-md transition-all ${
                       isCurrent ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-white shadow-sm px-2 -mx-2 py-1" : ""
-                    }`}
+                    } ${isIgnored ? "opacity-50" : ""}`}
                   >
                     <p className="text-[15px] text-gray-800 leading-[1.85] whitespace-pre-wrap">
                       {sentences.map((s, si) => (
                         <Fragment key={si}>
                           <span
                             className={
-                              s.score >= 50
-                                ? "bg-cyan-100 px-1 py-0.5 rounded"
-                                : ""
+                              isIgnored
+                                ? ""
+                                : s.score >= 60
+                                  ? "bg-cyan-100 px-1 py-0.5 rounded"
+                                  : s.score >= 40
+                                    ? "bg-cyan-50 px-1 py-0.5 rounded"
+                                    : ""
                             }
                             title={s.why || undefined}
                           >
@@ -1782,25 +1905,41 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
                         </Fragment>
                       ))}
                     </p>
-                    {/* 07/07 (Orsu) — topReasons retirées (patron veut pousser
-                        vers humanisation globale, pas fix par zone). */}
                   </div>
                   <div className="flex items-start justify-center pt-1">
                     {isFlagged && (
+                      <div className="flex flex-col items-center gap-1">
+                        <button
+                          onClick={() => goto(flagIdx)}
+                          className={`flex flex-col items-center rounded-lg px-2 py-1.5 border-2 bg-white shadow-sm group hover:scale-105 transition-transform ${
+                            isCurrent ? "border-orange-400" : "border-cyan-400"
+                          }`}
+                          title={`Zone ${flagIdx + 1} · ${p.score}% suspect`}
+                        >
+                          <Cpu className={`h-3.5 w-3.5 ${isCurrent ? "text-orange-500" : "text-cyan-500"}`} />
+                          <div className={`text-[13px] font-black tabular-nums ${isCurrent ? "text-orange-500" : "text-cyan-500"}`}>
+                            {flagIdx + 1}
+                          </div>
+                          <div className="text-[8px] font-bold text-gray-400 tabular-nums leading-none mt-0.5">
+                            {p.score}%
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => toggleIgnore(p.index)}
+                          className="text-[8px] font-bold text-gray-400 hover:text-orange-600 uppercase tracking-widest"
+                          title="Ignorer cette zone"
+                        >
+                          Ignorer
+                        </button>
+                      </div>
+                    )}
+                    {isIgnored && !isFlagged && (
                       <button
-                        onClick={() => goto(flagIdx)}
-                        className={`flex flex-col items-center rounded-lg px-2 py-1.5 border-2 bg-white shadow-sm group hover:scale-105 transition-transform ${
-                          isCurrent ? "border-orange-400" : "border-cyan-400"
-                        }`}
-                        title={`Zone ${flagIdx + 1} · ${p.score}% IA`}
+                        onClick={() => toggleIgnore(p.index)}
+                        className="text-[8px] font-bold text-orange-600 hover:text-orange-800 uppercase tracking-widest px-1"
+                        title="Restaurer cette zone"
                       >
-                        <Cpu className={`h-3.5 w-3.5 ${isCurrent ? "text-orange-500" : "text-cyan-500"}`} />
-                        <div className={`text-[13px] font-black tabular-nums ${isCurrent ? "text-orange-500" : "text-cyan-500"}`}>
-                          {flagIdx + 1}
-                        </div>
-                        <div className="text-[8px] font-bold text-gray-400 tabular-nums leading-none mt-0.5">
-                          {p.score}%
-                        </div>
+                        Restaurer
                       </button>
                     )}
                   </div>
@@ -1811,13 +1950,16 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
         </div>
       </div>
 
-      {/* Top offenders accordion en pied */}
-      {result.topOffenders && result.topOffenders.length > 0 && (
-        <div className="border-t border-gray-100 bg-gray-50/50 px-5 sm:px-6 py-4">
+      {/* Disclaimer + top offenders accordion */}
+      <div className="border-t border-gray-100 bg-gray-50/50 px-5 sm:px-6 py-4 space-y-3">
+        <p className="text-[11px] text-gray-500 leading-relaxed italic">
+          Aucun détecteur IA n'est fiable à 100%. Résultat à interpréter avec discernement.
+        </p>
+        {result.topOffenders && result.topOffenders.length > 0 && (
           <details className="text-xs">
             <summary className="cursor-pointer text-[10px] uppercase tracking-widest text-gray-600 font-black hover:text-gray-900 flex items-center gap-1.5">
               <Flame className="h-3 w-3 text-red-500" />
-              Voir les {Math.min(5, result.topOffenders.length)} extraits les plus flaggués par Claude
+              Voir les {Math.min(5, result.topOffenders.length)} extraits les plus signalés par Claude
             </summary>
             <div className="space-y-1.5 mt-3">
               {result.topOffenders.slice(0, 5).map((snippet, i) => (
@@ -1827,8 +1969,8 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
               ))}
             </div>
           </details>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
