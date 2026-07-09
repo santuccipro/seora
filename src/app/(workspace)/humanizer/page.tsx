@@ -114,10 +114,10 @@ type AnalyzeOnlyResult = {
 
 const PHASE_LABELS: Record<string, string> = {
   extracting: "Extraction du texte du document",
-  "detecting-before": "Scan initial du score IA (4 détecteurs)",
+  "detecting-before": "Scan initial des zones suspectes (4 détecteurs)",
   "cleaning-deterministic": "Nettoyage homoglyphes + connecteurs académiques",
   "rewriting-llm": "Reformulation phrase par phrase (Claude Opus 4.8)",
-  "detecting-after": "Nouveau scan du score IA",
+  "detecting-after": "Nouveau scan des zones suspectes",
   retrying: "Score encore élevé, nouvelle passe plus agressive",
   restoring: "Restauration des zones préservées",
   done: "Terminé",
@@ -387,7 +387,7 @@ export default function HumanizerPage() {
       }
       if (done) {
         setAnalyzeOnlyResult(done);
-        toast.success(`Analyse terminée — score IA ${done.claudeScore}%`);
+        toast.success(`Analyse terminée — ${done.claudeScore}% de textes suspects`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur lors de l'analyse");
@@ -624,7 +624,7 @@ export default function HumanizerPage() {
               {[
                 { icon: Upload, title: "Glisse ton PDF ou DOCX", desc: "Max 15 Mo, formats standards" },
                 { icon: Settings2, title: "Choisis ton mode", desc: "Basique / Équilibré / Agressif" },
-                { icon: Sparkles, title: "Récupère ton doc humanisé", desc: "Score IA sous 15% + export DOCX/PDF" },
+                { icon: Sparkles, title: "Récupère ton doc humanisé", desc: "Zones suspectes sous 15% + export DOCX/PDF" },
               ].map((step, i) => (
                 <div key={i} className="flex items-start gap-3 p-3 rounded-2xl bg-orange-50/50">
                   <div className="h-9 w-9 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
@@ -673,7 +673,7 @@ export default function HumanizerPage() {
             Analyse mon mémoire / DPP
           </h1>
           <p className="text-gray-600 max-w-lg mx-auto">
-            Score IA global + zones à risque paragraphe par paragraphe. Humanisation en 1 clic si besoin.
+            Indication de rédaction assistée + zones suspectes paragraphe par paragraphe. Humanisation en 1 clic si besoin.
           </p>
         </div>
 
@@ -797,22 +797,22 @@ export default function HumanizerPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                     <div className="text-center">
                       <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
-                        Score IA avant
+                        Textes suspects avant
                       </p>
                       <ScoreRing value={result.aiScoreBefore ?? 0} kind="before" />
                       <p className="mt-3 text-sm font-medium text-gray-600">
-                        Probabilité de détection IA
+                        Indication de rédaction assistée
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
-                        Score IA après
+                        Textes suspects après
                       </p>
                       <ScoreRing value={result.aiScoreAfter ?? 0} kind="after" />
                       <p className="mt-3 text-sm font-medium text-gray-600">
                         {(result.aiScoreAfter ?? 100) <= 15
-                          ? "✓ Passe les détecteurs"
-                          : "Zone de risque, essaie Agressif"}
+                          ? "✓ Zone verte, faible signal"
+                          : "Zone de vigilance, essaie Agressif"}
                       </p>
                     </div>
                   </div>
@@ -855,7 +855,7 @@ export default function HumanizerPage() {
                         </p>
                       )}
                       <p className="text-[10px] text-purple-700/70 mt-2">
-                        Ce score émule le détecteur ML de Compilatio Studium. Objectif : &lt; 15 %.
+                        Ce score émule le détecteur ML de Compilatio Studium. Objectif : &lt; 15 %. Aucun détecteur IA n&apos;est fiable à 100 % — indication et non preuve.
                       </p>
                     </div>
                   )}
@@ -1018,7 +1018,7 @@ export default function HumanizerPage() {
                   <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Rapport Claude · phrase par phrase</p>
                   <h2 className="text-lg sm:text-xl font-extrabold">Preuve détaillée par Claude Sonnet</h2>
                   <p className="text-xs opacity-90 mt-0.5">
-                    {claudeReport.paragraphs.length} segments analysés · surlignage inline par phrase · zones à risque top 5
+                    {claudeReport.paragraphs.length} segments analysés · surlignage inline par phrase · zones suspectes top 5
                   </p>
                 </div>
                 <ArrowRight className="h-5 w-5 shrink-0" />
@@ -1038,7 +1038,7 @@ export default function HumanizerPage() {
                   <p className="text-xs opacity-90 mt-0.5">
                     {loadingClaudeReport
                       ? "Claude Sonnet analyse chaque phrase de ton texte humanisé…"
-                      : "Claude Sonnet passe ton texte au peigne fin — chaque phrase notée + zones à risque restantes"}
+                      : "Claude Sonnet passe ton texte au peigne fin — chaque phrase notée + zones suspectes restantes"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1126,7 +1126,7 @@ export default function HumanizerPage() {
                 <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
                 <p className="text-sm font-semibold text-gray-800">
                   {analyzePhase === "extracting" && "Extraction du texte du document…"}
-                  {analyzePhase === "detecting" && "Repérage des zones à risque…"}
+                  {analyzePhase === "detecting" && "Repérage des zones suspectes…"}
                   {analyzePhase === "scoring" && "Notation Claude Sonnet (3 tranches parallèles)…"}
                 </p>
               </div>
@@ -1189,7 +1189,7 @@ export default function HumanizerPage() {
                   <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Étape suivante — optionnelle</p>
                   <h3 className="text-lg sm:text-xl font-extrabold">Humaniser ce document ?</h3>
                   <p className="text-xs opacity-90 mt-1 leading-relaxed">
-                    Claude Opus 4.8 va réécrire les passages à risque pour faire chuter le score IA sous 15 %. Choisis une intensité — le coût s&apos;ajoute au token déjà utilisé pour l&apos;analyse.
+                    Claude Opus 4.8 va réécrire les zones potentiellement rédigées avec assistance IA pour faire chuter le taux de textes suspects sous 15 %. Choisis une intensité — le coût s&apos;ajoute au token déjà utilisé pour l&apos;analyse.
                   </p>
                 </div>
               </div>
@@ -1337,7 +1337,7 @@ export default function HumanizerPage() {
               <ArrowRight className="h-4 w-4" />
             </button>
             <p className="text-[11px] text-gray-500 text-center -mt-2 mb-4">
-              L&apos;analyse ne réécrit rien. Tu verras ton score IA + les zones à risque, puis tu décideras si tu veux humaniser.
+              L&apos;analyse ne réécrit rien. Tu verras l&apos;indication de rédaction assistée + les zones suspectes, puis tu décideras si tu veux humaniser. Ce diagnostic est une indication, pas une preuve.
             </p>
 
             {/* Advanced settings */}
@@ -1369,7 +1369,7 @@ export default function HumanizerPage() {
                   </div>
 
                   <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
-                    Score IA cible
+                    Textes suspects — cible
                   </p>
                   <div className="flex items-center gap-3 mb-5">
                     <input
@@ -1510,7 +1510,7 @@ export default function HumanizerPage() {
             formality: Number(result.scoreDetails.after?.formality ?? 0),
             parallelism: Number(result.scoreDetails.after?.parallelism ?? 0),
           } : undefined}
-          summary={`Score IA passé de ${result.aiScoreBefore ?? 0}% à ${result.aiScoreAfter ?? 0}% en ${result.passesApplied ?? 0} passes. ${(result.aiScoreAfter ?? 100) <= 15 ? "Le texte passe désormais les détecteurs." : "Certaines zones restent à humaniser."}`}
+          summary={`Textes suspects passés de ${result.aiScoreBefore ?? 0}% à ${result.aiScoreAfter ?? 0}% en ${result.passesApplied ?? 0} passes. ${(result.aiScoreAfter ?? 100) <= 15 ? "Le texte se rapproche du seuil vert." : "Certaines zones restent à humaniser."} Aucun détecteur IA n'est fiable à 100% — résultat à interpréter avec discernement.`}
           onClose={() => setShowReport(false)}
         />
       )}
@@ -2036,7 +2036,7 @@ function TimelineBars({
               height: `${heightPct * 0.7}%`,
               minHeight: "18px",
             }}
-            title={`Zone ${i + 1} · ${p.score}% IA`}
+            title={`Zone ${i + 1} · ${p.score}% suspect`}
           />
         );
       })}
@@ -2075,7 +2075,7 @@ function ScoreRing({ value, kind }: { value: number; kind: "before" | "after" })
       <div className="absolute inset-0 flex items-center justify-center flex-col">
         <span className={`text-3xl font-extrabold ${textClass}`}>{clamped}%</span>
         <span className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">
-          IA
+          Suspects
         </span>
       </div>
     </div>
