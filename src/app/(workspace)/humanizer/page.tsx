@@ -37,6 +37,8 @@ import {
   ChevronDown,
   Cpu,
   BarChart3,
+  User,
+  Printer,
 } from "lucide-react";
 
 type Mode = "basic" | "balanced" | "aggressive" | "compilatio-proof";
@@ -725,13 +727,22 @@ export default function HumanizerPage() {
             <ArrowLeft className="h-4 w-4" />
             Retour au dashboard
           </Link>
-          <Link
-            href="/humanizer/history"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
-          >
-            <History className="h-4 w-4" />
-            Historique
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/humanizer/history"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              <History className="h-4 w-4" />
+              Historique
+            </Link>
+            <Link
+              href="/profile"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              <User className="h-4 w-4" />
+              Mon compte
+            </Link>
+          </div>
         </div>
 
         <div className="text-center mb-8">
@@ -1800,6 +1811,21 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
               ↺ {ignoredIndexes.size} ignorée{ignoredIndexes.size > 1 ? "s" : ""}
             </button>
           )}
+          {/* 10/07/26 (Orsu) — Bouton PDF via window.print() ciblé sur le rapport. */}
+          <button
+            onClick={() => {
+              document.documentElement.classList.add("print-report");
+              setTimeout(() => {
+                window.print();
+                setTimeout(() => document.documentElement.classList.remove("print-report"), 500);
+              }, 50);
+            }}
+            className="ml-auto rounded-full bg-white text-orange-700 hover:bg-orange-50 px-2.5 py-1 text-[10px] font-black transition-colors flex items-center gap-1 no-print"
+            title="Télécharger en PDF"
+          >
+            <Printer className="h-3 w-3" />
+            PDF
+          </button>
         </div>
       </div>
 

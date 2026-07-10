@@ -23,5 +23,6 @@ export const config = {
     "/job-match/:path*",
     "/cover-letter/:path*",
     "/cv-editor/:path*",
+    "/profile/:path*",
   ],
 };

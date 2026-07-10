@@ -733,3 +733,33 @@ input[type="range"].accent-indigo-500::-moz-range-track {
   border-radius: 4px;
   background: #e0e7ff;
 }
+
+/* ═══════════════════════════════════════ */
+/*        PRINT REPORT (PDF export)       */
+/*        10/07/26 (Orsu)                 */
+/* ═══════════════════════════════════════ */
+@media print {
+  .no-print { display: none !important; }
+  html.print-report body { background: white !important; }
+  html.print-report .bg-gradient-to-br,
+  html.print-report .bg-gradient-to-r {
+    background: white !important;
+    color: #111827 !important;
+  }
+  html.print-report .shadow-xl,
+  html.print-report .shadow-lg,
+  html.print-report .shadow-md,
+  html.print-report .shadow-sm { box-shadow: none !important; }
+  html.print-report .max-h-\[720px\],
+  html.print-report .max-h-\[500px\],
+  html.print-report .max-h-\[320px\] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  html.print-report .overflow-y-auto {
+    overflow: visible !important;
+  }
+  html.print-report a { color: inherit !important; text-decoration: none !important; }
+  @page { margin: 15mm; size: A4; }
+}
+
