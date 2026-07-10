@@ -1,11 +1,18 @@
 "use client";
 
-import { Fragment, useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import AiReport from "@/components/ai-report/ai-report";
+import ScoreRing from "@/components/analysis/ScoreRing";
+import AxisCard from "@/components/analysis/AxisCard";
+import TimelineNumbered from "@/components/analysis/TimelineNumbered";
+import ZoneHighlight from "@/components/analysis/ZoneHighlight";
+import ZonesSidebar from "@/components/analysis/ZonesSidebar";
+import LoadingReport from "@/components/analysis/LoadingReport";
+import { exportReportToPDF } from "@/components/analysis/ExportPDF";
 import {
   Bot,
   Upload,
@@ -16,7 +23,7 @@ import {
   Loader2,
   Zap,
   Shield,
-  TrendingDown,
+  ShieldAlert,
   Download,
   RotateCcw,
   ArrowRight,
@@ -33,12 +40,11 @@ import {
   Feather,
   Scale,
   FileSearch,
-  ChevronUp,
-  ChevronDown,
   Cpu,
   BarChart3,
   User,
-  Printer,
+  Files,
+  Languages,
 } from "lucide-react";
 
 type Mode = "basic" | "balanced" | "aggressive" | "compilatio-proof";
@@ -879,7 +885,7 @@ export default function HumanizerPage() {
                       <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
                         Textes suspects avant
                       </p>
-                      <ScoreRing value={result.aiScoreBefore ?? 0} kind="before" />
+                      <LegacyScoreRing value={result.aiScoreBefore ?? 0} kind="before" />
                       <p className="mt-3 text-sm font-medium text-gray-600">
                         Indication de rédaction assistée
                       </p>
@@ -888,7 +894,7 @@ export default function HumanizerPage() {
                       <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
                         Textes suspects après
                       </p>
-                      <ScoreRing value={result.aiScoreAfter ?? 0} kind="after" />
+                      <LegacyScoreRing value={result.aiScoreAfter ?? 0} kind="after" />
                       <p className="mt-3 text-sm font-medium text-gray-600">
                         {(result.aiScoreAfter ?? 100) <= 15
                           ? "✓ Zone verte, faible signal"
@@ -1191,66 +1197,7 @@ export default function HumanizerPage() {
 
         {/* Loader analyse-only (avant réécriture) */}
         {analyzingOnly && (
-          <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-8 mb-6">
-            <div className="flex flex-col items-center">
-              <div className="relative mb-6">
-                <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg">
-                  <FileSearch className="h-9 w-9 text-white" />
-                </div>
-                <div
-                  className="absolute -inset-3 rounded-3xl border-2 border-orange-300/40 animate-spin"
-                  style={{ borderStyle: "dashed", animationDuration: "3s" }}
-                />
-              </div>
-              <div className="flex items-center gap-2 mb-2">
-                <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
-                <p className="text-sm font-semibold text-gray-800">
-                  {analyzePhase === "extracting" && "Extraction du texte du document…"}
-                  {analyzePhase === "detecting" && "Repérage des zones suspectes…"}
-                  {analyzePhase === "scoring" && "Notation Claude Sonnet (3 tranches parallèles)…"}
-                </p>
-              </div>
-              {analyzePhaseDetail && (
-                <p className="text-xs text-gray-400 italic mb-3 text-center max-w-md">
-                  {analyzePhaseDetail}
-                </p>
-              )}
-              <div className="w-full max-w-md space-y-2 mt-3">
-                {[
-                  { key: "extracting", label: "Extraction du texte" },
-                  { key: "detecting", label: "Score par paragraphe" },
-                  { key: "scoring", label: "Notation Claude Sonnet" },
-                ].map((step, i) => {
-                  const order = ["extracting", "detecting", "scoring"];
-                  const currentIdx = order.indexOf(analyzePhase);
-                  const stepIdx = order.indexOf(step.key);
-                  const active = stepIdx === currentIdx;
-                  const passed = stepIdx < currentIdx;
-                  return (
-                    <div key={step.key} className="flex items-center gap-3">
-                      <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 ${
-                        passed ? "bg-emerald-500" : active ? "bg-orange-500" : "bg-gray-200"
-                      }`}>
-                        {passed ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                        ) : active ? (
-                          <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
-                        ) : (
-                          <span className="text-[10px] text-white font-bold">{i + 1}</span>
-                        )}
-                      </div>
-                      <p className={`text-xs ${passed ? "text-gray-500" : active ? "text-gray-900 font-semibold" : "text-gray-400"}`}>
-                        {step.label}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] text-gray-400 max-w-md text-center mt-5">
-                Aucune réécriture — juste le diagnostic. Ça peut prendre 30-60s sur un gros doc.
-              </p>
-            </div>
-          </div>
+          <LoadingReport phase={analyzePhase} detail={analyzePhaseDetail} />
         )}
 
         {/* 09/07 (Orsu) — Résultat Moteur v2 (statistique + stylométrique) */}
@@ -1294,7 +1241,7 @@ export default function HumanizerPage() {
         {!analyzingOnly && !analyzing && !result && !analyzeOnlyResultV2 && analyzeOnlyResult && (
           <div className="space-y-5 mb-6">
             {/* Rapport unifié façon Compilatio */}
-            <AnalysisReport result={analyzeOnlyResult} />
+            <AnalysisReport result={analyzeOnlyResult} onReset={resetAll} />
 
             {/* CTA Humaniser */}
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
@@ -1690,11 +1637,19 @@ export default function HumanizerPage() {
   );
 }
 
-function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
+function AnalysisReport({
+  result,
+  onReset,
+}: {
+  result: AnalyzeOnlyResult;
+  onReset?: () => void;
+}) {
   const paragraphs = result.paragraphs ?? [];
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
 
-  // 09/07 (Orsu) — Refonte UX Magister+ (deep-research Compilatio) :
-  // ignoré-state client-side, recalcul global sans nouvel API call.
+  // 09/07 (Orsu) — Refonte UX Magister+ : ignoré-state client-side, recalcul
+  // global sans nouvel API call.
   const [ignoredIndexes, setIgnoredIndexes] = useState<Set<number>>(new Set());
   const [currentIdx, setCurrentIdx] = useState(0);
 
@@ -1703,8 +1658,6 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
   );
 
   // Recompute score client-side quand des zones sont ignorées.
-  // Cohérent avec la compression serveur (× 0.5 sur registre+langue avg),
-  // mais dérivé de la moyenne des paragraphes non-ignorés.
   const activeParagraphs = paragraphs.filter((p) => !ignoredIndexes.has(p.index));
   const recomputedRawAvg =
     activeParagraphs.length > 0
@@ -1721,7 +1674,6 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
       else next.add(index);
       return next;
     });
-    // Reset curseur pour éviter d'être hors-bornes
     setCurrentIdx(0);
   };
 
@@ -1739,467 +1691,312 @@ function AnalysisReport({ result }: { result: AnalyzeOnlyResult }) {
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  // 3 axes Magister+ (au lieu des 4 dimensions).
-  // Similitudes + Texte non-reconnu = placeholders (pas encore implémentés
-  // côté Seora — on assume "<1%" et "0%" pour rester cohérent avec la
-  // philosophie Compilatio "indication, pas preuve").
-  const axes = [
-    {
-      key: "similitudes",
-      label: "Similitudes",
-      value: "< 1%",
-      subtitle: "Aucune correspondance externe détectée",
-      accent: "emerald",
-      placeholder: true,
-    },
-    {
-      key: "redaction-ia",
-      label: "Rédaction par IA",
-      value: `${displayedIA}%`,
-      subtitle:
-        ignoredIndexes.size > 0
-          ? `Recalculé sans ${ignoredIndexes.size} zone${ignoredIndexes.size > 1 ? "s" : ""} ignorée${ignoredIndexes.size > 1 ? "s" : ""}`
-          : "Indication de rédaction assistée",
-      accent: displayedIA >= 40 ? "red" : displayedIA >= 20 ? "amber" : "cyan",
-      placeholder: false,
-    },
-    {
-      key: "texte-non-reconnu",
-      label: "Texte non-reconnu",
-      value: "0%",
-      subtitle: "Structures atypiques absentes",
-      accent: "gray",
-      placeholder: true,
-    },
-  ];
+  const handleExportPDF = async () => {
+    if (!reportRef.current) return;
+    setExporting(true);
+    const loadingToast = toast.loading("Génération du PDF...");
+    try {
+      await exportReportToPDF(reportRef.current, result.fileName);
+      toast.success("PDF téléchargé", { id: loadingToast });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Échec de l'export PDF", {
+        id: loadingToast,
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const hasZones = paragraphs.length > 0;
+  const noRiskDetected = flagged.length === 0 && displayedIA === 0;
+
+  const fileSizeInfo = result.wordCount
+    ? `${result.wordCount.toLocaleString("fr-FR")} mots`
+    : "";
 
   return (
-    <div className="rounded-3xl bg-white shadow-xl border border-orange-100 overflow-hidden">
-      {/* Header — filename + 4 badges (Magister+ style) */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-5 sm:px-6 py-4 text-white">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-            <FileText className="h-4 w-4" />
+    <div
+      ref={reportRef}
+      className="rounded-2xl bg-white shadow-sm border border-zinc-200 overflow-hidden"
+    >
+      {/* ═══ HEADER : ScoreRing + métadonnées + actions ═══ */}
+      <div className="px-6 sm:px-8 py-6 border-b border-zinc-100 bg-gradient-to-br from-white via-orange-50/30 to-white">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* ScoreRing */}
+          <div className="mx-auto lg:mx-0 shrink-0">
+            <ScoreRing
+              value={displayedIA}
+              size={180}
+              label="Textes suspects"
+            />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold truncate">{result.fileName}</p>
-            <p className="text-[10px] opacity-80">Rapport d'analyse</p>
-          </div>
-          <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-black bg-white/15 rounded-full px-3 py-1">
-            Textes suspects
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
-            {result.wordCount.toLocaleString("fr-FR")} mots
-          </span>
-          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
-            {paragraphs.length} zones analysées
-          </span>
-          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
-            {flagged.length} zone{flagged.length > 1 ? "s" : ""} suspecte{flagged.length > 1 ? "s" : ""}
-          </span>
-          <span className="rounded-full bg-white text-orange-700 px-2.5 py-1 text-[10px] font-black">
-            {displayedIA}% suspects
-          </span>
-          {ignoredIndexes.size > 0 && (
-            <button
-              onClick={resetIgnored}
-              className="rounded-full bg-white/25 hover:bg-white/40 px-2.5 py-1 text-[10px] font-bold transition-colors"
-              title="Restaurer les zones ignorées"
-            >
-              ↺ {ignoredIndexes.size} ignorée{ignoredIndexes.size > 1 ? "s" : ""}
-            </button>
-          )}
-          {/* 10/07/26 (Orsu) — Bouton PDF via window.print() ciblé sur le rapport. */}
-          <button
-            onClick={() => {
-              document.documentElement.classList.add("print-report");
-              setTimeout(() => {
-                window.print();
-                setTimeout(() => document.documentElement.classList.remove("print-report"), 500);
-              }, 50);
-            }}
-            className="ml-auto rounded-full bg-white text-orange-700 hover:bg-orange-50 px-2.5 py-1 text-[10px] font-black transition-colors flex items-center gap-1 no-print"
-            title="Télécharger en PDF"
-          >
-            <Printer className="h-3 w-3" />
-            PDF
-          </button>
-        </div>
-      </div>
 
-      {/* Timeline horizontale numérotée + score */}
-      <div className="px-5 sm:px-6 py-6 bg-gray-50/50 border-b border-gray-100">
-        <div className="flex items-center gap-5">
-          <div className="flex items-center gap-2 shrink-0">
-            <Cpu className="h-4 w-4 text-cyan-600" />
-            <span className="text-[11px] uppercase tracking-widest text-gray-500 font-black hidden sm:inline">
-              Textes suspects
-            </span>
-          </div>
-          <TimelineBars
-            paragraphs={paragraphs}
-            flagged={flagged}
-            currentIdx={currentIdx}
-            onSelect={goto}
-          />
-          <div className="text-4xl font-black text-cyan-500 shrink-0 tabular-nums">
-            {displayedIA}<span className="text-base opacity-70">%</span>
-          </div>
-        </div>
-
-        {/* Nav */}
-        {flagged.length > 0 && (
-          <div className="flex items-center justify-between mt-5 text-xs">
-            <button
-              onClick={() => goto(0)}
-              className="font-semibold text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              « Début du document
-            </button>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => goto(currentIdx - 1)}
-                disabled={currentIdx === 0}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <ChevronUp className="h-4 w-4 text-gray-600" />
-              </button>
-              <span className="font-bold text-gray-700 tabular-nums min-w-[3.5rem] text-center">
-                {Math.min(currentIdx + 1, flagged.length)} / {flagged.length}
+          {/* Metadata + actions */}
+          <div className="flex-1 min-w-0 w-full">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+                <FileText className="h-5 w-5 text-orange-600" strokeWidth={2.2} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] uppercase tracking-widest font-black text-zinc-500 mb-0.5">
+                  Rapport d&apos;analyse
+                </p>
+                <h2 className="text-lg sm:text-xl font-bold text-zinc-900 truncate">
+                  {result.fileName}
+                </h2>
+              </div>
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1">
+                <Languages className="h-3 w-3" />
+                FR
               </span>
-              <button
-                onClick={() => goto(currentIdx + 1)}
-                disabled={currentIdx >= flagged.length - 1}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <ChevronDown className="h-4 w-4 text-gray-600" />
-              </button>
             </div>
-            <button
-              onClick={() => goto(flagged.length - 1)}
-              className="font-semibold text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              Fin du document »
-            </button>
+
+            {/* 4 chips métadonnées */}
+            <div className="flex flex-wrap gap-2 mb-5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-700">
+                <FileText className="h-3 w-3 text-zinc-400" />
+                {fileSizeInfo}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-white border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-700">
+                <BarChart3 className="h-3 w-3 text-cyan-500" />
+                {paragraphs.length} zones analysées
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-white border border-zinc-200 px-2.5 py-1 text-[11px] font-semibold text-zinc-700">
+                <Cpu className="h-3 w-3 text-orange-500" />
+                {flagged.length} zone{flagged.length > 1 ? "s" : ""} à risque
+              </span>
+              {ignoredIndexes.size > 0 && (
+                <button
+                  type="button"
+                  onClick={resetIgnored}
+                  className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200 px-2.5 py-1 text-[11px] font-bold text-orange-700 hover:bg-orange-100 transition-colors"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  {ignoredIndexes.size} ignorée{ignoredIndexes.size > 1 ? "s" : ""}
+                </button>
+              )}
+            </div>
+
+            {/* Actions principales */}
+            <div className="flex flex-col sm:flex-row gap-2 no-print">
+              <button
+                type="button"
+                onClick={handleExportPDF}
+                disabled={exporting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/25 hover:shadow-lg hover:shadow-orange-500/40 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              >
+                {exporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {exporting ? "Génération..." : "Télécharger PDF"}
+              </button>
+              {onReset && (
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Nouvelle analyse
+                </button>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* 3 axes Magister+ — Similitudes / Rédaction IA / Texte non-reconnu */}
-      <div className="px-5 sm:px-6 py-5 border-b border-gray-100 bg-gradient-to-br from-gray-50 to-white">
-        <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black mb-4 flex items-center gap-1.5">
-          <BarChart3 className="h-3 w-3 text-cyan-600" />
+      {/* ═══ TIMELINE ═══ */}
+      <div className="px-6 sm:px-8 py-6 border-b border-zinc-100 bg-white">
+        <TimelineNumbered
+          paragraphs={paragraphs}
+          flagged={flagged}
+          currentIdx={currentIdx}
+          onSelect={goto}
+        />
+      </div>
+
+      {/* ═══ EMPTY STATE (si rien de suspect) ═══ */}
+      {noRiskDetected && hasZones && (
+        <div className="px-6 sm:px-8 py-6 border-b border-zinc-100 bg-gradient-to-br from-emerald-50/40 to-white">
+          <div className="flex items-center gap-4 max-w-2xl mx-auto">
+            <div className="h-14 w-14 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="h-7 w-7 text-emerald-600" strokeWidth={2.2} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-emerald-900">
+                Aucune zone suspecte détectée sur ce document.
+              </p>
+              <p className="text-xs text-emerald-800/80 mt-0.5">
+                Le style rédactionnel est compatible avec une rédaction humaine.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 3 AXES ═══ */}
+      <div className="px-6 sm:px-8 py-6 border-b border-zinc-100 bg-zinc-50/50">
+        <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-black mb-4 flex items-center gap-1.5">
+          <BarChart3 className="h-3 w-3 text-orange-500" />
           Décomposition du diagnostic
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {axes.map((axe) => {
-            const textColor =
-              axe.accent === "red" ? "text-red-600" :
-              axe.accent === "amber" ? "text-amber-600" :
-              axe.accent === "cyan" ? "text-cyan-600" :
-              axe.accent === "emerald" ? "text-emerald-600" :
-              "text-gray-400";
-            const chipBg =
-              axe.accent === "red" ? "bg-red-100 text-red-700" :
-              axe.accent === "amber" ? "bg-amber-100 text-amber-700" :
-              axe.accent === "cyan" ? "bg-cyan-100 text-cyan-700" :
-              axe.accent === "emerald" ? "bg-emerald-100 text-emerald-700" :
-              "bg-gray-100 text-gray-500";
-            return (
-              <div
-                key={axe.key}
-                className={`rounded-2xl border p-4 shadow-sm ${
-                  axe.placeholder ? "bg-gray-50/50 border-gray-200" : "bg-white border-gray-200"
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-xs font-black text-gray-900 uppercase tracking-wide">{axe.label}</p>
-                  {axe.placeholder && (
-                    <span className={`text-[9px] font-black uppercase tracking-widest ${chipBg} rounded-full px-2 py-0.5`}>
-                      Non-mesuré
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-baseline gap-1 mb-2">
-                  <span className={`text-3xl font-black tabular-nums ${textColor}`}>{axe.value}</span>
-                </div>
-                <p className="text-[10px] text-gray-500 leading-snug">{axe.subtitle}</p>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <AxisCard
+            icon={Files}
+            title="Similitudes"
+            value="< 1%"
+            subtitle="Non-mesuré (module plagiat à venir)"
+            accent="gray"
+            progressPct={0}
+          />
+          <AxisCard
+            icon={Sparkles}
+            title="Détection IA"
+            value={displayedIA}
+            subtitle="Textes présentant des formulations stylistiquement proches d'un texte généré par une IA"
+            accent="orange"
+            emphasize
+            countUp
+            progressPct={displayedIA}
+          />
+          <AxisCard
+            icon={ShieldAlert}
+            title="Obfuscation"
+            value={0}
+            subtitle="Non-détecté sur ce document"
+            accent="violet"
+            badge="Exclusif Seora"
+            countUp
+            progressPct={0}
+          />
         </div>
-        <p className="text-[10px] text-gray-400 mt-3 leading-relaxed">
-          Ce diagnostic est une <strong className="font-bold text-gray-500">indication</strong>, pas une preuve. Complète-le d'un échange oral si nécessaire.
+        <p className="text-[10px] text-zinc-400 mt-4 leading-relaxed">
+          Ce diagnostic est une <strong className="font-bold text-zinc-500">indication statistique</strong>, pas une preuve.
         </p>
       </div>
 
-      {/* Analyse globale Claude */}
+      {/* ═══ ANALYSE CLAUDE SONNET (raisonnement global) ═══ */}
       {result.claudeReasoning && (
-        <div className="px-5 sm:px-6 py-4 border-b border-gray-100 bg-gradient-to-br from-purple-50 to-fuchsia-50">
-          <p className="text-[10px] uppercase tracking-widest text-purple-800 font-black mb-2 flex items-center gap-1.5">
+        <div className="px-6 sm:px-8 py-5 border-b border-zinc-100 bg-gradient-to-br from-violet-50 to-fuchsia-50/50">
+          <p className="text-[10px] uppercase tracking-widest text-violet-800 font-black mb-2 flex items-center gap-1.5">
             <Shield className="h-3 w-3" />
-            Analyse globale Claude Sonnet
+            Analyse globale · Claude Sonnet
           </p>
-          <p className="text-sm text-purple-900/90 leading-relaxed">
-            {result.claudeReasoning}
+          <p className="text-sm text-violet-900/90 leading-relaxed italic">
+            « {result.claudeReasoning} »
           </p>
         </div>
       )}
 
-      {/* Split : sidebar zones (gauche) + reader fluide (droite) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
-        {/* Sidebar — liste des zones suspectes */}
-        <div className="max-h-[320px] lg:max-h-[720px] overflow-y-auto bg-gray-50/60">
-          <div className="sticky top-0 z-10 bg-gray-100/90 backdrop-blur px-4 py-3 border-b border-gray-200">
-            <p className="text-[10px] uppercase tracking-widest text-gray-600 font-black">
-              Zones suspectes ({flagged.length})
-            </p>
-            <p className="text-[10px] text-gray-500 mt-0.5">Clique pour aller au passage · Ignore une zone que tu revendiques</p>
-          </div>
-          {flagged.length === 0 ? (
-            <div className="px-4 py-6 text-center">
-              <div className="mx-auto h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              </div>
-              <p className="text-xs text-gray-600">Aucune zone suspecte</p>
-              {ignoredIndexes.size > 0 && (
-                <button
-                  onClick={resetIgnored}
-                  className="mt-3 text-[11px] font-semibold text-orange-600 hover:text-orange-800"
-                >
-                  Restaurer les zones ignorées ({ignoredIndexes.size})
-                </button>
+      {/* ═══ READER SPLIT : Sidebar + Zone highlight ═══ */}
+      <div className="px-6 sm:px-8 py-6 bg-white">
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
+          {/* Sidebar */}
+          <ZonesSidebar
+            flagged={flagged}
+            ignoredIndexes={ignoredIndexes}
+            currentIdx={currentIdx}
+            onGoto={goto}
+            onToggleIgnore={toggleIgnore}
+            onResetIgnored={resetIgnored}
+          />
+
+          {/* Reader */}
+          <div className="min-w-0 rounded-2xl bg-white border border-zinc-200 shadow-sm overflow-hidden">
+            <div className="sticky top-0 z-10 px-5 py-3 border-b border-zinc-100 bg-white/95 backdrop-blur flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-black">
+                Texte annoté
+              </p>
+              <span className="text-[10px] text-zinc-400">
+                Passe la souris sur une phrase surlignée pour voir le motif
+              </span>
+            </div>
+            <div className="max-h-[640px] overflow-y-auto px-5 sm:px-6 py-4">
+              {paragraphs.length === 0 ? (
+                <p className="text-sm text-zinc-500 italic text-center py-12">
+                  Aucun texte à afficher.
+                </p>
+              ) : (
+                paragraphs.map((p) => {
+                  const flagIdx = flagged.findIndex((f) => f.index === p.index);
+                  const isFlagged = flagIdx !== -1;
+                  const isIgnored = ignoredIndexes.has(p.index);
+                  const isCurrent = isFlagged && flagIdx === currentIdx;
+                  return (
+                    <ZoneHighlight
+                      key={p.index}
+                      paragraph={p}
+                      flagIdx={flagIdx}
+                      isCurrent={isCurrent}
+                      isIgnored={isIgnored}
+                      onToggleIgnore={() => toggleIgnore(p.index)}
+                      onGoto={() => goto(flagIdx)}
+                    />
+                  );
+                })
               )}
             </div>
-          ) : (
-            <ul>
-              {flagged.map((p, i) => {
-                const isCurrent = i === currentIdx;
-                return (
-                  <li key={p.index}>
-                    <div
-                      className={`px-4 py-3 border-b border-gray-100 transition-colors ${
-                        isCurrent ? "bg-white shadow-sm ring-2 ring-inset ring-orange-400" : "hover:bg-white"
-                      }`}
-                    >
-                      <button
-                        onClick={() => goto(i)}
-                        className="w-full text-left"
-                      >
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <div className={`h-6 w-6 rounded-md flex items-center justify-center text-white text-[10px] font-black shrink-0 ${
-                            isCurrent ? "bg-orange-500" : "bg-cyan-500"
-                          }`}>
-                            {i + 1}
-                          </div>
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                            Zone {p.index + 1}
-                          </span>
-                          <span className="ml-auto text-[10px] font-black text-gray-700 tabular-nums">
-                            {p.score}%
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-700 leading-relaxed line-clamp-3">
-                          « {p.text.replace(/\s+/g, " ").trim().slice(0, 120)}
-                          {p.text.length > 120 ? "…" : ""} »
-                        </p>
-                      </button>
-                      <button
-                        onClick={() => toggleIgnore(p.index)}
-                        className="mt-2 text-[10px] font-semibold text-gray-500 hover:text-orange-600 transition-colors inline-flex items-center gap-1"
-                        title="Retirer cette zone du calcul global (indication, pas preuve)"
-                      >
-                        <XIcon className="h-3 w-3" />
-                        Ignorer cette zone
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        {/* Reader — flux du texte avec surlignage + badges numérotés */}
-        <div className="max-h-[720px] overflow-y-auto bg-white">
-          <div className="px-5 sm:px-8 py-6 grid grid-cols-[1fr_72px] gap-x-3 gap-y-2">
-            {paragraphs.map((p) => {
-              const flagIdx = flagged.findIndex((f) => f.index === p.index);
-              const isFlagged = flagIdx !== -1;
-              const isIgnored = ignoredIndexes.has(p.index);
-              const isCurrent = isFlagged && flagIdx === currentIdx;
-
-              // Surlignage par zone : cyan si suspect, gris barré si ignoré.
-              const sentences = p.sentences && p.sentences.length > 0
-                ? p.sentences
-                : [{ text: p.text, tail: "", score: p.score }];
-
-              return (
-                <Fragment key={p.index}>
-                  <div
-                    id={`report-para-${p.index}`}
-                    className={`scroll-mt-6 rounded-md transition-all ${
-                      isCurrent ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-white shadow-sm px-2 -mx-2 py-1" : ""
-                    } ${isIgnored ? "opacity-50" : ""}`}
-                  >
-                    <p className="text-[15px] text-gray-800 leading-[1.85] whitespace-pre-wrap">
-                      {sentences.map((s, si) => (
-                        <Fragment key={si}>
-                          <span
-                            className={
-                              isIgnored
-                                ? ""
-                                : s.score >= 60
-                                  ? "bg-cyan-100 px-1 py-0.5 rounded"
-                                  : s.score >= 40
-                                    ? "bg-cyan-50 px-1 py-0.5 rounded"
-                                    : ""
-                            }
-                            title={s.why || undefined}
-                          >
-                            {s.text}
-                          </span>
-                          {s.tail || " "}
-                        </Fragment>
-                      ))}
-                    </p>
-                  </div>
-                  <div className="flex items-start justify-center pt-1">
-                    {isFlagged && (
-                      <div className="flex flex-col items-center gap-1">
-                        <button
-                          onClick={() => goto(flagIdx)}
-                          className={`flex flex-col items-center rounded-lg px-2 py-1.5 border-2 bg-white shadow-sm group hover:scale-105 transition-transform ${
-                            isCurrent ? "border-orange-400" : "border-cyan-400"
-                          }`}
-                          title={`Zone ${flagIdx + 1} · ${p.score}% suspect`}
-                        >
-                          <Cpu className={`h-3.5 w-3.5 ${isCurrent ? "text-orange-500" : "text-cyan-500"}`} />
-                          <div className={`text-[13px] font-black tabular-nums ${isCurrent ? "text-orange-500" : "text-cyan-500"}`}>
-                            {flagIdx + 1}
-                          </div>
-                          <div className="text-[8px] font-bold text-gray-400 tabular-nums leading-none mt-0.5">
-                            {p.score}%
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => toggleIgnore(p.index)}
-                          className="text-[8px] font-bold text-gray-400 hover:text-orange-600 uppercase tracking-widest"
-                          title="Ignorer cette zone"
-                        >
-                          Ignorer
-                        </button>
-                      </div>
-                    )}
-                    {isIgnored && !isFlagged && (
-                      <button
-                        onClick={() => toggleIgnore(p.index)}
-                        className="text-[8px] font-bold text-orange-600 hover:text-orange-800 uppercase tracking-widest px-1"
-                        title="Restaurer cette zone"
-                      >
-                        Restaurer
-                      </button>
-                    )}
-                  </div>
-                </Fragment>
-              );
-            })}
           </div>
         </div>
       </div>
 
-      {/* Disclaimer + top offenders accordion */}
-      <div className="border-t border-gray-100 bg-gray-50/50 px-5 sm:px-6 py-4 space-y-3">
-        <p className="text-[11px] text-gray-500 leading-relaxed italic">
-          Aucun détecteur IA n'est fiable à 100%. Résultat à interpréter avec discernement.
-        </p>
-        {result.topOffenders && result.topOffenders.length > 0 && (
+      {/* ═══ TOP OFFENDERS ═══ */}
+      {result.topOffenders && result.topOffenders.length > 0 && (
+        <div className="border-t border-zinc-100 px-6 sm:px-8 py-4 bg-zinc-50/60">
           <details className="text-xs">
-            <summary className="cursor-pointer text-[10px] uppercase tracking-widest text-gray-600 font-black hover:text-gray-900 flex items-center gap-1.5">
+            <summary className="cursor-pointer text-[10px] uppercase tracking-widest text-zinc-600 font-black hover:text-zinc-900 flex items-center gap-1.5 no-print">
               <Flame className="h-3 w-3 text-red-500" />
-              Voir les {Math.min(5, result.topOffenders.length)} extraits les plus signalés par Claude
+              Voir les {Math.min(5, result.topOffenders.length)} extraits les plus signalés
             </summary>
-            <div className="space-y-1.5 mt-3">
+            <div className="space-y-2 mt-3">
               {result.topOffenders.slice(0, 5).map((snippet, i) => (
-                <p key={i} className="text-xs text-gray-800 italic leading-relaxed pl-3 border-l-2 border-cyan-300">
+                <p
+                  key={i}
+                  className="text-xs text-zinc-800 italic leading-relaxed pl-3 border-l-2 border-cyan-300"
+                >
                   « {snippet} »
                 </p>
               ))}
             </div>
           </details>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Barre horizontale de bâtonnets — un bâton par zone flaggée, hauteur =
- * intensité IA, position = index dans le doc. Curseur orange au-dessus
- * de la zone courante.
- */
-function TimelineBars({
-  paragraphs,
-  flagged,
-  currentIdx,
-  onSelect,
-}: {
-  paragraphs: ParagraphScore[];
-  flagged: ParagraphScore[];
-  currentIdx: number;
-  onSelect: (i: number) => void;
-}) {
-  if (paragraphs.length === 0) {
-    return <div className="flex-1 h-10 rounded-lg bg-gray-100" />;
-  }
-  const currentAbsIdx = flagged[currentIdx]?.index;
-
-  return (
-    <div className="flex-1 relative h-14 min-w-0">
-      {/* Axe horizontal fin */}
-      <div className="absolute inset-x-0 top-1/2 h-px bg-gray-300" />
-
-      {/* Marker "AI + numéro" au-dessus de la zone courante */}
-      {currentAbsIdx != null && (
-        <div
-          className="absolute -top-1 flex flex-col items-center pointer-events-none z-10 transition-all duration-300"
-          style={{
-            left: `${(currentAbsIdx / Math.max(1, paragraphs.length - 1)) * 100}%`,
-            transform: "translateX(-50%)",
-          }}
-        >
-          <div className="h-6 w-6 rounded bg-orange-500 flex items-center justify-center shadow-md">
-            <Cpu className="h-3 w-3 text-white" />
-          </div>
-          <div className="text-[10px] font-black text-orange-500 mt-0.5 tabular-nums">
-            {currentIdx + 1}
-          </div>
         </div>
       )}
 
-      {/* Bâtonnets pour chaque zone flaggée */}
-      {flagged.map((p, i) => {
-        const pos = (p.index / Math.max(1, paragraphs.length - 1)) * 100;
-        const heightPct = Math.max(30, Math.min(100, p.score));
-        const isCurrent = i === currentIdx;
-        return (
+      {/* ═══ FOOTER ACTIONS ═══ */}
+      <div className="border-t border-zinc-100 px-6 sm:px-8 py-4 bg-zinc-50/60 flex flex-col sm:flex-row items-center justify-between gap-3 no-print">
+        <button
+          type="button"
+          onClick={handleExportPDF}
+          disabled={exporting}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-zinc-200 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 disabled:opacity-60 transition-all"
+        >
+          {exporting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          Télécharger PDF
+        </button>
+        {onReset && (
           <button
-            key={p.index}
-            onClick={() => onSelect(i)}
-            className={`absolute top-1/2 -translate-y-1/2 rounded-sm transition-all hover:brightness-110 ${
-              isCurrent ? "bg-orange-500 w-1.5 z-10" : p.risk === "high" ? "bg-cyan-500 w-1" : "bg-cyan-300 w-1"
-            }`}
-            style={{
-              left: `${pos}%`,
-              height: `${heightPct * 0.7}%`,
-              minHeight: "18px",
-            }}
-            title={`Zone ${i + 1} · ${p.score}% suspect`}
-          />
-        );
-      })}
+            type="button"
+            onClick={onReset}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white border border-zinc-200 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Analyser un autre doc
+          </button>
+        )}
+      </div>
+
+      {/* ═══ DISCLAIMER ═══ */}
+      <div className="border-t border-zinc-100 px-6 sm:px-8 py-4 bg-white">
+        <p className="text-[11px] text-zinc-500 leading-relaxed italic text-center max-w-3xl mx-auto">
+          Ce diagnostic est une indication statistique et non une preuve. Aucun détecteur IA n&apos;atteint 100% de fiabilité. Interprétez avec discernement.
+        </p>
+      </div>
     </div>
   );
 }
@@ -2326,7 +2123,7 @@ function AnalysisReportV2({ result }: { result: AnalyzeV2Result }) {
 
       {/* Score global */}
       <div className="px-5 sm:px-6 py-6 bg-gray-50/50 border-b border-gray-100 flex flex-col sm:flex-row items-center gap-5">
-        <ScoreRing value={result.scoreGlobal} kind="before" />
+        <LegacyScoreRing value={result.scoreGlobal} kind="before" />
         <div className="flex-1 text-center sm:text-left">
           <p className="text-[10px] uppercase tracking-widest text-gray-500 font-black mb-1">
             Score global v2
@@ -2490,7 +2287,7 @@ function AnalysisReportV2({ result }: { result: AnalyzeV2Result }) {
   );
 }
 
-function ScoreRing({ value, kind }: { value: number; kind: "before" | "after" }) {
+function LegacyScoreRing({ value, kind }: { value: number; kind: "before" | "after" }) {
   const clamped = Math.max(0, Math.min(100, value));
   const good = kind === "after" && clamped <= 15;
   const bad = clamped >= 40;
