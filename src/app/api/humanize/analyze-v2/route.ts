@@ -43,6 +43,7 @@ interface DetectorZone {
 interface DetectorResponse {
   score_global: number;
   confidence: number;
+  obfuscation_score?: number; // v3.1r5 — axe séparé (homoglyphs cyrilliques + chars invisibles)
   signals: {
     fast_detect_gpt: number;
     perplexity_sentence_avg: number;
@@ -231,6 +232,7 @@ export async function POST(req: NextRequest) {
             engineVersion: "v2",
             scoreGlobal: Math.round(detected.score_global),
             confidence: detected.confidence,
+            obfuscationScore: Math.round(detected.obfuscation_score ?? 0),
             signals: detected.signals,
             zones: paragraphs,
             meta: detected.meta,

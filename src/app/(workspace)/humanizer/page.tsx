@@ -104,20 +104,18 @@ type AnalyzeOnlyResult = {
   fileName: string;
   wordCount: number;
   claudeScore: number;
-  // 09/07 (Orsu) — remonté pour debug interne, jamais affiché.
   claudeRawGlobal?: number;
   claudeReasoning: string;
   topOffenders: string[];
   paragraphs: ParagraphScore[];
-  // 09/07 (Orsu) — dimensions gardées côté payload pour compat descendante,
-  // mais on n'affiche plus que REGISTRE + LANGUE (STRUCTURE + ANTITHÈSES
-  // sont des patterns humains normaux, cf recalibration Compilatio-grade).
   dimensions?: {
     structure: number;
     registre: number;
     antitheses: number;
     langue: number;
   };
+  // 10/07 (Orsu) — populé quand on route via mapV2ToV1 (Moteur v2 activé)
+  obfuscationScore?: number;
 };
 
 // 09/07 (Orsu) — Moteur v2 : détection statistique + stylométrique.
@@ -151,6 +149,7 @@ type AnalyzeV2Result = {
   engineVersion: "v2";
   scoreGlobal: number;
   confidence: number;
+  obfuscationScore?: number; // 10/07 — axe séparé du score IA
   signals: V2Signals;
   zones: Array<{
     index: number;
@@ -231,7 +230,9 @@ export default function HumanizerPage() {
   const [analyzingOnly, setAnalyzingOnly] = useState(false);
   // 09/07 (Orsu) — Moteur v2 (statistique + stylométrique). Toggle OFF par
   // défaut tant que le patron n'a pas validé ; visible en beta.
-  const [useV2, setUseV2] = useState(false);
+  // 10/07 (Orsu) — Toggle ON par défaut après validation patron : moteur v3.1r8
+  // (ensemble 3 classifieurs + 15 signaux, MAE 4.9 vs Compilatio sur 5 docs).
+  const [useV2, setUseV2] = useState(true);
   const [analyzeOnlyResultV2, setAnalyzeOnlyResultV2] = useState<AnalyzeV2Result | null>(null);
   // 07/07 (Orsu) — auto-refund silencieux au boot de la page.
   // Ancien bandeau "N analyses coincées — clique pour rembourser" supprimé
@@ -1200,10 +1201,12 @@ export default function HumanizerPage() {
           <LoadingReport phase={analyzePhase} detail={analyzePhaseDetail} />
         )}
 
-        {/* 09/07 (Orsu) — Résultat Moteur v2 (statistique + stylométrique) */}
+        {/* 10/07 (Orsu) — Résultat Moteur v2 rendu via l'UI premium AnalysisReport
+            (mapping v2 -> v1 pour bénéficier de ScoreRing + TimelineNumbered +
+             AxisCard cyan/violet + ZoneHighlight + ZonesSidebar sticky). */}
         {!analyzingOnly && !analyzing && !result && analyzeOnlyResultV2 && (
           <div className="space-y-5 mb-6">
-            <AnalysisReportV2 result={analyzeOnlyResultV2} />
+            <AnalysisReport result={mapV2ToV1(analyzeOnlyResultV2)} onReset={resetAll} />
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
               <div className="flex items-start gap-4 mb-5">
                 <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
@@ -1637,6 +1640,35 @@ export default function HumanizerPage() {
   );
 }
 
+// 10/07 (Orsu) — Adapter le résultat du Moteur v2 (score_global agrégé, signals,
+// zones brutes) vers le format AnalyzeOnlyResult attendu par l'UI premium
+// AnalysisReport (ScoreRing + Timeline + Axes cyan/violet + Highlight + Sidebar).
+function mapV2ToV1(v2: AnalyzeV2Result): AnalyzeOnlyResult {
+  const paragraphs: ParagraphScore[] = (v2.zones ?? []).map((z) => ({
+    index: z.index,
+    text: z.text,
+    score: Math.round(z.score),
+    risk: z.risk,
+  }));
+  // Top-3 signaux les plus déclenchés pour "topOffenders"
+  const s = v2.signals;
+  const topOffenders: string[] = [];
+  if (s.ai_favorite_hits >= 20) topOffenders.push(`${s.ai_favorite_hits} tournures IA-typiques (${s.ai_favorite_top?.slice(0, 3).join(", ")})`);
+  if (s.homoglyph_count >= 5) topOffenders.push(`${s.homoglyph_count} caractères cyrilliques camouflés`);
+  if (typeof s.perplexity_sentence_avg === "number" && s.perplexity_sentence_avg < 40) topOffenders.push(`Perplexity moyenne basse (${s.perplexity_sentence_avg.toFixed(0)}) — style prévisible`);
+  if (typeof s.burstiness === "number" && s.burstiness < 0.5) topOffenders.push(`Burstiness faible (${s.burstiness.toFixed(2)}) — cadence uniforme typique IA`);
+  return {
+    id: v2.id,
+    fileName: v2.fileName,
+    wordCount: v2.wordCount,
+    claudeScore: v2.scoreGlobal,
+    claudeReasoning: `Analyse Moteur v2 (v3.1r8) — ${paragraphs.length} zones scannées, confidence ${(v2.confidence * 100).toFixed(0)}%. Score final ${v2.scoreGlobal}% (méthode : ensemble de 3 classifieurs sémantiques + 14 signaux stylo/statistiques). ${topOffenders.length > 0 ? "Marqueurs dominants : " + topOffenders.join(" · ") : "Aucun marqueur dominant identifié."}`,
+    topOffenders,
+    paragraphs,
+    obfuscationScore: v2.obfuscationScore ?? 0,
+  };
+}
+
 function AnalysisReport({
   result,
   onReset,
@@ -1864,12 +1896,18 @@ function AnalysisReport({
           <AxisCard
             icon={ShieldAlert}
             title="Obfuscation"
-            value={0}
-            subtitle="Non-détecté sur ce document"
+            value={result.obfuscationScore ?? 0}
+            subtitle={
+              (result.obfuscationScore ?? 0) >= 60
+                ? "Tentative de camouflage détectée (caractères non-latins ou invisibles)"
+                : (result.obfuscationScore ?? 0) > 0
+                  ? "Traces de caractères inhabituels"
+                  : "Aucune tentative d'obfuscation détectée"
+            }
             accent="violet"
             badge="Exclusif Seora"
             countUp
-            progressPct={0}
+            progressPct={result.obfuscationScore ?? 0}
           />
         </div>
         <p className="text-[10px] text-zinc-400 mt-4 leading-relaxed">
