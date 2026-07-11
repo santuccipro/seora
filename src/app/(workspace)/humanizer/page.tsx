@@ -256,6 +256,25 @@ export default function HumanizerPage() {
   const [totalPasses, setTotalPasses] = useState(0);
   const [phaseDetail, setPhaseDetail] = useState<string>("");
   const [result, setResult] = useState<Analysis | null>(null);
+  // 11/07 (Orsu) — Nouveau flow DOCX natif : preserve 100% du formatage
+  // (police, gras, taille) via un parser XML natif + rewrite ciblé HIGH ≥60%.
+  // Uniquement pour les .docx. Les autres formats (PDF, TXT) gardent l'ancien
+  // flow SSE (`/api/humanize`). Endpoint = /api/humanize/docx-native.
+  type DocxNativeResult = {
+    fileName: string;
+    blobUrl: string;
+    scoreBefore: number;
+    scoreAfter: number;
+    report: {
+      paragraphsProcessed: number;
+      paragraphsRewritten: number;
+      paragraphsFailed: number;
+      passesUsed: number;
+      globalScoreBefore: number;
+      globalScoreAfter: number;
+    } | null;
+  };
+  const [docxNativeResult, setDocxNativeResult] = useState<DocxNativeResult | null>(null);
   const [viewMode, setViewMode] = useState<"score" | "diff" | "raw">("score");
   const [showReport, setShowReport] = useState(false);
   const [showFullText, setShowFullText] = useState<"before" | "after" | null>(null);
@@ -473,8 +492,119 @@ export default function HumanizerPage() {
     }
   }, [uploaded, language, useV2]);
 
+  // 11/07 (Orsu) — Flow DOCX natif : preserve 100% du formatage.
+  // Appelle /api/humanize/docx-native (POST multipart, réponse = .docx binaire
+  // + header X-Humanize-Report en base64 JSON). Pas de streaming SSE : fetch
+  // direct sync (rapide 15-45s, tient dans le maxDuration 300s Vercel Pro).
+  const startDocxNative = useCallback(async () => {
+    if (!uploaded) return;
+    setAnalyzing(true);
+    setPhase("extracting");
+    setPass(0);
+    setTotalPasses(0);
+    setPhaseDetail("Parsing du XML natif (preserve police, gras, taille)…");
+    setResult(null);
+    setDocxNativeResult(null);
+
+    // Fake phase progression pour UX (backend est sync, pas de SSE).
+    // Les labels matchent PHASE_LABELS pour réutiliser la timeline existante.
+    const phaseTimers: ReturnType<typeof setTimeout>[] = [];
+    phaseTimers.push(
+      setTimeout(() => {
+        setPhase("detecting-before");
+        setPhaseDetail("Scan des paragraphes suspects…");
+      }, 3000),
+    );
+    phaseTimers.push(
+      setTimeout(() => {
+        setPhase("rewriting-llm");
+        setPhaseDetail("Réécriture ciblée des paragraphes HIGH (≥60%)…");
+      }, 8000),
+    );
+    phaseTimers.push(
+      setTimeout(() => {
+        setPhase("detecting-after");
+        setPhaseDetail("Vérification post-humanisation…");
+      }, 25000),
+    );
+
+    try {
+      const fd = new FormData();
+      fd.append("file", uploaded.file);
+
+      const res = await fetch("/api/humanize/docx-native", {
+        method: "POST",
+        body: fd,
+      });
+
+      phaseTimers.forEach(clearTimeout);
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        let msg = `HTTP ${res.status}`;
+        try {
+          const parsed = JSON.parse(errText);
+          msg = parsed.error || msg;
+        } catch {
+          if (errText) msg = errText.slice(0, 200);
+        }
+        throw new Error(msg);
+      }
+
+      const reportB64 = res.headers.get("X-Humanize-Report");
+      let report: DocxNativeResult["report"] = null;
+      if (reportB64) {
+        try {
+          report = JSON.parse(atob(reportB64));
+        } catch (e) {
+          console.warn("[docx-native] failed to parse report header", e);
+        }
+      }
+      const scoreBefore = parseFloat(
+        res.headers.get("X-Global-Score-Before") ||
+          String(report?.globalScoreBefore ?? 0),
+      );
+      const scoreAfter = parseFloat(
+        res.headers.get("X-Global-Score-After") ||
+          String(report?.globalScoreAfter ?? 0),
+      );
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      setPhase("done");
+      setDocxNativeResult({
+        fileName: uploaded.name,
+        blobUrl,
+        scoreBefore,
+        scoreAfter,
+        report,
+      });
+
+      toast.success(
+        `Humanisation terminée · ${Math.round(scoreBefore)}% → ${Math.round(scoreAfter)}%`,
+      );
+    } catch (err) {
+      phaseTimers.forEach(clearTimeout);
+      toast.error(
+        err instanceof Error ? err.message : "Erreur lors de l'humanisation",
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [uploaded]);
+
   const startAnalysis = useCallback(async () => {
     if (!uploaded) return;
+
+    // 11/07 (Orsu) — DOCX → nouveau flow natif (preserve formatage 100%).
+    // PDF / TXT / DOC gardent l'ancien flow SSE `/api/humanize`.
+    const ext = uploaded.name.toLowerCase().split(".").pop();
+    if (ext === "docx") {
+      await startDocxNative();
+      return;
+    }
+
     setAnalyzing(true);
     setPhase("extracting");
     setPass(0);
@@ -564,7 +694,7 @@ export default function HumanizerPage() {
       setAnalyzing(false);
       toast.error(err instanceof Error ? err.message : "Erreur lors de l'analyse");
     }
-  }, [uploaded, mode, language, targetScore, preservationList]);
+  }, [uploaded, mode, language, targetScore, preservationList, startDocxNative]);
 
   // Auto-launch when the user landed here from the landing popup — the file
   // is already loaded and they've already seen a preview score, no need to
@@ -670,7 +800,33 @@ export default function HumanizerPage() {
     setPhase("extracting");
     setPass(0);
     setPreservationList([]);
+    // 11/07 (Orsu) — nettoie le blob URL du flow DOCX natif
+    if (docxNativeResult?.blobUrl) {
+      URL.revokeObjectURL(docxNativeResult.blobUrl);
+    }
+    setDocxNativeResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // 11/07 (Orsu) — libère le blob URL du flow DOCX natif quand la page
+  // se démonte pour éviter les fuites mémoire.
+  useEffect(() => {
+    return () => {
+      if (docxNativeResult?.blobUrl) {
+        URL.revokeObjectURL(docxNativeResult.blobUrl);
+      }
+    };
+  }, [docxNativeResult?.blobUrl]);
+
+  // 11/07 (Orsu) — Télécharge le DOCX humanisé (blob URL déjà en mémoire).
+  const downloadDocxNative = () => {
+    if (!docxNativeResult) return;
+    const a = document.createElement("a");
+    a.href = docxNativeResult.blobUrl;
+    a.download = `humanized_${docxNativeResult.fileName.replace(/\.docx$/i, "")}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   if (status === "loading") {
@@ -835,6 +991,117 @@ export default function HumanizerPage() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 11/07 (Orsu) — Résultat du flow DOCX natif : preserve 100% du
+            formatage. Rendu simple : score before/after + rapport paragraphes
+            + bouton download du blob (déjà en mémoire). */}
+        {!analyzing && docxNativeResult && (
+          <div className="space-y-5">
+            <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                  <CheckCircle2 className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Humanisation terminée</h2>
+                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                    <FileText className="h-3 w-3" />
+                    {docxNativeResult.fileName} · formatage 100% préservé
+                  </p>
+                </div>
+              </div>
+
+              {/* Scores avant / après */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                <div className="text-center">
+                  <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
+                    Textes suspects avant
+                  </p>
+                  <LegacyScoreRing value={Math.round(docxNativeResult.scoreBefore)} kind="before" />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-3">
+                    Textes suspects après
+                  </p>
+                  <LegacyScoreRing value={Math.round(docxNativeResult.scoreAfter)} kind="after" />
+                  <p className="mt-3 text-sm font-medium text-gray-600">
+                    {docxNativeResult.scoreAfter <= 15
+                      ? "✓ Zone verte, faible signal"
+                      : docxNativeResult.scoreAfter <= 30
+                        ? "Zone de vigilance"
+                        : "Score encore élevé"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Rapport paragraphes */}
+              {docxNativeResult.report && (
+                <div className="pt-6 border-t border-gray-100">
+                  <p className="text-xs uppercase tracking-widest text-gray-400 font-semibold mb-4">
+                    Rapport d&apos;humanisation
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-emerald-50 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+                        Réécrits
+                      </p>
+                      <p className="text-xl font-extrabold text-emerald-600 mt-1">
+                        {docxNativeResult.report.paragraphsRewritten}
+                        <span className="text-sm text-gray-400"> / {docxNativeResult.report.paragraphsProcessed}</span>
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+                        Paragraphes analysés
+                      </p>
+                      <p className="text-xl font-extrabold text-gray-900 mt-1">
+                        {docxNativeResult.report.paragraphsProcessed}
+                      </p>
+                    </div>
+                    <div className={`rounded-xl p-3 ${docxNativeResult.report.paragraphsFailed > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
+                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+                        Échecs
+                      </p>
+                      <p className={`text-xl font-extrabold mt-1 ${docxNativeResult.report.paragraphsFailed > 0 ? "text-amber-600" : "text-gray-900"}`}>
+                        {docxNativeResult.report.paragraphsFailed}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+                        Passes
+                      </p>
+                      <p className="text-xl font-extrabold text-gray-900 mt-1">
+                        {docxNativeResult.report.passesUsed}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Actions : download + reset */}
+            <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Télécharge ton DOCX humanisé</h2>
+              <p className="text-xs text-gray-500 mb-4">
+                Le document conserve exactement la même police, mise en page, gras et taille que l&apos;original — seuls les paragraphes à risque ont été réécrits.
+              </p>
+              <button
+                onClick={downloadDocxNative}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:shadow-xl transition-all"
+              >
+                <Download className="h-4 w-4" />
+                Télécharger le DOCX humanisé
+              </button>
+              <button
+                onClick={resetAll}
+                className="w-full mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-gray-500 hover:text-gray-900 py-2 transition-colors"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Humaniser un autre document
+              </button>
             </div>
           </div>
         )}
@@ -1204,7 +1471,7 @@ export default function HumanizerPage() {
         {/* 10/07 (Orsu) — Résultat Moteur v2 rendu via l'UI premium AnalysisReport
             (mapping v2 -> v1 pour bénéficier de ScoreRing + TimelineNumbered +
              AxisCard cyan/violet + ZoneHighlight + ZonesSidebar sticky). */}
-        {!analyzingOnly && !analyzing && !result && analyzeOnlyResultV2 && (
+        {!analyzingOnly && !analyzing && !result && !docxNativeResult && analyzeOnlyResultV2 && (
           <div className="space-y-5 mb-6">
             <AnalysisReport result={mapV2ToV1(analyzeOnlyResultV2)} onReset={resetAll} />
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
@@ -1241,7 +1508,7 @@ export default function HumanizerPage() {
         )}
 
         {/* Résultat de l'analyse-only (avant humanisation) */}
-        {!analyzingOnly && !analyzing && !result && !analyzeOnlyResultV2 && analyzeOnlyResult && (
+        {!analyzingOnly && !analyzing && !result && !docxNativeResult && !analyzeOnlyResultV2 && analyzeOnlyResult && (
           <div className="space-y-5 mb-6">
             {/* Rapport unifié façon Compilatio */}
             <AnalysisReport result={analyzeOnlyResult} onReset={resetAll} />
@@ -1308,7 +1575,7 @@ export default function HumanizerPage() {
         )}
 
         {/* Upload + config */}
-        {!analyzingOnly && !analyzing && !result && !analyzeOnlyResult && !analyzeOnlyResultV2 && (
+        {!analyzingOnly && !analyzing && !result && !docxNativeResult && !analyzeOnlyResult && !analyzeOnlyResultV2 && (
           <>
             {/* Big drop zone at the top */}
             <div className="rounded-3xl bg-white shadow-xl border border-orange-100 p-6 sm:p-8 mb-4">
