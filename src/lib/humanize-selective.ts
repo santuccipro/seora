@@ -111,7 +111,7 @@ export async function humanizeSelective(
 ): Promise<HumanizeReport> {
   const targetScore = options.targetScore ?? 40;
   const highRiskThreshold = options.highRiskThreshold ?? 60;
-  const maxRetries = options.maxRetries ?? 2;
+  const maxRetries = options.maxRetries ?? 3;
   const onProgress = options.onProgress;
 
   const scoreFn = deps.scoreFn ?? defaultScoreFn;
@@ -389,9 +389,10 @@ ${listed}`;
 
 /**
  * Rewrite d'un paragraphe. Le prompt varie selon `attempt` :
- *   0 = prompt standard (variations légères, marqueurs oraux)
- *   1 = prompt agressif (casse structure, injecte marqueurs perso, baisse registre)
- *   2+ = prompt allégé (change juste les tournures les plus flag)
+ *   0 = Sonnet 4.6 — réécriture ciblée sur les 8 signaux Seora v3.2
+ *   1 = Opus 4.8 — injection marqueurs oraux + phrases courtes, tous les mots IA remplacés
+ *   2 = Opus 4.8 — restructuration complète (ordre idées inversé)
+ *   3+ = Opus 4.8 — paraphrase libre, approche radicale dernière chance
  * → variation utile pour trouver un angle qui casse le score sans dériver.
  */
 async function defaultRewriteFn(text: string, attempt: number): Promise<string> {
@@ -399,8 +400,8 @@ async function defaultRewriteFn(text: string, attempt: number): Promise<string> 
   const raw = await callClaude(prompt, {
     system:
       "Tu réécris du texte académique français pour le rendre indétectable par Compilatio. Retourne UNIQUEMENT le texte reformulé, aucun commentaire, aucun préambule, aucun backtick.",
-    // Attempt 0 = Sonnet (rapide + bon), retries = Opus 4.7 (plus créatif)
-    model: attempt === 0 ? "claude-sonnet-4-6" : "claude-opus-4-7",
+    // Attempt 0 = Sonnet (rapide + bon), retries = Opus 4.8 (plus créatif)
+    model: attempt === 0 ? "claude-sonnet-4-6" : "claude-opus-4-8",
     timeoutMs: 45_000,
   });
   return stripPreamble(raw).trim();
@@ -411,49 +412,71 @@ async function defaultRewriteFn(text: string, attempt: number): Promise<string> 
 // ============================================================================
 
 function buildRewritePrompt(text: string, attempt: number): string {
-  const base = `Reformule le texte suivant en préservant EXACTEMENT le sens et le contenu factuel, mais en variant la formulation. Contraintes STRICTES :
-- Longueur : reste dans ±20% de la longueur originale (mots)
-- Style : varie les tournures, casse la rigidité de structure, injecte quelques marqueurs oraux légers ("franchement", "en vrai", "du coup", "genre")
-- Interdits : em-dashes (—), guillemets typographiques (« », " "), structure "premièrement/deuxièmement/troisièmement"
-- Préserve : nombres, noms propres, dates, citations
-Écris UNIQUEMENT le texte reformulé, aucun commentaire.
+  if (attempt === 0) {
+    return `Réécris le texte ci-dessous pour le rendre indétectable par Compilatio Studium.
 
-TEXTE :
-${text}`;
+CIBLES PRÉCISES à corriger (signaux IA que le détecteur mesure) :
+• Connecteurs : remplace "Donc/Ainsi/De plus/En outre/Cependant/Par ailleurs/En premier lieu/Par conséquent" par des transitions plus directes ou des phrases sans transition
+• Formules IA : remplace "il est important de noter", "il convient de", "en somme", "pérenniser", "optimiser", "levier", "paradigme", "synergies", "convergents" par du vocabulaire courant
+• Longueur phrases : varie FORTEMENT (1 phrase < 8 mots, 1 phrase > 35 mots, reste entre les deux) — pas de longueur uniforme
+• Interdits : em-dashes (—), guillemets « »
+• Structure : casse les cascades "Premièrement/Deuxièmement/Troisièmement"
 
-  if (attempt === 0) return base;
-
-  if (attempt === 1) {
-    // Retry AGRESSIF — le premier essai n'a pas suffi à baisser le score.
-    return `Le texte suivant est encore trop "IA-detectable". Réécris-le en cassant AGRESSIVEMENT sa structure :
-- Injecte au moins 2 marqueurs oraux ("franchement,", "concrètement,", "à mon niveau", "en vrai", "du coup", "bon,")
-- Insère au moins 1 phrase courte (<8 mots) : "C'est du vécu.", "Ça change tout.", "Bref, ouais."
-- Casse TOUTES les cascades énumératives ("Premièrement/Deuxièmement/Troisièmement" → flux naturel sans annonce)
-- Casse TOUTES les antithèses balancées ("X n'est pas Y, c'est Z" → asymétrique)
-- Baisse le registre 20 % du temps : socle→base, pérenniser→faire durer, convergent→qui va dans le même sens, dilapider→cramer
-- Fluidifie avec participes présents plutôt que subordonnées
-- Reste dans ±25% de la longueur originale (mots)
-- Interdits : em-dashes (—), guillemets « » " "
-- Préserve : nombres, noms propres, dates, citations, termes techniques
-
-Écris UNIQUEMENT le texte reformulé, aucun commentaire.
+CONTRAINTES :
+• Préserve le sens exact, les chiffres, noms propres, dates, termes techniques
+• Reste dans ±20% de la longueur originale
+• Écris UNIQUEMENT le texte reformulé, aucun commentaire
 
 TEXTE :
 ${text}`;
   }
 
-  // attempt >= 2 → variation "allégée" : on garde le squelette mais on
-  // vise uniquement les tournures les plus flag. Utile quand la version
-  // AGRESSIVE a dérivé le sens ou raccourci trop.
-  return `Le texte suivant reste borderline IA-detectable après plusieurs tentatives. Applique une CORRECTION CHIRURGICALE (sans réécrire tout) :
-- Remplace CHAQUE occurrence de "il est important de noter", "il convient de", "en somme", "par ailleurs", "trois effets convergents", "un socle de" par une reformulation naturelle.
-- Casse UNE cascade énumérative si présente ("Premièrement/Deuxièmement...").
-- Injecte 1 marqueur oral discret ("franchement," ou "concrètement,") au début d'une phrase.
-- Garde EXACTEMENT le même sens et la même longueur (±10 %).
-- Interdits : em-dashes (—), guillemets typographiques.
-- Préserve : nombres, noms propres, dates, citations, termes techniques.
+  if (attempt === 1) {
+    return `Ce texte est encore détecté comme IA après une première réécriture. Réécris-le en cassant TOUS les patterns IA :
 
-Écris UNIQUEMENT le texte corrigé, aucun commentaire.
+ACTIONS OBLIGATOIRES :
+1. Injecte 2-3 marqueurs oraux discrets : "franchement,", "concrètement,", "en vrai,", "du coup,", "bon,"
+2. Ajoute 1-2 phrases très courtes (< 8 mots) : "C'est du vécu.", "Ça change tout.", "Simple mais efficace."
+3. Casse TOUTES les transitions académiques → phrases directes sans connecteur
+4. Remplace TOUS les mots IA : "pérenniser"→"faire durer", "optimiser"→"améliorer", "levier"→"outil", "paradigme"→"façon de voir", "convergents"→"dans le même sens"
+5. Ajoute UNE légère imperfection naturelle : répétition d'un mot proche, reformulation un peu maladroite mais authentique
+6. Varie la longueur : quelques phrases très courtes (< 8 mots), quelques longues (> 30 mots)
+7. Interdits STRICTS : — (em-dash), « », "Premièrement/Deuxièmement", "il est important de", "il convient de"
+
+Garde le sens exact. ±25% longueur. Préserve chiffres/noms/dates.
+Écris UNIQUEMENT le texte, aucun commentaire.
+
+TEXTE :
+${text}`;
+  }
+
+  if (attempt === 2) {
+    return `Malgré 2 tentatives, ce texte reste détecté comme IA. RESTRUCTURE-LE COMPLÈTEMENT en changeant l'ordre des informations :
+
+STRATÉGIE : Réorganise les idées dans un ordre différent (commence par la conséquence, puis la cause — ou par un exemple concret, puis la règle générale). L'objectif est de briser le pattern narratif régulier de l'IA.
+
+PLUS :
+• Début de paragraphe : commence par un fait concret, pas par une affirmation générale
+• Phrases : au moins 1 < 6 mots, au moins 1 > 30 mots
+• Aucun connecteur académique (Donc/Ainsi/En outre/Cependant...)
+• Remplace tous les mots abstraits/nominalisations par des verbes d'action
+• Autorisé : légère répétition d'un mot, formulation un peu moins formelle
+
+Garde le sens complet. ±30% longueur. Préserve chiffres/noms/dates/termes techniques.
+Écris UNIQUEMENT le texte restructuré, aucun commentaire.
+
+TEXTE :
+${text}`;
+  }
+
+  // attempt >= 3 → paraphrase libre, dernière chance
+  return `Dernière tentative. Ce texte résiste à toutes les reformulations. Approche radicale : PARAPHRASE LIBRE en gardant uniquement les faits clés.
+
+Identifie les 3-5 informations essentielles et réécris-les comme si tu les expliquais à quelqu'un oralement, de façon directe et décontractée. Inclus 1 phrase très courte et varie les constructions. Aucun connecteur académique.
+
+Préserve : chiffres, noms propres, dates, termes techniques spécifiques.
+Longueur : ±30% de l'original.
+Écris UNIQUEMENT le texte, sans commentaire.
 
 TEXTE :
 ${text}`;
