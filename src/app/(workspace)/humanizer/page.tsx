@@ -407,6 +407,7 @@ export default function HumanizerPage() {
 
   const [analyzePhase, setAnalyzePhase] = useState<string>("extracting");
   const [analyzePhaseDetail, setAnalyzePhaseDetail] = useState<string>("");
+  const [analyzePercent, setAnalyzePercent] = useState(0);
 
   const startAnalyzeOnly = useCallback(async () => {
     if (!uploaded) return;
@@ -416,6 +417,7 @@ export default function HumanizerPage() {
     setResult(null);
     setAnalyzePhase("extracting");
     setAnalyzePhaseDetail("");
+    setAnalyzePercent(0);
 
     const fd = new FormData();
     fd.append("file", uploaded.file);
@@ -457,6 +459,7 @@ export default function HumanizerPage() {
           if (eventType === "progress") {
             setAnalyzePhase(data.phase);
             setAnalyzePhaseDetail(data.detail ?? "");
+            if (typeof data.percent === 'number') setAnalyzePercent(data.percent);
           } else if (eventType === "done") {
             if (useV2 && data.engineVersion === "v2") {
               doneV2 = data as AnalyzeV2Result;
@@ -496,6 +499,9 @@ export default function HumanizerPage() {
   // Appelle /api/humanize/docx-native (POST multipart, réponse = .docx binaire
   // + header X-Humanize-Report en base64 JSON). Pas de streaming SSE : fetch
   // direct sync (rapide 15-45s, tient dans le maxDuration 300s Vercel Pro).
+  // 12/07 (Orsu) — Fix vision Marius : workflow linéaire forcé + réutilisation
+  // des scores paragraphe-par-paragraphe déjà calculés par l'analyse (skip
+  // du gros scoring initial → latence divisée par ~2).
   const startDocxNative = useCallback(async () => {
     if (!uploaded) return;
     setAnalyzing(true);
@@ -505,6 +511,23 @@ export default function HumanizerPage() {
     setPhaseDetail("Parsing du XML natif (preserve police, gras, taille)…");
     setResult(null);
     setDocxNativeResult(null);
+
+    // 12/07 (Orsu) — Récupère les scores paragraphe-par-paragraphe déjà
+    // calculés par /analyze-v2 (recommandé) ou /analyze (v1). Si dispo, on
+    // les passe au backend qui skip son scoring initial (latence /2).
+    // ⚠ On ne les envoie QUE pour les DOCX : pour les PDFs, l'index des
+    // zones extraites (analyse texte brut) ne correspond pas à l'index des
+    // paragraphes après conversion PDF→DOCX (pdf2docx segmente autrement).
+    // Le backend a un guard (length mismatch → fallback scoring complet).
+    const ext = uploaded.name.toLowerCase().split(".").pop();
+    const paragraphScoresFromV2 =
+      analyzeOnlyResultV2?.zones?.map((z) => Math.round(z.score));
+    const paragraphScoresFromV1 =
+      analyzeOnlyResult?.paragraphs?.map((p) => Math.round(p.score));
+    const paragraphScores =
+      ext === "docx"
+        ? (paragraphScoresFromV2 ?? paragraphScoresFromV1)
+        : undefined;
 
     // Fake phase progression pour UX (backend est sync, pas de SSE).
     // Les labels matchent PHASE_LABELS pour réutiliser la timeline existante.
@@ -531,6 +554,9 @@ export default function HumanizerPage() {
     try {
       const fd = new FormData();
       fd.append("file", uploaded.file);
+      if (paragraphScores && paragraphScores.length > 0) {
+        fd.append("paragraphScores", JSON.stringify(paragraphScores));
+      }
 
       const res = await fetch("/api/humanize/docx-native", {
         method: "POST",
@@ -592,15 +618,17 @@ export default function HumanizerPage() {
     } finally {
       setAnalyzing(false);
     }
-  }, [uploaded]);
+  }, [uploaded, analyzeOnlyResult, analyzeOnlyResultV2]);
 
   const startAnalysis = useCallback(async () => {
     if (!uploaded) return;
 
     // 11/07 (Orsu) — DOCX → nouveau flow natif (preserve formatage 100%).
-    // PDF / TXT / DOC gardent l'ancien flow SSE `/api/humanize`.
+    // 12/07 (Orsu) — PDF aussi : convertit en DOCX préservant (pdf2docx) côté
+    // backend puis passe dans humanizeDocxNative. Images/layout/tableaux
+    // conservés. TXT / DOC gardent l'ancien flow SSE `/api/humanize`.
     const ext = uploaded.name.toLowerCase().split(".").pop();
-    if (ext === "docx") {
+    if (ext === "docx" || ext === "pdf") {
       await startDocxNative();
       return;
     }
@@ -697,14 +725,34 @@ export default function HumanizerPage() {
   }, [uploaded, mode, language, targetScore, preservationList, startDocxNative]);
 
   // Auto-launch when the user landed here from the landing popup — the file
-  // is already loaded and they've already seen a preview score, no need to
-  // ask for mode / config again.
+  // est déjà chargée mais on force le workflow linéaire (12/07 Orsu, vision
+  // Marius) : d'abord l'analyse IA, puis l'utilisateur clique Humaniser en
+  // voyant les zones flaggées. On ne saute plus l'étape analyse.
   useEffect(() => {
-    if (autoLaunch && uploaded && !analyzing && !result && mode === "compilatio-proof") {
+    if (
+      autoLaunch &&
+      uploaded &&
+      !analyzing &&
+      !analyzingOnly &&
+      !result &&
+      !analyzeOnlyResult &&
+      !analyzeOnlyResultV2 &&
+      mode === "compilatio-proof"
+    ) {
       setAutoLaunch(false);
-      startAnalysis();
+      startAnalyzeOnly();
     }
-  }, [autoLaunch, uploaded, analyzing, result, mode, startAnalysis]);
+  }, [
+    autoLaunch,
+    uploaded,
+    analyzing,
+    analyzingOnly,
+    result,
+    analyzeOnlyResult,
+    analyzeOnlyResultV2,
+    mode,
+    startAnalyzeOnly,
+  ]);
 
   const regenerate = async (bumpMode: Mode = "aggressive") => {
     if (!result?.id) return;
@@ -805,6 +853,7 @@ export default function HumanizerPage() {
       URL.revokeObjectURL(docxNativeResult.blobUrl);
     }
     setDocxNativeResult(null);
+    setAnalyzePercent(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -1465,7 +1514,7 @@ export default function HumanizerPage() {
 
         {/* Loader analyse-only (avant réécriture) */}
         {analyzingOnly && (
-          <LoadingReport phase={analyzePhase} detail={analyzePhaseDetail} />
+          <LoadingReport phase={analyzePhase} detail={analyzePhaseDetail} percent={analyzePercent} />
         )}
 
         {/* 10/07 (Orsu) — Résultat Moteur v2 rendu via l'UI premium AnalysisReport

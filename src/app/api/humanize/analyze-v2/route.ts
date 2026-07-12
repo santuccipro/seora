@@ -188,10 +188,23 @@ export async function POST(req: NextRequest) {
             throw new Error("Texte trop court (min. 100 caractères).");
           }
           const wordCount = originalText.trim().split(/\s+/).length;
-          send("progress", { phase: "detecting", detail: `${wordCount} mots · pipeline v2` });
-          send("progress", { phase: "scoring", detail: "Perplexity + stylo + Fast-DetectGPT…" });
+          const paragraphCount = originalText.split(/\n{2,}/).filter((p) => p.trim().length > 0).length;
+          const estimatedMs = Math.max(15_000, paragraphCount * 300);
+          send("progress", { phase: "detecting", detail: `${wordCount} mots · pipeline v2 · ~${Math.round(estimatedMs / 1000)}s estimé`, percent: 10 });
+          let currentPct = 10;
+          const progressInterval = setInterval(() => {
+            if (currentPct < 87) {
+              currentPct += 1;
+              send("progress", { phase: "detecting", detail: `${wordCount} mots · pipeline v2`, percent: currentPct });
+            }
+          }, 1000);
 
-          const detected = await callDetector(originalText, language);
+          let detected!: DetectorResponse;
+          try {
+            detected = await callDetector(originalText, language);
+          } finally {
+            clearInterval(progressInterval);
+          }
 
           // Map detector zones to paragraph format the UI already knows
           const paragraphs = detected.zones.map((z) => ({
@@ -237,6 +250,7 @@ export async function POST(req: NextRequest) {
             zones: paragraphs,
             meta: detected.meta,
             elapsedMs: detected.elapsed_ms,
+            percent: 100,
           });
         } catch (err) {
           const errText = err instanceof Error ? err.message : "Erreur inconnue";

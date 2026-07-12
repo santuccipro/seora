@@ -15,6 +15,7 @@ import { CheckCircle2, Loader2, FileSearch } from "lucide-react";
 export type LoadingReportProps = {
   phase: string;
   detail?: string;
+  percent?: number;
 };
 
 const STEPS: Array<{ key: string; label: string }> = [
@@ -23,11 +24,12 @@ const STEPS: Array<{ key: string; label: string }> = [
   { key: "scoring", label: "Notation Claude Sonnet" },
 ];
 
-export default function LoadingReport({ phase, detail }: LoadingReportProps) {
+export default function LoadingReport({ phase, detail, percent }: LoadingReportProps) {
   const order = STEPS.map((s) => s.key);
   const idx = order.indexOf(phase);
   const currentIdx = idx === -1 ? 0 : idx;
   const globalPct = Math.round(((currentIdx + 0.5) / STEPS.length) * 100);
+  const displayPct = typeof percent === 'number' && percent > 0 ? percent : globalPct;
 
   return (
     <div className="rounded-3xl bg-white shadow-xl border border-zinc-200 overflow-hidden mb-6">
@@ -77,7 +79,7 @@ export default function LoadingReport({ phase, detail }: LoadingReportProps) {
               transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               className="text-4xl font-black text-orange-500 tabular-nums"
             >
-              {globalPct}
+              {displayPct}
               <span className="text-lg opacity-70">%</span>
             </motion.div>
           </div>
@@ -138,7 +140,7 @@ export default function LoadingReport({ phase, detail }: LoadingReportProps) {
           <motion.div
             className="h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full"
             initial={{ width: 0 }}
-            animate={{ width: `${globalPct}%` }}
+            animate={{ width: `${displayPct}%` }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           />
         </div>
