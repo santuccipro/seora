@@ -5,35 +5,40 @@
  *
  * Pipeline complet sur un .docx :
  *  1. `parseDocx(inputBuffer)`                       (étape A)
- *  2. Score GLOBAL initial via `detector.tryseora.com/detect`
- *     (chunké en 4000 mots, moyenne pondérée)
- *  3. `humanizeSelective(paragraphs, ...)`           (étape B)
+ *  2. `humanizeSelective(paragraphs, ...)`           (étape B)
  *      → mute in-place les paragraphes HIGH (≥ highRiskThreshold)
- *  4. `serializeDocx({zip, documentDom})`            (étape A)
- *  5. Re-parse + re-score global du buffer produit → globalScoreAfter
- *  6. Si globalScoreAfter > finalTargetGlobal et qu'il reste des passes
+ *  3. `globalScoreBefore` / `globalScoreAfter` estimés à partir des scores
+ *     paragraphe-par-paragraphe (moyenne pondérée par nombre de mots).
+ *  4. Si globalScoreAfter > finalTargetGlobal et qu'il reste des passes
  *     globales autorisées : on ABAISSE `highRiskThreshold` de 10 et on
  *     relance une passe sur les paragraphes encore risqués.
- *  7. Renvoie {outputBuffer, report}.
+ *  5. `serializeDocx({zip, documentDom})` UNE fois à la fin (étape A)
+ *  6. Renvoie {outputBuffer, report}.
+ *
+ * 12/07 (Orsu) — SKIP GLOBAL SCORING : la V3.1 faisait 2 gros scorings
+ * détecteur Fly (chunké 4000 mots) avant/après = ~20 min sur DPP 12800 mots.
+ * On les remplace par une estimation issue des scores paragraphe (déjà
+ * calculés par humanizeSelective via Sonnet 4.6, précis). Économie ~20 min.
+ * Le `detectorFn` reste dans l'interface pour compat mais n'est plus appelé.
  *
  * ⚠ Design :
  *  - Isolation totale de `humanize-engine.ts` (le pipeline "full" en prod
  *    n'est pas touché). Ce module ouvre un NOUVEAU flow parallèle.
- *  - Toutes les dépendances externes (fetch détecteur, callClaude via
- *    humanizeSelective) sont injectables via `HumanizeDocxDeps` pour les
- *    tests. En prod : tout est par défaut sur les prod services.
+ *  - Toutes les dépendances externes (callClaude via humanizeSelective) sont
+ *    injectables via `HumanizeDocxDeps` pour les tests. En prod : tout est
+ *    par défaut sur les prod services.
  */
 
 import {
   parseDocx,
   serializeDocx,
-  ParagraphNode,
   ParsedDocx,
 } from "./docx-native-parser";
 import {
   humanizeSelective,
   HumanizeDeps,
   HumanizeReport,
+  defaultScoreFn,
 } from "./humanize-selective";
 
 // ============================================================================
@@ -53,6 +58,15 @@ export interface HumanizeDocxOptions {
   maxGlobalRetries?: number;
   /** Callback progression (SSE / UI). */
   onProgress?: (event: HumanizeDocxProgressEvent) => void;
+  /**
+   * Scores par paragraphe déjà calculés côté analyse (workflow "analyse
+   * d'abord → humanise après"). Si fourni, la 1ère passe skip le scoring
+   * initial paragraphe-par-paragraphe (économie ~50% latence). L'array doit
+   * être aligné index-par-index sur les paragraphes du DOCX parsé. Les
+   * passes de retry global rescorent quand même le sous-ensemble restant.
+   * 12/07 (Orsu) — Fix 1 vision Marius (linéaire forcé + réutilisation).
+   */
+  prescoredParagraphs?: number[];
 }
 
 export interface HumanizeDocxProgressEvent {
@@ -96,9 +110,14 @@ export interface HumanizeDocxResult {
  */
 export interface HumanizeDocxDeps {
   /**
-   * Score global (0-100) d'un texte via le détecteur Seora. Par défaut :
-   * chunk 4000 mots + POST /detect vers `SEORA_DETECTOR_URL` avec bearer
-   * token `SEORA_DETECTOR_TOKEN`, retries 3× sur 503.
+   * DÉPRÉCIÉ (12/07 Orsu) — laissé dans l'interface pour compat des tests
+   * existants mais N'EST PLUS APPELÉ. Les scores globaux avant/après sont
+   * désormais estimés à partir des scores paragraphe (moyenne pondérée par
+   * nombre de mots).
+   *
+   * Historiquement : score global (0-100) d'un texte via le détecteur Seora
+   * (chunk 4000 mots + POST /detect vers `SEORA_DETECTOR_URL`). Ces 2 appels
+   * coûtaient ~20 min sur un DPP 12800 mots — d'où le skip.
    */
   detectorFn?: (text: string) => Promise<number>;
   /** Deps passées à `humanizeSelective` (mocks de scoreFn / rewriteFn en test). */
@@ -120,23 +139,22 @@ export async function humanizeDocxNative(
   const finalTargetGlobal = options.finalTargetGlobal ?? 15;
   const maxGlobalRetries = options.maxGlobalRetries ?? 1;
   const onProgress = options.onProgress;
+  const prescoredParagraphs = options.prescoredParagraphs;
 
-  const detectorFn = deps.detectorFn ?? defaultDetectorFn;
+  // 12/07 (Orsu) — SKIP GLOBAL SCORING : detectorFn n'est plus appelé.
+  // Réservé à l'interface pour compat mais inutilisé (voir doc du type).
+  void deps.detectorFn;
 
-  // ---------- Pass 1 ----------
+  // ---------- Parse ----------
   onProgress?.({ step: "parse", pass: 1 });
-  let parsed: ParsedDocx = await parseDocx(inputBuffer);
+  const parsed: ParsedDocx = await parseDocx(inputBuffer);
   const paragraphsCount = parsed.paragraphs.length;
-
-  onProgress?.({ step: "score", pass: 1, detail: "initial global score" });
-  const fullTextBefore = joinParagraphsText(parsed.paragraphs);
-  const globalScoreBefore = await detectorFn(fullTextBefore);
 
   let currentHighRiskThreshold = initialHighRiskThreshold;
   let mergedPerParagraph: HumanizeReport["perParagraph"] = [];
   let passesUsed = 0;
-  let outputBuffer: Buffer = inputBuffer;
-  let globalScoreAfter = globalScoreBefore;
+  let globalScoreBefore = 0;
+  let globalScoreAfter = 0;
 
   // maxGlobalRetries=1 → 2 passes autorisées (1 nominale + 1 retry)
   const maxPasses = 1 + maxGlobalRetries;
@@ -149,6 +167,38 @@ export async function humanizeDocxNative(
       pass,
       detail: { highRiskThreshold: currentHighRiskThreshold },
     });
+
+    // 12/07 (Orsu) — Fix 1 vision Marius : sur la 1ère passe, si l'UI a
+    // fourni `prescoredParagraphs`, on wrap le scoreFn pour renvoyer ces
+    // valeurs sur le batch initial (identifié par texts.length === total).
+    // Les rescores post-rewrite (batches de taille 1) passent au vrai scoreFn.
+    const injectedDeps: HumanizeDeps = { ...(deps.humanizeSelectiveDeps ?? {}) };
+    if (
+      pass === 1 &&
+      prescoredParagraphs &&
+      prescoredParagraphs.length === parsed.paragraphs.length
+    ) {
+      const realScoreFn = injectedDeps.scoreFn;
+      const totalCount = parsed.paragraphs.length;
+      let initialBatchServed = 0;
+      injectedDeps.scoreFn = async (texts: string[]) => {
+        // Batch initial : humanize-selective envoie N batches qui totalisent
+        // parsed.paragraphs.length (dans l'ordre) au step "scoring". On sert
+        // ces batches depuis prescored jusqu'à épuisement, puis on retombe
+        // sur le vrai scoreFn (rescores post-rewrite).
+        if (initialBatchServed < totalCount) {
+          const start = initialBatchServed;
+          const end = Math.min(start + texts.length, totalCount);
+          const slice = prescoredParagraphs.slice(start, end);
+          initialBatchServed = end;
+          if (slice.length === texts.length) return slice;
+          // Fallback si mismatch : refile au vrai scoreFn
+        }
+        // Rescores post-rewrite (batches taille 1 en général) → délégation
+        // au scoreFn réel (injecté par les tests) ou defaultScoreFn (prod).
+        return realScoreFn ? realScoreFn(texts) : defaultScoreFn(texts);
+      };
+    }
 
     const passReport = await humanizeSelective(
       parsed.paragraphs,
@@ -163,23 +213,24 @@ export async function humanizeDocxNative(
             detail: e,
           }),
       },
-      deps.humanizeSelectiveDeps ?? {},
+      injectedDeps,
     );
 
     mergedPerParagraph = mergePerParagraph(mergedPerParagraph, passReport.perParagraph);
 
-    onProgress?.({ step: "serialize", pass });
-    outputBuffer = await serializeDocx({
-      zip: parsed.zip,
-      documentDom: parsed.documentDom,
-    });
-
-    onProgress?.({ step: "rescore", pass });
-    // Re-parser le buffer produit et re-scorer sur le texte réellement sérialisé
-    // (ceinture-bretelles : garantit qu'on score exactement ce qui va sortir).
-    const reparsed = await parseDocx(outputBuffer);
-    const fullTextAfter = joinParagraphsText(reparsed.paragraphs);
-    globalScoreAfter = await detectorFn(fullTextAfter);
+    // 12/07 (Orsu) — Estimation globale depuis les scores paragraphe (skip
+    // gros scoring détecteur Fly). Précision suffisante : chaque paragraphe
+    // est scoré par Claude Sonnet 4.6, moyenne pondérée par nb de mots.
+    if (pass === 1) {
+      globalScoreBefore = computeGlobalScoreFromParagraphs(
+        mergedPerParagraph,
+        "before",
+      );
+    }
+    globalScoreAfter = computeGlobalScoreFromParagraphs(
+      mergedPerParagraph,
+      "after",
+    );
 
     onProgress?.({
       step: "final_check",
@@ -197,14 +248,22 @@ export async function humanizeDocxNative(
     }
 
     // ---------- Prépare la passe suivante ----------
-    // On travaille désormais sur le doc REPARSÉ (qui contient déjà les
-    // mutations précédentes) pour ne pas les perdre. On abaisse le seuil de 10.
-    parsed = reparsed;
+    // Les paragraphes de `parsed.paragraphs` ont été mutés in-place par
+    // humanizeSelective ; pas besoin de re-parser un buffer sérialisé. On
+    // abaisse juste le seuil HIGH de 10 pour re-cibler les paragraphes
+    // encore risqués.
     currentHighRiskThreshold = Math.max(
       targetScore,
       currentHighRiskThreshold - 10,
     );
   }
+
+  // ---------- Serialize (une seule fois à la fin) ----------
+  onProgress?.({ step: "serialize", pass: passesUsed });
+  const outputBuffer: Buffer = await serializeDocx({
+    zip: parsed.zip,
+    documentDom: parsed.documentDom,
+  });
 
   const paragraphsRewritten = mergedPerParagraph.filter(
     (p) => p.changed && p.scoreAfter <= targetScore,
@@ -229,13 +288,36 @@ export async function humanizeDocxNative(
   };
 }
 
+/**
+ * Estime un score global 0-100 à partir des scores paragraphe (moyenne
+ * pondérée par nombre de mots). Remplace les 2 appels détecteur Fly qui
+ * coûtaient ~20 min sur DPP 12800 mots. Précision suffisante : chaque
+ * paragraphe est déjà scoré finement par Claude Sonnet 4.6.
+ *
+ * `which` = "before" utilise scoreBefore + textBefore ;
+ * `which` = "after"  utilise scoreAfter + textAfter (post-rewrite).
+ */
+function computeGlobalScoreFromParagraphs(
+  perParagraph: HumanizeReport["perParagraph"],
+  which: "before" | "after",
+): number {
+  let weightedSum = 0;
+  let totalWords = 0;
+  for (const p of perParagraph) {
+    const text = which === "before" ? p.textBefore : p.textAfter;
+    const score = which === "before" ? p.scoreBefore : p.scoreAfter;
+    const words = text.trim().split(/\s+/).filter(Boolean).length;
+    if (words === 0) continue;
+    weightedSum += score * words;
+    totalWords += words;
+  }
+  if (totalWords === 0) return 0;
+  return Math.max(0, Math.min(100, Math.round(weightedSum / totalWords)));
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-function joinParagraphsText(paragraphs: ParagraphNode[]): string {
-  return paragraphs.map((p) => p.text).join("\n\n");
-}
 
 /**
  * Fusionne le rapport per-paragraph d'une nouvelle passe dans l'agrégat :
@@ -281,100 +363,8 @@ function mergePerParagraph(
 }
 
 // ============================================================================
-// DEFAULT DETECTOR — POST /detect vers detector.tryseora.com
+// (12/07 Orsu) — defaultDetectorFn + postDetectWithRetry SUPPRIMÉS.
+// Le scoring global est désormais estimé depuis les scores paragraphe. Cf.
+// `computeGlobalScoreFromParagraphs` plus haut. Si un jour on veut revenir au
+// scoring détecteur, ressusciter depuis le git history de ce fichier.
 // ============================================================================
-
-/**
- * Score global d'un texte via le détecteur Seora. Chunké en 4000 mots,
- * moyenne pondérée par le nombre de mots.
- */
-async function defaultDetectorFn(text: string): Promise<number> {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length < 30) {
-    // Trop court pour un scoring fiable — on renvoie 0 (safer that surchoter).
-    return 0;
-  }
-
-  const chunks: string[] = [];
-  const chunkSize = 4000;
-  for (let i = 0; i < words.length; i += chunkSize) {
-    chunks.push(words.slice(i, i + chunkSize).join(" "));
-  }
-
-  let weightedSum = 0;
-  let totalWords = 0;
-
-  for (const chunk of chunks) {
-    const chunkWords = chunk.trim().split(/\s+/).filter(Boolean).length;
-    const score = await postDetectWithRetry(chunk, "fr");
-    weightedSum += score * chunkWords;
-    totalWords += chunkWords;
-  }
-
-  if (totalWords === 0) return 0;
-  return Math.max(0, Math.min(100, Math.round(weightedSum / totalWords)));
-}
-
-interface DetectorPayload {
-  score_global?: number;
-}
-
-/**
- * POST /detect avec retry sur 503 (le détecteur peut renvoyer 503 sous
- * charge — Fly.io warm-up). 3 tentatives max, backoff 2s puis 5s.
- */
-async function postDetectWithRetry(
-  text: string,
-  language: string,
-): Promise<number> {
-  const url = process.env.SEORA_DETECTOR_URL ?? "https://detector.tryseora.com";
-  const token = process.env.SEORA_DETECTOR_TOKEN ?? "";
-  const trimmedUrl = url.replace(/\/$/, "");
-
-  const backoffs = [0, 2000, 5000];
-  let lastErr: unknown = null;
-
-  for (let attempt = 0; attempt < backoffs.length; attempt++) {
-    if (backoffs[attempt] > 0) {
-      await new Promise((r) => setTimeout(r, backoffs[attempt]));
-    }
-    try {
-      const res = await fetch(`${trimmedUrl}/detect`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ text, language, fast_mode: false }),
-        signal: AbortSignal.timeout(240_000),
-      });
-      if (res.status === 503) {
-        lastErr = new Error(`Detector 503 (attempt ${attempt + 1})`);
-        continue;
-      }
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(
-          `Detector HTTP ${res.status}: ${errText.slice(0, 300)}`,
-        );
-      }
-      const data = (await res.json()) as DetectorPayload;
-      const score = Number(data.score_global);
-      if (!Number.isFinite(score)) {
-        throw new Error(
-          `Detector response missing score_global: ${JSON.stringify(data).slice(0, 300)}`,
-        );
-      }
-      return Math.max(0, Math.min(100, score));
-    } catch (err) {
-      lastErr = err;
-      // Sur erreur réseau (autre que 503 déjà gérée), on retente
-      if (attempt < backoffs.length - 1) continue;
-      throw err;
-    }
-  }
-
-  throw lastErr instanceof Error
-    ? lastErr
-    : new Error("Detector unavailable after retries");
-}

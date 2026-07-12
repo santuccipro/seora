@@ -84,11 +84,19 @@ export interface HumanizeDeps {
    * texte réécrit. Doit throw si échec (le caller gère le retry).
    */
   rewriteFn?: (text: string, attempt: number) => Promise<string>;
-  /** Concurrency pour le scoring batch (default 5). */
+  /**
+   * Concurrency pour le scoring batch (default 15).
+   * 12/07 (Orsu) — Bump 5→15 pour DPP 12800 mots (~19 batches → 2 rounds au
+   * lieu de 4). Le runner Cloudflare (Mac mini + Claude Max) tient la charge.
+   */
   scoreConcurrency?: number;
   /** Taille de batch pour scoring (default 20). */
   scoreBatchSize?: number;
-  /** Concurrency pour le rewriting paragraphe par paragraphe (default 5). */
+  /**
+   * Concurrency pour le rewriting paragraphe par paragraphe (default 15).
+   * 12/07 (Orsu) — Bump 5→15 idem scoreConcurrency (rewrites Sonnet 4.6 sur
+   * attempt 0, Opus 4.7 sur retries).
+   */
   rewriteConcurrency?: number;
 }
 
@@ -108,9 +116,9 @@ export async function humanizeSelective(
 
   const scoreFn = deps.scoreFn ?? defaultScoreFn;
   const rewriteFn = deps.rewriteFn ?? defaultRewriteFn;
-  const scoreConcurrency = deps.scoreConcurrency ?? 5;
+  const scoreConcurrency = deps.scoreConcurrency ?? 15;
   const scoreBatchSize = deps.scoreBatchSize ?? 20;
-  const rewriteConcurrency = deps.rewriteConcurrency ?? 5;
+  const rewriteConcurrency = deps.rewriteConcurrency ?? 15;
 
   const perParagraph: HumanizeReport["perParagraph"] = paragraphs.map((p, i) => ({
     index: i,
@@ -328,8 +336,12 @@ async function scoreAllParagraphs(
  * Scoring par batch : envoie N paragraphes en 1 seul appel Claude et
  * récupère un JSON `{scores: [{i,s}, ...]}`. Robuste aux paragraphes
  * courts (< 100 chars → score 0 fixé).
+ *
+ * Exporté pour permettre à humanize-docx-native.ts de le réutiliser en
+ * fallback quand des scores pré-calculés (workflow "analyse d'abord") sont
+ * épuisés (voir option `prescoredParagraphs`).
  */
-async function defaultScoreFn(texts: string[]): Promise<number[]> {
+export async function defaultScoreFn(texts: string[]): Promise<number[]> {
   if (texts.length === 0) return [];
 
   // Court-circuit : un seul texte trop court → score 0 direct
