@@ -110,10 +110,12 @@ async function extractPDF(buffer: Buffer): Promise<string> {
     if (rawPages.length === 0) throw new Error("unpdf: no text extracted");
     return rawPages.map(reflowPdfText).join("\n\n");
   } catch {
-    // Fallback: pdf-parse handles XFA, older PDF versions, and other edge cases
-    const pdfParse = (await import("pdf-parse")).default;
-    const result = await pdfParse(buffer);
-    return result.text || "";
+    // Fallback: pdf-parse v2 for XFA/exotic PDFs that pdfjs rejects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { PDFParse } = (await import("pdf-parse")) as any;
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    return (result?.text as string) || "";
   }
 }
 
