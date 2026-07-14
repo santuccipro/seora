@@ -405,6 +405,57 @@ export default function HumanizerPage() {
     setResult(null);
   }, []);
 
+  // ML quick-score droper (comparaison gratuite sans token)
+  const mlFileInputRef = useRef<HTMLInputElement>(null);
+  const [mlUploaded, setMlUploaded] = useState<{ name: string; file: File } | null>(null);
+  const [mlDragOver, setMlDragOver] = useState(false);
+  const [mlScoring, setMlScoring] = useState(false);
+  type MlResult = {
+    scoreGlobal: number | null;
+    wordCount: number;
+    signals: {
+      semantic: number | null;
+      homoglyphs: number;
+      homoglyphScore: number;
+      connectors: number | null;
+      aiFavoriteHits: number | null;
+      aiFavoriteTop: string[];
+      nearZeroTypos: number | null;
+      tripartite: number | null;
+    };
+    failedSignals: string[];
+  };
+  const [mlResult, setMlResult] = useState<MlResult | null>(null);
+
+  const handleMlFile = useCallback((file: File) => {
+    const validExts = [".pdf", ".docx", ".doc", ".txt"];
+    if (!validExts.some((ext) => file.name.toLowerCase().endsWith(ext))) {
+      toast.error("Format non supporté");
+      return;
+    }
+    setMlUploaded({ name: file.name, file });
+    setMlResult(null);
+  }, []);
+
+  const startMlScore = useCallback(async () => {
+    if (!mlUploaded) return;
+    setMlScoring(true);
+    setMlResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", mlUploaded.file);
+      fd.append("language", language);
+      const res = await fetch("/api/quick-ml-score", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setMlResult(data as MlResult);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur score ML");
+    } finally {
+      setMlScoring(false);
+    }
+  }, [mlUploaded, language]);
+
   const [analyzePhase, setAnalyzePhase] = useState<string>("extracting");
   const [analyzePhaseDetail, setAnalyzePhaseDetail] = useState<string>("");
   const [analyzePercent, setAnalyzePercent] = useState(0);
@@ -1689,6 +1740,81 @@ export default function HumanizerPage() {
                 </div>
               )}
             </div>
+
+            {/* ── Comparateur API ML (gratuit, sans token) ─────────────────── */}
+            <div className="rounded-2xl border-2 border-cyan-200 bg-cyan-50/30 p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Cpu className="h-4 w-4 text-cyan-600 shrink-0" />
+                <span className="text-sm font-black text-cyan-900">Score API ML</span>
+                <span className="rounded-full bg-cyan-100 text-cyan-700 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest">Gratuit</span>
+              </div>
+              <p className="text-[11px] text-gray-500 mb-3 leading-snug">
+                Compare avec le moteur ML (xlm-roberta fine-tuné, sans token). Dépose le même fichier ici pour voir le score brut du détecteur.
+              </p>
+
+              {/* Hidden file input */}
+              <input
+                ref={mlFileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc,.txt"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleMlFile(f); }}
+              />
+
+              {mlResult ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className={`text-2xl font-black ${(mlResult.scoreGlobal ?? 0) < 15 ? "text-emerald-600" : (mlResult.scoreGlobal ?? 0) < 40 ? "text-orange-500" : "text-red-600"}`}>
+                      {mlResult.scoreGlobal !== null ? `${mlResult.scoreGlobal}%` : "N/A"}
+                    </div>
+                    <div className="flex-1 text-xs text-gray-500">
+                      <div>Semantic ML: {mlResult.signals.semantic?.toFixed(1) ?? "N/A"}</div>
+                      <div>Homoglyphes: {mlResult.signals.homoglyphs} chars ({mlResult.signals.homoglyphScore?.toFixed(0) ?? 0}/100)</div>
+                      {mlResult.signals.aiFavoriteTop?.length > 0 && (
+                        <div className="truncate">Mots IA: {mlResult.signals.aiFavoriteTop.slice(0, 3).join(", ")}</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setMlUploaded(null); setMlResult(null); }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <XIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setMlDragOver(true); }}
+                  onDragLeave={() => setMlDragOver(false)}
+                  onDrop={(e) => { e.preventDefault(); setMlDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleMlFile(f); }}
+                  onClick={() => mlFileInputRef.current?.click()}
+                  className={`rounded-xl border border-dashed cursor-pointer transition-all p-4 text-center ${mlDragOver ? "border-cyan-500 bg-cyan-100" : "border-cyan-300 hover:border-cyan-500 bg-white/60"}`}
+                >
+                  {mlScoring ? (
+                    <div className="flex items-center justify-center gap-2 text-cyan-600">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-xs font-bold">Analyse ML en cours…</span>
+                    </div>
+                  ) : mlUploaded ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-700 truncate">{mlUploaded.name}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startMlScore(); }}
+                        className="shrink-0 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-black text-white hover:bg-cyan-700"
+                      >
+                        Scorer →
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs font-bold text-gray-600">Glisse ton doc ici</p>
+                      <p className="text-[10px] text-gray-400">PDF · DOCX · TXT</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* ─────────────────────────────────────────────────────────────── */}
 
             {/* Réglages avancés (langue, préservation) — l'intensité d'humanisation
                 se choisit après l'analyse, dans la CTA "Humaniser". */}
