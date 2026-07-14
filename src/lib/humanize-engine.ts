@@ -99,23 +99,22 @@ export async function extractTextFromFile(
 }
 
 async function extractPDF(buffer: Buffer): Promise<string> {
-  // `unpdf` bundles a serverless-friendly pdfjs build — no subprocess, no
-  // DOMMatrix polyfill, works on Vercel Node runtime.
-  //
-  // mergePages:false → une entrée par page ; on joint avec un double
-  // saut de ligne pour préserver au minimum la séparation entre pages
-  // et éviter le "gros bloc de texte" quand le PDF est extrait.
-  const { extractText, getDocumentProxy } = await import("unpdf");
-  const doc = await getDocumentProxy(new Uint8Array(buffer));
-  const { text } = await extractText(doc, { mergePages: false });
-  const pages = Array.isArray(text) ? text : [text as string];
-  const rawPages = pages
-    .map((p) => (p ?? "").trim())
-    .filter(Boolean);
-  // 07/07 (Orsu) — reflowPdfText fusionne les sauts de ligne intra-paragraphe
-  // introduits par pdfjs. Sans ça on avait des mots seuls sur des lignes
-  // ("School", "de", "patrimoine,") qui cassaient la mise en page du rapport.
-  return rawPages.map(reflowPdfText).join("\n\n");
+  // Primary: unpdf (serverless pdfjs). Fallback: pdf-parse for XFA/exotic PDFs
+  // that pdfjs rejects with "This operation is not supported for this type".
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const doc = await getDocumentProxy(new Uint8Array(buffer));
+    const { text } = await extractText(doc, { mergePages: false });
+    const pages = Array.isArray(text) ? text : [text as string];
+    const rawPages = pages.map((p) => (p ?? "").trim()).filter(Boolean);
+    if (rawPages.length === 0) throw new Error("unpdf: no text extracted");
+    return rawPages.map(reflowPdfText).join("\n\n");
+  } catch {
+    // Fallback: pdf-parse handles XFA, older PDF versions, and other edge cases
+    const pdfParse = (await import("pdf-parse")).default;
+    const result = await pdfParse(buffer);
+    return result.text || "";
+  }
 }
 
 /**
