@@ -223,20 +223,11 @@ export function updateParagraphText(
     return;
   }
 
-  let cursor = 0;
-  for (let i = 0; i < writableRuns.length; i++) {
-    const run = writableRuns[i];
-    let sliceLen: number;
-    if (i === writableRuns.length - 1) {
-      sliceLen = Math.max(0, newText.length - cursor);
-    } else {
-      const share = run.text.length / totalOriginalLen;
-      sliceLen = Math.round(share * newText.length);
-    }
-    const slice = newText.slice(cursor, cursor + sliceLen);
-    cursor += sliceLen;
-    writeRun(run, slice);
-  }
+  // Write everything to the first writable run and clear the rest.
+  // Proportional splits across runs break words mid-run when the new text
+  // length differs from the original, causing torn formatting in Word.
+  writeRun(writableRuns[0], newText);
+  for (let i = 1; i < writableRuns.length; i++) writeRun(writableRuns[i], "");
 
   paragraph.text = runs.map((r) => r.text).join("");
 }

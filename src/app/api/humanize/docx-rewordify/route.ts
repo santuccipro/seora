@@ -98,10 +98,31 @@ REGLAS ESTRICTAS:
 
 function buildPrompt(text: string, lang: string): string {
   if (lang === "en")
-    return `Rewrite this text replacing approximately 35% of the words with contextual synonyms. Keep the same sentence structure, register and tone. Preserve proper nouns, dates and numbers. IMPORTANT: reply with ONLY the rewritten text, no explanation, no list, no markdown, no title.\n\nText:\n${text}`;
+    return `You are rewriting a section of an academic professional report to make it sound authentically human. Do ALL of the following:
+1. Replace 30-40% of words with precise contextual synonyms (avoid generic LLM synonyms like "crucial", "leverage", "highlight", "ensure")
+2. Vary sentence length: split 1-2 long sentences into shorter ones, or occasionally merge 2 short ones
+3. Replace overused connectors ("furthermore", "in addition", "it should be noted", "it is important to") with less formulaic transitions or restructured sentences
+4. Prefer active voice where it sounds natural
+5. Preserve ALL proper nouns, dates, numbers, legal references, and technical terms exactly
+6. Keep the same professional academic register and meaning
+IMPORTANT: reply with ONLY the rewritten text, no explanation, no list, no markdown, no title.\n\nText:\n${text}`;
   if (lang === "es")
-    return `Reescribe este texto reemplazando aproximadamente el 35% de las palabras por sinónimos contextuales. Mantén la misma estructura, registro y tono. Conserva nombres propios, fechas y cifras. IMPORTANTE: responde con SOLO el texto reescrito, sin explicación, lista, markdown ni título.\n\nTexto:\n${text}`;
-  return `Réécris ce texte en remplaçant environ 35% des mots par des synonymes contextuels appropriés. Garde exactement la même structure de phrase, le même registre et le même ton. Conserve les noms propres, dates et chiffres. IMPORTANT: réponds avec SEULEMENT le texte réécrit, sans aucune explication, liste, titre ou markdown.\n\nTexte :\n${text}`;
+    return `Reescribes una sección de un informe profesional académico para que suene auténticamente humano. Haz TODO lo siguiente:
+1. Reemplaza 30-40% de palabras por sinónimos contextuales precisos (evita sinónimos genéricos de IA como "crucial", "destacar", "garantizar", "en este sentido")
+2. Varía la longitud de las frases: divide 1-2 frases largas o fusiona 2 cortas ocasionalmente
+3. Reemplaza conectores sobreutilizados ("además", "cabe destacar", "es importante señalar") con transiciones menos formulaicas
+4. Prefiere voz activa cuando suene natural
+5. Conserva exactamente nombres propios, fechas, números, referencias legales y términos técnicos
+6. Mantén el mismo registro profesional y el mismo sentido
+IMPORTANTE: responde con SOLO el texto reescrito, sin explicación ni markdown.\n\nTexto:\n${text}`;
+  return `Tu réécris une section d'un dossier professionnel académique pour qu'elle sonne authentiquement humaine. Fais TOUT ce qui suit :
+1. Remplace 30 à 40% des mots par des synonymes contextuels précis (évite les synonymes typiques des IA comme "crucial", "essentiel", "permettre de", "il convient de noter", "mettre en lumière")
+2. Varie la longueur des phrases : coupe 1 ou 2 longues phrases en phrases plus courtes, ou fusionne parfois 2 courtes
+3. Remplace les connecteurs sur-utilisés ("en effet", "de plus", "par conséquent", "il est important de", "dans ce contexte") par des transitions moins formulaiques ou restructure la phrase
+4. Préfère la voix active quand c'est naturel
+5. Conserve EXACTEMENT tous les noms propres, dates, chiffres, références légales et termes techniques
+6. Garde le même registre professionnel académique et le même sens
+IMPORTANT : réponds avec SEULEMENT le texte réécrit, sans aucune explication, liste, titre ou markdown.\n\nTexte :\n${text}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -215,7 +236,9 @@ export async function POST(req: NextRequest) {
                   model: "claude-sonnet-4-6",
                   timeoutMs: 100_000,
                 });
-                updateParagraphText(para, injectCyrillic(reworded.trim()));
+                // No cyrillic injection in DOCX — homoglyphs break Word fonts/spellcheck.
+                // Structural rewrite is the primary anti-detection mechanism here.
+                updateParagraphText(para, reworded.trim());
                 rewrittenCount++;
               } catch (err) {
                 console.error(
