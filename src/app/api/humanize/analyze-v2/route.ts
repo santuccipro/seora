@@ -77,26 +77,54 @@ async function callDetector(text: string, language: Language): Promise<DetectorR
   const url = process.env.SEORA_DETECTOR_URL;
   if (!url) throw new Error("SEORA_DETECTOR_URL non configuré côté Vercel");
   const token = process.env.SEORA_DETECTOR_TOKEN || "";
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 240_000);
-  try {
-    const res = await fetch(`${url.replace(/\/$/, "")}/detect`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ text, language, fast_mode: false }),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Detector HTTP ${res.status}: ${errText.slice(0, 300)}`);
+
+  // Retry up to 3 times on 503/502 (Fly.io cold start) with exponential backoff
+  const MAX_ATTEMPTS = 3;
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (attempt > 1) {
+      await new Promise((r) => setTimeout(r, (attempt - 1) * 5000)); // 5s, 10s
     }
-    return (await res.json()) as DetectorResponse;
-  } finally {
-    clearTimeout(timeout);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 240_000);
+    try {
+      const res = await fetch(`${url.replace(/\/$/, "")}/detect`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text, language, fast_mode: false }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        const err = new Error(`Detector HTTP ${res.status}: ${errText.slice(0, 300)}`);
+        // Retry on 502/503 (Fly.io cold start / transient)
+        if ((res.status === 502 || res.status === 503) && attempt < MAX_ATTEMPTS) {
+          lastErr = err;
+          console.warn(`[analyze-v2] Detector ${res.status} — retry ${attempt}/${MAX_ATTEMPTS}`);
+          clearTimeout(timeout);
+          continue;
+        }
+        throw err;
+      }
+      clearTimeout(timeout);
+      return (await res.json()) as DetectorResponse;
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err instanceof Error && (err.name === "AbortError" || err.message.includes("aborted"))) {
+        throw err; // don't retry hard timeouts
+      }
+      if (attempt < MAX_ATTEMPTS) {
+        lastErr = err instanceof Error ? err : new Error(String(err));
+        console.warn(`[analyze-v2] Detector error attempt ${attempt}: ${lastErr.message}`);
+        continue;
+      }
+      throw err;
+    }
   }
+  throw lastErr ?? new Error("Detector unavailable after retries");
 }
 
 export async function POST(req: NextRequest) {
