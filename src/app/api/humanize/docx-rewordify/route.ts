@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
                 const reworded = await callClaude(buildPrompt(para.text, lang), {
                   system: "",
                   model: "claude-sonnet-4-6",
-                  timeoutMs: 40_000,
+                  timeoutMs: 100_000,
                 });
                 updateParagraphText(para, injectCyrillic(reworded.trim()));
                 rewrittenCount++;

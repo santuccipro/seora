@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { callClaude } from "@/lib/claude-client";
 
 export const runtime = "nodejs";
-export const maxDuration = 90;
+export const maxDuration = 120;
 
 const TOKEN_COST = 1;
 
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       const reworded = await callClaude(buildPrompt(text, language), {
         system: "",
         model: "claude-sonnet-4-6",
-        timeoutMs: 40_000,
+        timeoutMs: 100_000,
       });
 
       const humanizedText = withCyrillic
