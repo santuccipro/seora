@@ -89,6 +89,27 @@ REGLAS ESTRICTAS:
 
 const SYSTEM: Record<string, string> = { fr: SYSTEM_FR, en: SYSTEM_EN, es: SYSTEM_ES };
 
+// Split text into sentence-level chunks of ≤ MAX_CHUNK_CHARS each.
+// Mac mini claude --print hangs on long prompts; chunking keeps each call short.
+const MAX_CHUNK_CHARS = 500;
+
+function splitChunks(text: string): string[] {
+  if (text.length <= MAX_CHUNK_CHARS) return [text];
+  const sentences = text.match(/[^.!?]+[.!?]+[\s]*/g) ?? [text];
+  const chunks: string[] = [];
+  let current = "";
+  for (const s of sentences) {
+    if (current && (current + s).length > MAX_CHUNK_CHARS) {
+      chunks.push(current.trimEnd());
+      current = s;
+    } else {
+      current += s;
+    }
+  }
+  if (current.trim()) chunks.push(current.trimEnd());
+  return chunks.length ? chunks : [text];
+}
+
 function buildPrompt(text: string, language: string): string {
   if (language === "fr") {
     return `Remplace environ 35% des mots de ce paragraphe par des synonymes en gardant la même structure :\n\n${text}`;
@@ -137,15 +158,22 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const reworded = await callClaude(buildPrompt(text, language), {
-        system: SYSTEM[language] ?? SYSTEM_FR,
-        model: "claude-sonnet-4-6",
-        timeoutMs: 70_000,
-      });
+      const chunks = splitChunks(text);
+      const sys = SYSTEM[language] ?? SYSTEM_FR;
+      const rewordedParts: string[] = [];
+      for (const chunk of chunks) {
+        const part = await callClaude(buildPrompt(chunk, language), {
+          system: sys,
+          model: "claude-sonnet-4-6",
+          timeoutMs: 30_000,
+        });
+        rewordedParts.push(part.trim());
+      }
+      const reworded = rewordedParts.join(" ");
 
       const humanizedText = withCyrillic
-        ? injectCyrillic(reworded.trim())
-        : reworded.trim();
+        ? injectCyrillic(reworded)
+        : reworded;
 
       return NextResponse.json({ humanizedText });
     } catch (err) {
