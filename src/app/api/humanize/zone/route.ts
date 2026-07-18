@@ -142,8 +142,11 @@ export async function POST(req: NextRequest) {
     if (!text || text.length < 20) {
       return NextResponse.json({ error: "Texte trop court" }, { status: 400 });
     }
-    if (text.length > 3000) {
-      return NextResponse.json({ error: "Zone trop longue (max 3000 caractères)" }, { status: 400 });
+    if (text.length > 800) {
+      return NextResponse.json(
+        { error: "Zone trop longue pour l'humanizer rapide — utilise le bouton DOCX Rewordify (violet) en bas de page pour traiter tout le document." },
+        { status: 400 }
+      );
     }
 
     const deductResult = await prisma.user.updateMany({
@@ -165,7 +168,7 @@ export async function POST(req: NextRequest) {
         const part = await callClaude(buildPrompt(chunk, language), {
           system: sys,
           model: "claude-sonnet-4-6",
-          timeoutMs: 30_000,
+          timeoutMs: 50_000,
         });
         rewordedParts.push(part.trim());
       }
