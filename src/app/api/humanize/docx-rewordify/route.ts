@@ -233,6 +233,7 @@ export async function POST(req: NextRequest) {
         documentDom: parsed.documentDom,
       });
       const outName = `humanized_rw_${file.name}`
+        .replace(/\.pdf$/i, ".docx")
         .replace(/[^\w.\- ]+/g, "_")
         .slice(0, 120);
       const ab = new ArrayBuffer(outBuf.byteLength);
