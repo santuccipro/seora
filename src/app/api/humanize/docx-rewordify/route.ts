@@ -7,11 +7,11 @@ import { parseDocx, serializeDocx, updateParagraphText } from "@/lib/docx-native
 import { defaultScoreFn } from "@/lib/humanize-selective";
 
 export const runtime = "nodejs";
-export const maxDuration = 180;
+export const maxDuration = 300;
 
 const TOKEN_COST = 3;
 const HIGH_RISK_THRESHOLD = 60;
-const CONCURRENT_REWRITES = 4;
+const CONCURRENT_REWRITES = 10;
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
                 const reworded = await callClaude(buildPrompt(para.text, lang), {
                   system: SYSTEMS[lang] ?? SYSTEMS.fr,
                   model: "claude-sonnet-4-6",
-                  timeoutMs: 45_000,
+                  timeoutMs: 30_000,
                 });
                 updateParagraphText(para, injectCyrillic(reworded.trim()));
                 rewrittenCount++;
