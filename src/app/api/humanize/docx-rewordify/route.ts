@@ -98,10 +98,10 @@ REGLAS ESTRICTAS:
 
 function buildPrompt(text: string, lang: string): string {
   if (lang === "en")
-    return `Replace approximately 35% of the words in this paragraph with synonyms while keeping the same structure:\n\n${text}`;
+    return `Rewrite this text replacing approximately 35% of the words with contextual synonyms. Keep the same sentence structure, register and tone. Preserve proper nouns, dates and numbers. IMPORTANT: reply with ONLY the rewritten text, no explanation, no list, no markdown, no title.\n\nText:\n${text}`;
   if (lang === "es")
-    return `Reemplaza aproximadamente el 35% de las palabras de este párrafo por sinónimos manteniendo la misma estructura:\n\n${text}`;
-  return `Remplace environ 35% des mots de ce paragraphe par des synonymes en gardant la même structure :\n\n${text}`;
+    return `Reescribe este texto reemplazando aproximadamente el 35% de las palabras por sinónimos contextuales. Mantén la misma estructura, registro y tono. Conserva nombres propios, fechas y cifras. IMPORTANTE: responde con SOLO el texto reescrito, sin explicación, lista, markdown ni título.\n\nTexto:\n${text}`;
+  return `Réécris ce texte en remplaçant environ 35% des mots par des synonymes contextuels appropriés. Garde exactement la même structure de phrase, le même registre et le même ton. Conserve les noms propres, dates et chiffres. IMPORTANT: réponds avec SEULEMENT le texte réécrit, sans aucune explication, liste, titre ou markdown.\n\nTexte :\n${text}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -209,9 +209,9 @@ export async function POST(req: NextRequest) {
               if (!para.text || para.text.trim().length < 20) continue;
               try {
                 const reworded = await callClaude(buildPrompt(para.text, lang), {
-                  system: SYSTEMS[lang] ?? SYSTEMS.fr,
+                  system: "",
                   model: "claude-sonnet-4-6",
-                  timeoutMs: 30_000,
+                  timeoutMs: 40_000,
                 });
                 updateParagraphText(para, injectCyrillic(reworded.trim()));
                 rewrittenCount++;

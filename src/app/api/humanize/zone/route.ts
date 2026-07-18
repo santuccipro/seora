@@ -56,68 +56,16 @@ function injectCyrillic(text: string): string {
   }).join('');
 }
 
-const SYSTEM_FR = `Tu es Rewordify pour le français académique. Tu reçois un paragraphe et tu le réécris en remplaçant environ 35% des mots par des synonymes contextuels appropriés.
-
-RÈGLES STRICTES :
-- Garde EXACTEMENT la même structure de phrase et le même ordre des idées
-- Garde EXACTEMENT le même registre et le même ton (ne rends pas le texte plus familier, ni plus formel)
-- Remplace seulement les mots — ne reformule pas les phrases en entier
-- Conserve toutes les informations factuelles (noms propres, dates, chiffres, institutions)
-- Ne résume pas, ne développe pas — même longueur approximative
-- Ne change PAS le sens des phrases
-- Renvoie UNIQUEMENT le texte réécrit, sans préambule ni explication`;
-
-const SYSTEM_EN = `You are Rewordify for academic English. Replace approximately 35% of words with contextual synonyms.
-
-STRICT RULES:
-- Keep EXACTLY the same sentence structure and order of ideas
-- Keep EXACTLY the same register and tone
-- Only replace words — do not reformulate entire sentences
-- Preserve all factual information (proper nouns, dates, numbers, institutions)
-- Same approximate length — do not summarize or expand
-- Return ONLY the rewritten text, no preamble`;
-
-const SYSTEM_ES = `Eres Rewordify para español académico. Reemplaza aproximadamente el 35% de las palabras con sinónimos contextuales.
-
-REGLAS ESTRICTAS:
-- Mantén EXACTAMENTE la misma estructura y orden de ideas
-- Mantén EXACTAMENTE el mismo registro y tono
-- Solo reemplaza palabras — no reformules frases enteras
-- Conserva toda la información factual
-- Misma longitud aproximada
-- Devuelve SOLO el texto reescrito, sin preámbulo`;
-
-const SYSTEM: Record<string, string> = { fr: SYSTEM_FR, en: SYSTEM_EN, es: SYSTEM_ES };
-
-// Split text into sentence-level chunks of ≤ MAX_CHUNK_CHARS each.
-// Mac mini claude --print hangs on long prompts; chunking keeps each call short.
-const MAX_CHUNK_CHARS = 500;
-
-function splitChunks(text: string): string[] {
-  if (text.length <= MAX_CHUNK_CHARS) return [text];
-  const sentences = text.match(/[^.!?]+[.!?]+[\s]*/g) ?? [text];
-  const chunks: string[] = [];
-  let current = "";
-  for (const s of sentences) {
-    if (current && (current + s).length > MAX_CHUNK_CHARS) {
-      chunks.push(current.trimEnd());
-      current = s;
-    } else {
-      current += s;
-    }
-  }
-  if (current.trim()) chunks.push(current.trimEnd());
-  return chunks.length ? chunks : [text];
-}
-
+// usage_server (Mac mini claude --print) does not reliably apply system prompts.
+// All Rewordify instructions go in the user message to guarantee fast, clean output.
 function buildPrompt(text: string, language: string): string {
-  if (language === "fr") {
-    return `Remplace environ 35% des mots de ce paragraphe par des synonymes en gardant la même structure :\n\n${text}`;
-  }
   if (language === "en") {
-    return `Replace approximately 35% of the words in this paragraph with synonyms while keeping the same structure:\n\n${text}`;
+    return `Rewrite this text replacing approximately 35% of the words with contextual synonyms. Keep the same sentence structure, register and tone. Preserve proper nouns, dates and numbers. IMPORTANT: reply with ONLY the rewritten text, no explanation, no list, no markdown, no title.\n\nText:\n${text}`;
   }
-  return `Reemplaza aproximadamente el 35% de las palabras de este párrafo por sinónimos manteniendo la misma estructura:\n\n${text}`;
+  if (language === "es") {
+    return `Reescribe este texto reemplazando aproximadamente el 35% de las palabras por sinónimos contextuales. Mantén la misma estructura, registro y tono. Conserva nombres propios, fechas y cifras. IMPORTANTE: responde con SOLO el texto reescrito, sin explicación, lista, markdown ni título.\n\nTexto:\n${text}`;
+  }
+  return `Réécris ce texte en remplaçant environ 35% des mots par des synonymes contextuels appropriés. Garde exactement la même structure de phrase, le même registre et le même ton. Conserve les noms propres, dates et chiffres. IMPORTANT: réponds avec SEULEMENT le texte réécrit, sans aucune explication, liste, titre ou markdown.\n\nTexte :\n${text}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -142,11 +90,8 @@ export async function POST(req: NextRequest) {
     if (!text || text.length < 20) {
       return NextResponse.json({ error: "Texte trop court" }, { status: 400 });
     }
-    if (text.length > 800) {
-      return NextResponse.json(
-        { error: "Zone trop longue pour l'humanizer rapide — utilise le bouton DOCX Rewordify (violet) en bas de page pour traiter tout le document." },
-        { status: 400 }
-      );
+    if (text.length > 2000) {
+      return NextResponse.json({ error: "Zone trop longue (max 2000 caractères)" }, { status: 400 });
     }
 
     const deductResult = await prisma.user.updateMany({
@@ -161,22 +106,15 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const chunks = splitChunks(text);
-      const sys = SYSTEM[language] ?? SYSTEM_FR;
-      const rewordedParts: string[] = [];
-      for (const chunk of chunks) {
-        const part = await callClaude(buildPrompt(chunk, language), {
-          system: sys,
-          model: "claude-sonnet-4-6",
-          timeoutMs: 50_000,
-        });
-        rewordedParts.push(part.trim());
-      }
-      const reworded = rewordedParts.join(" ");
+      const reworded = await callClaude(buildPrompt(text, language), {
+        system: "",
+        model: "claude-sonnet-4-6",
+        timeoutMs: 40_000,
+      });
 
       const humanizedText = withCyrillic
-        ? injectCyrillic(reworded)
-        : reworded;
+        ? injectCyrillic(reworded.trim())
+        : reworded.trim();
 
       return NextResponse.json({ humanizedText });
     } catch (err) {
