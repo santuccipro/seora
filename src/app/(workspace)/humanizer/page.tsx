@@ -2468,6 +2468,9 @@ function AnalysisReport({
                       isIgnored={isIgnored}
                       onToggleIgnore={() => toggleIgnore(p.index)}
                       onGoto={() => goto(flagIdx)}
+                      onHumanize={isFlagged ? () => humanizeZone(p) : undefined}
+                      humanizedText={humanizedZones[p.index]?.text}
+                      humanizeLoading={humanizedZones[p.index]?.loading}
                     />
                   );
                 })
