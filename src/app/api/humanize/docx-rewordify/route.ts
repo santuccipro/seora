@@ -180,10 +180,12 @@ export async function POST(req: NextRequest) {
 
       const parsed = await parseDocx(buf);
 
-      // Use pre-scored if length matches, else score via Claude
+      // Use pre-scored when available. PDF zones vs DOCX paragraphs rarely match
+      // in count (PDF analyzer groups differently) so we never require exact length.
+      // Paragraphs beyond the pre-scored range default to 0 (not flagged).
       let scores: number[];
-      if (preScored && preScored.length === parsed.paragraphs.length) {
-        scores = preScored;
+      if (preScored && preScored.length > 0) {
+        scores = parsed.paragraphs.map((_, i) => preScored[i] ?? 0);
       } else {
         scores = await defaultScoreFn(parsed.paragraphs.map((p) => p.text));
       }
