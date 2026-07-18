@@ -1619,8 +1619,8 @@ export default function HumanizerPage() {
           <div className="space-y-5 mb-6">
             <AnalysisReport result={mapV2ToV1(analyzeOnlyResultV2)} onReset={resetAll} language={language} />
 
-            {/* DOCX Rewordify — affiché seulement si le fichier uploadé est un .docx */}
-            {uploaded && uploaded.name.toLowerCase().endsWith(".docx") && (
+            {/* DOCX Rewordify — PDF et DOCX (PDF converti côté serveur) */}
+            {uploaded && (uploaded.name.toLowerCase().endsWith(".docx") || uploaded.name.toLowerCase().endsWith(".pdf")) && (
               <div className="rounded-3xl bg-white border-2 border-violet-200 shadow-sm p-6 sm:p-8">
                 <div className="flex items-start gap-4 mb-5">
                   <div className="h-12 w-12 rounded-2xl bg-violet-100 flex items-center justify-center shrink-0">
@@ -1691,8 +1691,8 @@ export default function HumanizerPage() {
             {/* Rapport unifié façon Compilatio */}
             <AnalysisReport result={analyzeOnlyResult} onReset={resetAll} language={language} />
 
-            {/* DOCX Rewordify — affiché seulement si le fichier uploadé est un .docx */}
-            {uploaded && uploaded.name.toLowerCase().endsWith(".docx") && (
+            {/* DOCX Rewordify — PDF et DOCX (PDF converti côté serveur) */}
+            {uploaded && (uploaded.name.toLowerCase().endsWith(".docx") || uploaded.name.toLowerCase().endsWith(".pdf")) && (
               <div className="rounded-3xl bg-white border-2 border-violet-200 shadow-sm p-6 sm:p-8">
                 <div className="flex items-start gap-4 mb-5">
                   <div className="h-12 w-12 rounded-2xl bg-violet-100 flex items-center justify-center shrink-0">

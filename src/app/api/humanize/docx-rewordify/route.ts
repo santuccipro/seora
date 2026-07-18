@@ -7,13 +7,34 @@ import { parseDocx, serializeDocx, updateParagraphText } from "@/lib/docx-native
 import { defaultScoreFn } from "@/lib/humanize-selective";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 const TOKEN_COST = 3;
 const HIGH_RISK_THRESHOLD = 60;
 const CONCURRENT_REWRITES = 4;
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+async function convertPdfToDocx(pdfBuffer: Buffer, name: string): Promise<Buffer> {
+  const url = process.env.SEORA_DETECTOR_URL;
+  if (!url) throw new Error("SEORA_DETECTOR_URL non configuré");
+  const token = process.env.SEORA_DETECTOR_TOKEN ?? "";
+  const fd = new FormData();
+  fd.append("file", new Blob([new Uint8Array(pdfBuffer)], { type: "application/pdf" }), name);
+  const res = await fetch(`${url.replace(/\/$/, "")}/convert-pdf`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    throw new Error(`PDF→DOCX conversion HTTP ${res.status}: ${err.slice(0, 200)}`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.byteLength < 200) throw new Error("DOCX converti trop petit — invalide");
+  return buf;
+}
 
 // Cyrillic homoglyphs — same table as /api/humanize/zone
 const CYRILLIC: Record<string, string> = {
@@ -107,9 +128,10 @@ export async function POST(req: NextRequest) {
         { error: "Fichier trop lourd (max 10 Mo)" },
         { status: 400 },
       );
-    if (!file.name.toLowerCase().endsWith(".docx"))
+    const ext = file.name.toLowerCase().split(".").pop();
+    if (ext !== "docx" && ext !== "pdf")
       return NextResponse.json(
-        { error: "Format .docx uniquement" },
+        { error: "Format .docx ou .pdf uniquement" },
         { status: 400 },
       );
 
@@ -149,7 +171,13 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const buf = Buffer.from(await file.arrayBuffer());
+      const rawBuf = Buffer.from(await file.arrayBuffer());
+
+      // Convert PDF → DOCX before parsing
+      const buf: Buffer = ext === "pdf"
+        ? await convertPdfToDocx(rawBuf, file.name)
+        : rawBuf;
+
       const parsed = await parseDocx(buf);
 
       // Use pre-scored if length matches, else score via Claude
