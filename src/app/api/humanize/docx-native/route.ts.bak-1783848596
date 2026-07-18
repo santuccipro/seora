@@ -74,27 +74,6 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    // 12/07 (Orsu) — Fix 1 vision Marius : scores paragraphe-par-paragraphe
-    // déjà calculés côté analyse. Si fournis, on skip le scoring initial et
-    // on économise ~50% de la latence. Multipart field `paragraphScores` =
-    // JSON stringifié d'un array de nombres 0-100.
-    let prescoredParagraphs: number[] | undefined;
-    const rawScores = formData.get("paragraphScores");
-    if (typeof rawScores === "string" && rawScores.length > 0) {
-      try {
-        const parsed = JSON.parse(rawScores);
-        if (
-          Array.isArray(parsed) &&
-          parsed.every((s) => typeof s === "number" && Number.isFinite(s))
-        ) {
-          prescoredParagraphs = parsed.map((s: number) =>
-            Math.max(0, Math.min(100, Math.round(s))),
-          );
-        }
-      } catch {
-        // silent : on retombe sur scoring normal si JSON invalide
-      }
-    }
 
     // 4. Validation MIME + extension + taille
     if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -104,24 +83,17 @@ export async function POST(req: NextRequest) {
       );
     }
     const ext = (file.name.split(".").pop() || "").toLowerCase();
-    // 12/07 (Orsu) — Fix 2 vision Marius : accepte aussi les PDFs. On les
-    // convertit en DOCX préservant (pdf2docx via /convert-pdf sur le service
-    // détecteur Fly.io) avant de faire tourner humanizeDocxNative.
-    if (ext !== "docx" && ext !== "pdf") {
+    if (ext !== "docx") {
       return NextResponse.json(
-        { error: "Format non supporté — .docx ou .pdf uniquement" },
+        { error: "Format non supporté — .docx uniquement" },
         { status: 400 },
       );
     }
-    if (ext === "docx" && file.type && file.type !== DOCX_MIME) {
+    // Le navigateur envoie parfois un MIME vide ; on tolère si l'extension
+    // est bonne, mais on refuse tout MIME explicitement non-docx.
+    if (file.type && file.type !== DOCX_MIME) {
       return NextResponse.json(
         { error: `Type MIME invalide (attendu ${DOCX_MIME}, reçu ${file.type})` },
-        { status: 400 },
-      );
-    }
-    if (ext === "pdf" && file.type && file.type !== "application/pdf") {
-      return NextResponse.json(
-        { error: `Type MIME invalide (attendu application/pdf, reçu ${file.type})` },
         { status: 400 },
       );
     }
@@ -140,38 +112,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let inputBuffer: Buffer = Buffer.from(await file.arrayBuffer());
-
-    // 12/07 (Orsu) — Si PDF, on convertit en DOCX via le service détecteur
-    // Fly.io (pdf2docx). Préserve layout, tableaux, images. Timeout 60s
-    // (pdf2docx = ~3s pour 48 pages en test local).
-    if (ext === "pdf") {
-      try {
-        inputBuffer = await convertPdfToDocx(inputBuffer, file.name);
-      } catch (err) {
-        // Refund tokens on conversion failure
-        await prisma.user
-          .update({
-            where: { id: user.id },
-            data: { tokens: { increment: HUMANIZE_TOKEN_COST } },
-          })
-          .catch(() => {});
-        const msg = err instanceof Error ? err.message : "Erreur conversion";
-        console.error("[api/humanize/docx-native] PDF conversion failed:", msg);
-        return NextResponse.json(
-          {
-            error: `Conversion PDF → DOCX échouée : ${msg}. Vos tokens ont été remboursés.`,
-          },
-          { status: 500 },
-        );
-      }
-    }
+    const inputBuffer = Buffer.from(await file.arrayBuffer());
 
     let result;
     try {
-      result = await humanizeDocxNative(inputBuffer, {
-        prescoredParagraphs,
-      });
+      result = await humanizeDocxNative(inputBuffer);
     } catch (err) {
       // Refund tokens on failure
       await prisma.user
@@ -196,7 +141,7 @@ export async function POST(req: NextRequest) {
         data: {
           userId: user.id,
           fileName: file.name,
-          fileType: ext,
+          fileType: "docx",
           originalText: "",
           aiScoreBefore: result.report.globalScoreBefore,
           aiScoreAfter: result.report.globalScoreAfter,
@@ -231,7 +176,7 @@ export async function POST(req: NextRequest) {
     ).toString("base64");
 
     const outFilename = safeFilename(
-      `humanized_${file.name.replace(/\.(docx|pdf)$/i, "")}.docx`,
+      `humanized_${file.name.replace(/\.docx$/i, "")}.docx`,
     );
 
     // Buffer → Uint8Array — Response BodyInit accepte les typed arrays.
@@ -260,53 +205,4 @@ export async function POST(req: NextRequest) {
 /** Anti-injection Content-Disposition. */
 function safeFilename(name: string): string {
   return name.replace(/[^\w.\- ]+/g, "_").slice(0, 120);
-}
-
-/**
- * 12/07 (Orsu) — POST le PDF vers le service détecteur Fly.io (endpoint
- * `/convert-pdf`, ajouté en même temps que ce fix). Le service utilise
- * pdf2docx qui préserve layout, tableaux et images. Renvoie le DOCX binaire.
- *
- * Le service détecteur est déjà l'URL configurée pour /detect (utilisée par
- * humanize-docx-native et analyze-v2), donc on réutilise SEORA_DETECTOR_URL
- * / SEORA_DETECTOR_TOKEN — pas de nouvelle env var.
- */
-async function convertPdfToDocx(
-  pdfBuffer: Buffer,
-  originalName: string,
-): Promise<Buffer> {
-  const url = process.env.SEORA_DETECTOR_URL;
-  if (!url) {
-    throw new Error("SEORA_DETECTOR_URL non configuré côté Vercel");
-  }
-  const token = process.env.SEORA_DETECTOR_TOKEN ?? "";
-  const trimmedUrl = url.replace(/\/$/, "");
-
-  const fd = new FormData();
-  // Buffer → Blob (Node runtime supporte Blob via undici depuis Node 18)
-  const blob = new Blob([new Uint8Array(pdfBuffer)], {
-    type: "application/pdf",
-  });
-  fd.append("file", blob, originalName || "input.pdf");
-
-  const res = await fetch(`${trimmedUrl}/convert-pdf`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: fd,
-    signal: AbortSignal.timeout(120_000),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(
-      `Convert PDF HTTP ${res.status}: ${errText.slice(0, 300)}`,
-    );
-  }
-
-  const arrayBuf = await res.arrayBuffer();
-  const buf = Buffer.from(arrayBuf);
-  if (buf.byteLength < 200) {
-    throw new Error("DOCX converti trop petit — probablement invalide");
-  }
-  return buf;
 }

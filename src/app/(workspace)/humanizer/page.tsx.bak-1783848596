@@ -275,7 +275,6 @@ export default function HumanizerPage() {
     } | null;
   };
   const [docxNativeResult, setDocxNativeResult] = useState<DocxNativeResult | null>(null);
-  const [docxRewordifyLoading, setDocxRewordifyLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"score" | "diff" | "raw">("score");
   const [showReport, setShowReport] = useState(false);
   const [showFullText, setShowFullText] = useState<"before" | "after" | null>(null);
@@ -406,60 +405,8 @@ export default function HumanizerPage() {
     setResult(null);
   }, []);
 
-  // ML quick-score droper (comparaison gratuite sans token)
-  const mlFileInputRef = useRef<HTMLInputElement>(null);
-  const [mlUploaded, setMlUploaded] = useState<{ name: string; file: File } | null>(null);
-  const [mlDragOver, setMlDragOver] = useState(false);
-  const [mlScoring, setMlScoring] = useState(false);
-  type MlResult = {
-    scoreGlobal: number | null;
-    wordCount: number;
-    signals: {
-      semantic: number | null;
-      homoglyphs: number;
-      homoglyphScore: number;
-      connectors: number | null;
-      aiFavoriteHits: number | null;
-      aiFavoriteTop: string[];
-      nearZeroTypos: number | null;
-      tripartite: number | null;
-    };
-    failedSignals: string[];
-  };
-  const [mlResult, setMlResult] = useState<MlResult | null>(null);
-
-  const handleMlFile = useCallback((file: File) => {
-    const validExts = [".pdf", ".docx", ".doc", ".txt"];
-    if (!validExts.some((ext) => file.name.toLowerCase().endsWith(ext))) {
-      toast.error("Format non supporté");
-      return;
-    }
-    setMlUploaded({ name: file.name, file });
-    setMlResult(null);
-  }, []);
-
-  const startMlScore = useCallback(async () => {
-    if (!mlUploaded) return;
-    setMlScoring(true);
-    setMlResult(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", mlUploaded.file);
-      fd.append("language", language);
-      const res = await fetch("/api/quick-ml-score", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setMlResult(data as MlResult);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur score ML");
-    } finally {
-      setMlScoring(false);
-    }
-  }, [mlUploaded, language]);
-
   const [analyzePhase, setAnalyzePhase] = useState<string>("extracting");
   const [analyzePhaseDetail, setAnalyzePhaseDetail] = useState<string>("");
-  const [analyzePercent, setAnalyzePercent] = useState(0);
 
   const startAnalyzeOnly = useCallback(async () => {
     if (!uploaded) return;
@@ -469,7 +416,6 @@ export default function HumanizerPage() {
     setResult(null);
     setAnalyzePhase("extracting");
     setAnalyzePhaseDetail("");
-    setAnalyzePercent(0);
 
     const fd = new FormData();
     fd.append("file", uploaded.file);
@@ -511,7 +457,6 @@ export default function HumanizerPage() {
           if (eventType === "progress") {
             setAnalyzePhase(data.phase);
             setAnalyzePhaseDetail(data.detail ?? "");
-            if (typeof data.percent === 'number') setAnalyzePercent(data.percent);
           } else if (eventType === "done") {
             if (useV2 && data.engineVersion === "v2") {
               doneV2 = data as AnalyzeV2Result;
@@ -551,9 +496,6 @@ export default function HumanizerPage() {
   // Appelle /api/humanize/docx-native (POST multipart, réponse = .docx binaire
   // + header X-Humanize-Report en base64 JSON). Pas de streaming SSE : fetch
   // direct sync (rapide 15-45s, tient dans le maxDuration 300s Vercel Pro).
-  // 12/07 (Orsu) — Fix vision Marius : workflow linéaire forcé + réutilisation
-  // des scores paragraphe-par-paragraphe déjà calculés par l'analyse (skip
-  // du gros scoring initial → latence divisée par ~2).
   const startDocxNative = useCallback(async () => {
     if (!uploaded) return;
     setAnalyzing(true);
@@ -563,23 +505,6 @@ export default function HumanizerPage() {
     setPhaseDetail("Parsing du XML natif (preserve police, gras, taille)…");
     setResult(null);
     setDocxNativeResult(null);
-
-    // 12/07 (Orsu) — Récupère les scores paragraphe-par-paragraphe déjà
-    // calculés par /analyze-v2 (recommandé) ou /analyze (v1). Si dispo, on
-    // les passe au backend qui skip son scoring initial (latence /2).
-    // ⚠ On ne les envoie QUE pour les DOCX : pour les PDFs, l'index des
-    // zones extraites (analyse texte brut) ne correspond pas à l'index des
-    // paragraphes après conversion PDF→DOCX (pdf2docx segmente autrement).
-    // Le backend a un guard (length mismatch → fallback scoring complet).
-    const ext = uploaded.name.toLowerCase().split(".").pop();
-    const paragraphScoresFromV2 =
-      analyzeOnlyResultV2?.zones?.map((z) => Math.round(z.score));
-    const paragraphScoresFromV1 =
-      analyzeOnlyResult?.paragraphs?.map((p) => Math.round(p.score));
-    const paragraphScores =
-      ext === "docx"
-        ? (paragraphScoresFromV2 ?? paragraphScoresFromV1)
-        : undefined;
 
     // Fake phase progression pour UX (backend est sync, pas de SSE).
     // Les labels matchent PHASE_LABELS pour réutiliser la timeline existante.
@@ -606,9 +531,6 @@ export default function HumanizerPage() {
     try {
       const fd = new FormData();
       fd.append("file", uploaded.file);
-      if (paragraphScores && paragraphScores.length > 0) {
-        fd.append("paragraphScores", JSON.stringify(paragraphScores));
-      }
 
       const res = await fetch("/api/humanize/docx-native", {
         method: "POST",
@@ -670,17 +592,15 @@ export default function HumanizerPage() {
     } finally {
       setAnalyzing(false);
     }
-  }, [uploaded, analyzeOnlyResult, analyzeOnlyResultV2]);
+  }, [uploaded]);
 
   const startAnalysis = useCallback(async () => {
     if (!uploaded) return;
 
     // 11/07 (Orsu) — DOCX → nouveau flow natif (preserve formatage 100%).
-    // 12/07 (Orsu) — PDF aussi : convertit en DOCX préservant (pdf2docx) côté
-    // backend puis passe dans humanizeDocxNative. Images/layout/tableaux
-    // conservés. TXT / DOC gardent l'ancien flow SSE `/api/humanize`.
+    // PDF / TXT / DOC gardent l'ancien flow SSE `/api/humanize`.
     const ext = uploaded.name.toLowerCase().split(".").pop();
-    if (ext === "docx" || ext === "pdf") {
+    if (ext === "docx") {
       await startDocxNative();
       return;
     }
@@ -777,77 +697,14 @@ export default function HumanizerPage() {
   }, [uploaded, mode, language, targetScore, preservationList, startDocxNative]);
 
   // Auto-launch when the user landed here from the landing popup — the file
-  // est déjà chargée mais on force le workflow linéaire (12/07 Orsu, vision
-  // Marius) : d'abord l'analyse IA, puis l'utilisateur clique Humaniser en
-  // voyant les zones flaggées. On ne saute plus l'étape analyse.
+  // is already loaded and they've already seen a preview score, no need to
+  // ask for mode / config again.
   useEffect(() => {
-    if (
-      autoLaunch &&
-      uploaded &&
-      !analyzing &&
-      !analyzingOnly &&
-      !result &&
-      !analyzeOnlyResult &&
-      !analyzeOnlyResultV2 &&
-      mode === "compilatio-proof"
-    ) {
+    if (autoLaunch && uploaded && !analyzing && !result && mode === "compilatio-proof") {
       setAutoLaunch(false);
-      startAnalyzeOnly();
+      startAnalysis();
     }
-  }, [
-    autoLaunch,
-    uploaded,
-    analyzing,
-    analyzingOnly,
-    result,
-    analyzeOnlyResult,
-    analyzeOnlyResultV2,
-    mode,
-    startAnalyzeOnly,
-  ]);
-
-  const startDocxRewordify = useCallback(async () => {
-    if (!uploaded) return;
-    setDocxRewordifyLoading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", uploaded.file);
-      fd.append("language", language);
-
-      const scores =
-        analyzeOnlyResultV2?.zones?.map((z) => Math.round(z.score)) ??
-        analyzeOnlyResult?.paragraphs?.map((p) => Math.round(p.score));
-      if (scores && scores.length > 0) {
-        fd.append("paragraphScores", JSON.stringify(scores));
-      }
-
-      const res = await fetch("/api/humanize/docx-rewordify", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as { error?: string }).error || `HTTP ${res.status}`);
-      }
-
-      const rewrittenCount = res.headers.get("X-Rewritten-Count") ?? "?";
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `humanized_rw_${uploaded.name}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
-      toast.success(`DOCX téléchargé · ${rewrittenCount} zones réécrites (Rewordify − 3 tokens)`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur téléchargement DOCX");
-    } finally {
-      setDocxRewordifyLoading(false);
-    }
-  }, [uploaded, language, analyzeOnlyResultV2, analyzeOnlyResult]);
+  }, [autoLaunch, uploaded, analyzing, result, mode, startAnalysis]);
 
   const regenerate = async (bumpMode: Mode = "aggressive") => {
     if (!result?.id) return;
@@ -948,7 +805,6 @@ export default function HumanizerPage() {
       URL.revokeObjectURL(docxNativeResult.blobUrl);
     }
     setDocxNativeResult(null);
-    setAnalyzePercent(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -1609,7 +1465,7 @@ export default function HumanizerPage() {
 
         {/* Loader analyse-only (avant réécriture) */}
         {analyzingOnly && (
-          <LoadingReport phase={analyzePhase} detail={analyzePhaseDetail} percent={analyzePercent} />
+          <LoadingReport phase={analyzePhase} detail={analyzePhaseDetail} />
         )}
 
         {/* 10/07 (Orsu) — Résultat Moteur v2 rendu via l'UI premium AnalysisReport
@@ -1617,41 +1473,7 @@ export default function HumanizerPage() {
              AxisCard cyan/violet + ZoneHighlight + ZonesSidebar sticky). */}
         {!analyzingOnly && !analyzing && !result && !docxNativeResult && analyzeOnlyResultV2 && (
           <div className="space-y-5 mb-6">
-            <AnalysisReport result={mapV2ToV1(analyzeOnlyResultV2)} onReset={resetAll} language={language} />
-
-            {/* DOCX Rewordify — affiché seulement si le fichier uploadé est un .docx */}
-            {uploaded && uploaded.name.toLowerCase().endsWith(".docx") && (
-              <div className="rounded-3xl bg-white border-2 border-violet-200 shadow-sm p-6 sm:p-8">
-                <div className="flex items-start gap-4 mb-5">
-                  <div className="h-12 w-12 rounded-2xl bg-violet-100 flex items-center justify-center shrink-0">
-                    <FileText className="h-6 w-6 text-violet-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[10px] uppercase tracking-widest text-violet-500 font-bold">Nouveau · Format DOCX</p>
-                    <h3 className="text-lg sm:text-xl font-extrabold text-gray-900">Télécharger le DOCX humanisé</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                      Remplace ~35% des mots des zones flaggées par des synonymes (style Rewordify). Police, mise en page et structure conservées à 100%. Homoglyphes cyrilliques injectés.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={startDocxRewordify}
-                  disabled={docxRewordifyLoading}
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {docxRewordifyLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" />Humanisation en cours…</>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      Télécharger DOCX humanisé (Rewordify)
-                      <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-black">−3 tokens</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
+            <AnalysisReport result={mapV2ToV1(analyzeOnlyResultV2)} onReset={resetAll} />
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
               <div className="flex items-start gap-4 mb-5">
                 <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
@@ -1689,40 +1511,7 @@ export default function HumanizerPage() {
         {!analyzingOnly && !analyzing && !result && !docxNativeResult && !analyzeOnlyResultV2 && analyzeOnlyResult && (
           <div className="space-y-5 mb-6">
             {/* Rapport unifié façon Compilatio */}
-            <AnalysisReport result={analyzeOnlyResult} onReset={resetAll} language={language} />
-
-            {/* DOCX Rewordify — affiché seulement si le fichier uploadé est un .docx */}
-            {uploaded && uploaded.name.toLowerCase().endsWith(".docx") && (
-              <div className="rounded-3xl bg-white border-2 border-violet-200 shadow-sm p-6 sm:p-8">
-                <div className="flex items-start gap-4 mb-5">
-                  <div className="h-12 w-12 rounded-2xl bg-violet-100 flex items-center justify-center shrink-0">
-                    <FileText className="h-6 w-6 text-violet-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[10px] uppercase tracking-widest text-violet-500 font-bold">Nouveau · Format DOCX</p>
-                    <h3 className="text-lg sm:text-xl font-extrabold text-gray-900">Télécharger le DOCX humanisé</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                      Remplace ~35% des mots des zones flaggées par des synonymes (style Rewordify). Police, mise en page et structure conservées à 100%. Homoglyphes cyrilliques injectés.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={startDocxRewordify}
-                  disabled={docxRewordifyLoading}
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {docxRewordifyLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" />Humanisation en cours…</>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      Télécharger DOCX humanisé (Rewordify)
-                      <span className="ml-2 rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[10px] font-black">−3 tokens</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+            <AnalysisReport result={analyzeOnlyResult} onReset={resetAll} />
 
             {/* CTA Humaniser */}
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
@@ -1851,81 +1640,6 @@ export default function HumanizerPage() {
                 </div>
               )}
             </div>
-
-            {/* ── Comparateur API ML (gratuit, sans token) ─────────────────── */}
-            <div className="rounded-2xl border-2 border-cyan-200 bg-cyan-50/30 p-4 mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Cpu className="h-4 w-4 text-cyan-600 shrink-0" />
-                <span className="text-sm font-black text-cyan-900">Score API ML</span>
-                <span className="rounded-full bg-cyan-100 text-cyan-700 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest">Gratuit</span>
-              </div>
-              <p className="text-[11px] text-gray-500 mb-3 leading-snug">
-                Compare avec le moteur ML (xlm-roberta fine-tuné, sans token). Dépose le même fichier ici pour voir le score brut du détecteur.
-              </p>
-
-              {/* Hidden file input */}
-              <input
-                ref={mlFileInputRef}
-                type="file"
-                accept=".pdf,.docx,.doc,.txt"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleMlFile(f); }}
-              />
-
-              {mlResult ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-2xl font-black ${(mlResult.scoreGlobal ?? 0) < 15 ? "text-emerald-600" : (mlResult.scoreGlobal ?? 0) < 40 ? "text-orange-500" : "text-red-600"}`}>
-                      {mlResult.scoreGlobal !== null ? `${mlResult.scoreGlobal}%` : "N/A"}
-                    </div>
-                    <div className="flex-1 text-xs text-gray-500">
-                      <div>Semantic ML: {mlResult.signals.semantic?.toFixed(1) ?? "N/A"}</div>
-                      <div>Homoglyphes: {mlResult.signals.homoglyphs} chars ({mlResult.signals.homoglyphScore?.toFixed(0) ?? 0}/100)</div>
-                      {mlResult.signals.aiFavoriteTop?.length > 0 && (
-                        <div className="truncate">Mots IA: {mlResult.signals.aiFavoriteTop.slice(0, 3).join(", ")}</div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => { setMlUploaded(null); setMlResult(null); }}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setMlDragOver(true); }}
-                  onDragLeave={() => setMlDragOver(false)}
-                  onDrop={(e) => { e.preventDefault(); setMlDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleMlFile(f); }}
-                  onClick={() => mlFileInputRef.current?.click()}
-                  className={`rounded-xl border border-dashed cursor-pointer transition-all p-4 text-center ${mlDragOver ? "border-cyan-500 bg-cyan-100" : "border-cyan-300 hover:border-cyan-500 bg-white/60"}`}
-                >
-                  {mlScoring ? (
-                    <div className="flex items-center justify-center gap-2 text-cyan-600">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-xs font-bold">Analyse ML en cours…</span>
-                    </div>
-                  ) : mlUploaded ? (
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-gray-700 truncate">{mlUploaded.name}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); startMlScore(); }}
-                        className="shrink-0 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-black text-white hover:bg-cyan-700"
-                      >
-                        Scorer →
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-xs font-bold text-gray-600">Glisse ton doc ici</p>
-                      <p className="text-[10px] text-gray-400">PDF · DOCX · TXT</p>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            {/* ─────────────────────────────────────────────────────────────── */}
 
             {/* Réglages avancés (langue, préservation) — l'intensité d'humanisation
                 se choisit après l'analyse, dans la CTA "Humaniser". */}
@@ -2222,16 +1936,12 @@ function mapV2ToV1(v2: AnalyzeV2Result): AnalyzeOnlyResult {
   };
 }
 
-type HumanizedZoneEntry = { text: string; loading: boolean };
-
 function AnalysisReport({
   result,
   onReset,
-  language: docLanguage = "fr",
 }: {
   result: AnalyzeOnlyResult;
   onReset?: () => void;
-  language?: Language;
 }) {
   const paragraphs = result.paragraphs ?? [];
   const reportRef = useRef<HTMLDivElement>(null);
@@ -2241,53 +1951,6 @@ function AnalysisReport({
   // global sans nouvel API call.
   const [ignoredIndexes, setIgnoredIndexes] = useState<Set<number>>(new Set());
   const [currentIdx, setCurrentIdx] = useState(0);
-
-  // Humaniser par zone
-  const [humanizedZones, setHumanizedZones] = useState<Record<number, HumanizedZoneEntry>>({});
-  const [humanizingAll, setHumanizingAll] = useState(false);
-
-  const humanizeZone = useCallback(async (p: { index: number; text: string }) => {
-    setHumanizedZones((prev) => ({
-      ...prev,
-      [p.index]: { text: "", loading: true },
-    }));
-    try {
-      const res = await fetch("/api/humanize/zone", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: p.text, language: docLanguage }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erreur");
-      setHumanizedZones((prev) => ({
-        ...prev,
-        [p.index]: { text: data.humanizedText, loading: false },
-      }));
-      toast.success(`Zone ${p.index + 1} humanisée (−1 token)`);
-    } catch (err) {
-      setHumanizedZones((prev) => {
-        const next = { ...prev };
-        delete next[p.index];
-        return next;
-      });
-      toast.error(err instanceof Error ? err.message : "Erreur humanisation");
-    }
-  }, [docLanguage]);
-
-  const humanizeAll = useCallback(async () => {
-    const flaggedAll = paragraphs.filter(
-      (p) => (p.risk === "high" || p.risk === "medium") && !ignoredIndexes.has(p.index)
-    );
-    if (flaggedAll.length === 0) { toast.info("Aucune zone à humaniser."); return; }
-    setHumanizingAll(true);
-    toast.info(`Humanisation de ${flaggedAll.length} zones… (−${flaggedAll.length} tokens)`);
-    for (const p of flaggedAll) {
-      if (humanizedZones[p.index]?.text) continue;
-      await humanizeZone(p);
-    }
-    setHumanizingAll(false);
-    toast.success("Toutes les zones humanisées !");
-  }, [paragraphs, ignoredIndexes, humanizedZones, humanizeZone]);
 
   const flagged = paragraphs.filter(
     (p) => (p.risk === "high" || p.risk === "medium") && !ignoredIndexes.has(p.index)
@@ -2543,10 +2206,6 @@ function AnalysisReport({
             onGoto={goto}
             onToggleIgnore={toggleIgnore}
             onResetIgnored={resetIgnored}
-            onHumanize={humanizeZone}
-            onHumanizeAll={humanizeAll}
-            humanizedZones={humanizedZones}
-            humanizingAll={humanizingAll}
           />
 
           {/* Reader */}
@@ -2579,9 +2238,6 @@ function AnalysisReport({
                       isIgnored={isIgnored}
                       onToggleIgnore={() => toggleIgnore(p.index)}
                       onGoto={() => goto(flagIdx)}
-                      onHumanize={isFlagged ? () => humanizeZone(p) : undefined}
-                      humanizedText={humanizedZones[p.index]?.text}
-                      humanizeLoading={humanizedZones[p.index]?.loading}
                     />
                   );
                 })
@@ -2610,61 +2266,6 @@ function AnalysisReport({
               ))}
             </div>
           </details>
-        </div>
-      )}
-
-      {/* ═══ ZONES HUMANISÉES — RECAP ═══ */}
-      {Object.values(humanizedZones).some((z) => z.text) && (
-        <div className="border-t border-violet-100 px-6 sm:px-8 py-5 bg-gradient-to-br from-violet-50/60 to-white">
-          <p className="text-[10px] uppercase tracking-widest text-violet-700 font-black mb-3 flex items-center gap-1.5">
-            <Sparkles className="h-3 w-3" />
-            Récap — zones humanisées ({Object.values(humanizedZones).filter((z) => z.text).length})
-          </p>
-          <div className="space-y-2">
-            {paragraphs
-              .filter((p) => humanizedZones[p.index]?.text)
-              .map((p) => (
-                <div
-                  key={p.index}
-                  className="rounded-xl bg-white border border-violet-100 p-3 flex items-start gap-2"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-violet-500 font-bold uppercase tracking-widest mb-1">
-                      Zone {p.index + 1}
-                    </p>
-                    <p className="text-xs text-zinc-700 leading-relaxed">
-                      {humanizedZones[p.index].text}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(humanizedZones[p.index].text);
-                      toast.success("Copié !");
-                    }}
-                    className="shrink-0 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 p-1.5 transition-colors"
-                    title="Copier"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const all = paragraphs
-                .filter((p) => humanizedZones[p.index]?.text)
-                .map((p) => `[Zone ${p.index + 1}]\n${humanizedZones[p.index].text}`)
-                .join("\n\n");
-              navigator.clipboard.writeText(all);
-              toast.success("Toutes les zones copiées !");
-            }}
-            className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 text-xs font-bold transition-colors"
-          >
-            <Copy className="h-3.5 w-3.5" />
-            Tout copier
-          </button>
         </div>
       )}
 
