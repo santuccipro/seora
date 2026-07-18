@@ -1573,7 +1573,7 @@ export default function HumanizerPage() {
              AxisCard cyan/violet + ZoneHighlight + ZonesSidebar sticky). */}
         {!analyzingOnly && !analyzing && !result && !docxNativeResult && analyzeOnlyResultV2 && (
           <div className="space-y-5 mb-6">
-            <AnalysisReport result={mapV2ToV1(analyzeOnlyResultV2)} onReset={resetAll} />
+            <AnalysisReport result={mapV2ToV1(analyzeOnlyResultV2)} onReset={resetAll} language={language} />
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
               <div className="flex items-start gap-4 mb-5">
                 <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
@@ -1611,7 +1611,7 @@ export default function HumanizerPage() {
         {!analyzingOnly && !analyzing && !result && !docxNativeResult && !analyzeOnlyResultV2 && analyzeOnlyResult && (
           <div className="space-y-5 mb-6">
             {/* Rapport unifié façon Compilatio */}
-            <AnalysisReport result={analyzeOnlyResult} onReset={resetAll} />
+            <AnalysisReport result={analyzeOnlyResult} onReset={resetAll} language={language} />
 
             {/* CTA Humaniser */}
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
@@ -2111,12 +2111,16 @@ function mapV2ToV1(v2: AnalyzeV2Result): AnalyzeOnlyResult {
   };
 }
 
+type HumanizedZoneEntry = { text: string; loading: boolean };
+
 function AnalysisReport({
   result,
   onReset,
+  language: docLanguage = "fr",
 }: {
   result: AnalyzeOnlyResult;
   onReset?: () => void;
+  language?: Language;
 }) {
   const paragraphs = result.paragraphs ?? [];
   const reportRef = useRef<HTMLDivElement>(null);
@@ -2126,6 +2130,53 @@ function AnalysisReport({
   // global sans nouvel API call.
   const [ignoredIndexes, setIgnoredIndexes] = useState<Set<number>>(new Set());
   const [currentIdx, setCurrentIdx] = useState(0);
+
+  // Humaniser par zone
+  const [humanizedZones, setHumanizedZones] = useState<Record<number, HumanizedZoneEntry>>({});
+  const [humanizingAll, setHumanizingAll] = useState(false);
+
+  const humanizeZone = useCallback(async (p: { index: number; text: string }) => {
+    setHumanizedZones((prev) => ({
+      ...prev,
+      [p.index]: { text: "", loading: true },
+    }));
+    try {
+      const res = await fetch("/api/humanize/zone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: p.text, language: docLanguage }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur");
+      setHumanizedZones((prev) => ({
+        ...prev,
+        [p.index]: { text: data.humanizedText, loading: false },
+      }));
+      toast.success(`Zone ${p.index + 1} humanisée (−1 token)`);
+    } catch (err) {
+      setHumanizedZones((prev) => {
+        const next = { ...prev };
+        delete next[p.index];
+        return next;
+      });
+      toast.error(err instanceof Error ? err.message : "Erreur humanisation");
+    }
+  }, [docLanguage]);
+
+  const humanizeAll = useCallback(async () => {
+    const flaggedAll = paragraphs.filter(
+      (p) => (p.risk === "high" || p.risk === "medium") && !ignoredIndexes.has(p.index)
+    );
+    if (flaggedAll.length === 0) { toast.info("Aucune zone à humaniser."); return; }
+    setHumanizingAll(true);
+    toast.info(`Humanisation de ${flaggedAll.length} zones… (−${flaggedAll.length} tokens)`);
+    for (const p of flaggedAll) {
+      if (humanizedZones[p.index]?.text) continue;
+      await humanizeZone(p);
+    }
+    setHumanizingAll(false);
+    toast.success("Toutes les zones humanisées !");
+  }, [paragraphs, ignoredIndexes, humanizedZones, humanizeZone]);
 
   const flagged = paragraphs.filter(
     (p) => (p.risk === "high" || p.risk === "medium") && !ignoredIndexes.has(p.index)
@@ -2381,6 +2432,10 @@ function AnalysisReport({
             onGoto={goto}
             onToggleIgnore={toggleIgnore}
             onResetIgnored={resetIgnored}
+            onHumanize={humanizeZone}
+            onHumanizeAll={humanizeAll}
+            humanizedZones={humanizedZones}
+            humanizingAll={humanizingAll}
           />
 
           {/* Reader */}
@@ -2441,6 +2496,61 @@ function AnalysisReport({
               ))}
             </div>
           </details>
+        </div>
+      )}
+
+      {/* ═══ ZONES HUMANISÉES — RECAP ═══ */}
+      {Object.values(humanizedZones).some((z) => z.text) && (
+        <div className="border-t border-violet-100 px-6 sm:px-8 py-5 bg-gradient-to-br from-violet-50/60 to-white">
+          <p className="text-[10px] uppercase tracking-widest text-violet-700 font-black mb-3 flex items-center gap-1.5">
+            <Sparkles className="h-3 w-3" />
+            Récap — zones humanisées ({Object.values(humanizedZones).filter((z) => z.text).length})
+          </p>
+          <div className="space-y-2">
+            {paragraphs
+              .filter((p) => humanizedZones[p.index]?.text)
+              .map((p) => (
+                <div
+                  key={p.index}
+                  className="rounded-xl bg-white border border-violet-100 p-3 flex items-start gap-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-violet-500 font-bold uppercase tracking-widest mb-1">
+                      Zone {p.index + 1}
+                    </p>
+                    <p className="text-xs text-zinc-700 leading-relaxed">
+                      {humanizedZones[p.index].text}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(humanizedZones[p.index].text);
+                      toast.success("Copié !");
+                    }}
+                    className="shrink-0 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 p-1.5 transition-colors"
+                    title="Copier"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const all = paragraphs
+                .filter((p) => humanizedZones[p.index]?.text)
+                .map((p) => `[Zone ${p.index + 1}]\n${humanizedZones[p.index].text}`)
+                .join("\n\n");
+              navigator.clipboard.writeText(all);
+              toast.success("Toutes les zones copiées !");
+            }}
+            className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 text-xs font-bold transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Tout copier
+          </button>
         </div>
       )}
 

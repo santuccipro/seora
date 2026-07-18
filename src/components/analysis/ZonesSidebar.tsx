@@ -6,7 +6,7 @@
  */
 
 import { motion } from "framer-motion";
-import { EyeOff, RotateCcw, ArrowUpRight, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { EyeOff, RotateCcw, ArrowUpRight, AlertTriangle, CheckCircle2, Wand2, Loader2 } from "lucide-react";
 
 type Paragraph = {
   index: number;
@@ -15,6 +15,8 @@ type Paragraph = {
   risk: "high" | "medium" | "low";
 };
 
+export type HumanizedZoneMap = Record<number, { text: string; loading: boolean }>;
+
 export type ZonesSidebarProps = {
   flagged: Paragraph[];
   ignoredIndexes: Set<number>;
@@ -22,6 +24,10 @@ export type ZonesSidebarProps = {
   onGoto: (i: number) => void;
   onToggleIgnore: (zoneIndex: number) => void;
   onResetIgnored: () => void;
+  onHumanize?: (p: Paragraph) => void;
+  onHumanizeAll?: () => void;
+  humanizedZones?: HumanizedZoneMap;
+  humanizingAll?: boolean;
 };
 
 function preview(text: string, wordCount = 30): string {
@@ -43,9 +49,16 @@ export default function ZonesSidebar({
   onGoto,
   onToggleIgnore,
   onResetIgnored,
+  onHumanize,
+  onHumanizeAll,
+  humanizedZones,
+  humanizingAll,
 }: ZonesSidebarProps) {
   const ignoredCount = ignoredIndexes.size;
   const totalFlagged = flagged.length;
+  const humanizedCount = humanizedZones
+    ? Object.values(humanizedZones).filter((z) => z.text).length
+    : 0;
 
   return (
     <aside className="lg:sticky lg:top-24 self-start rounded-2xl bg-white border border-zinc-200 shadow-sm overflow-hidden">
@@ -55,14 +68,31 @@ export default function ZonesSidebar({
           <div className="h-7 w-7 rounded-lg bg-orange-100 flex items-center justify-center">
             <AlertTriangle className="h-3.5 w-3.5 text-orange-600" strokeWidth={2.4} />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="text-xs font-bold text-zinc-900">
               Zones à risque
             </p>
             <p className="text-[10px] text-zinc-500">
               {totalFlagged} détectée{totalFlagged > 1 ? "s" : ""}
+              {humanizedCount > 0 && ` · ${humanizedCount} humanisée${humanizedCount > 1 ? "s" : ""}`}
             </p>
           </div>
+          {onHumanize && totalFlagged > 0 && (
+            <button
+              type="button"
+              onClick={onHumanizeAll}
+              disabled={humanizingAll}
+              className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 px-2 py-1 text-[10px] font-bold transition-colors disabled:opacity-60"
+              title="Humaniser toutes les zones flaggées"
+            >
+              {humanizingAll ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Wand2 className="h-3 w-3" />
+              )}
+              Tout
+            </button>
+          )}
         </div>
       </div>
 
@@ -139,6 +169,35 @@ export default function ZonesSidebar({
                         <ArrowUpRight className="h-3 w-3" />
                         Voir
                       </button>
+                      {onHumanize && (() => {
+                        const hz = humanizedZones?.[p.index];
+                        if (hz?.loading) {
+                          return (
+                            <span className="text-[10px] font-bold text-violet-500 inline-flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              …
+                            </span>
+                          );
+                        }
+                        if (hz?.text) {
+                          return (
+                            <span className="text-[10px] font-bold text-emerald-600 inline-flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Humanisé
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => onHumanize(p)}
+                            className="text-[10px] font-bold text-violet-600 hover:text-violet-800 uppercase tracking-widest inline-flex items-center gap-1 transition-colors"
+                          >
+                            <Wand2 className="h-3 w-3" />
+                            Humaniser
+                          </button>
+                        );
+                      })()}
                       <button
                         type="button"
                         onClick={() => onToggleIgnore(p.index)}
