@@ -160,35 +160,6 @@ export default function ZoneHighlight({
                 </span>
               </motion.button>
 
-              {/* Humaniser / état */}
-              {onHumanize && !humanizedText && !humanizeLoading && (
-                <button
-                  type="button"
-                  onClick={onHumanize}
-                  className="text-[9px] font-bold text-violet-600 hover:text-violet-800 uppercase tracking-widest inline-flex items-center gap-0.5 transition-colors"
-                  title="Humaniser cette zone (−1 token)"
-                >
-                  <Wand2 className="h-2.5 w-2.5" strokeWidth={2.5} />
-                  Humaniser
-                </button>
-              )}
-              {humanizeLoading && (
-                <span className="text-[9px] font-bold text-violet-400 inline-flex items-center gap-0.5">
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  …
-                </span>
-              )}
-              {humanizedText && (
-                <button
-                  type="button"
-                  onClick={() => setPanelOpen((v) => !v)}
-                  className="text-[9px] font-bold text-emerald-600 hover:text-emerald-800 uppercase tracking-widest inline-flex items-center gap-0.5 transition-colors"
-                >
-                  <CheckCircle2 className="h-2.5 w-2.5" strokeWidth={2.5} />
-                  {panelOpen ? "Replier" : "Voir"}
-                </button>
-              )}
-
               <button
                 type="button"
                 onClick={onToggleIgnore}
@@ -212,6 +183,28 @@ export default function ZoneHighlight({
           )}
         </div>
       </div>
+
+      {/* ── Humaniser CTA bar (visible dès qu'une zone est flaggée) ── */}
+      {isFlagged && !isIgnored && onHumanize && !humanizedText && (
+        <div className="mt-2 -ml-4 pl-4">
+          {humanizeLoading ? (
+            <div className="flex items-center gap-2 py-2 text-xs text-violet-500 font-semibold">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Réécriture en cours…
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onHumanize}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 px-4 py-2 text-xs font-bold transition-colors"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              Humaniser cette zone
+              <span className="ml-1 rounded-full bg-violet-200 text-violet-700 px-1.5 py-0.5 text-[10px] font-black">−1 token</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Humanisé panel — before/after inline ── */}
       {humanizedText && panelOpen && (
