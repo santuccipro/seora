@@ -1619,39 +1619,6 @@ export default function HumanizerPage() {
           <div className="space-y-5 mb-6">
             <AnalysisReport result={mapV2ToV1(analyzeOnlyResultV2)} onReset={resetAll} language={language} />
 
-            {/* DOCX Rewordify — PDF et DOCX (PDF converti côté serveur) */}
-            {uploaded && (uploaded.name.toLowerCase().endsWith(".docx") || uploaded.name.toLowerCase().endsWith(".pdf")) && (
-              <div className="rounded-3xl bg-white border-2 border-violet-200 shadow-sm p-6 sm:p-8">
-                <div className="flex items-start gap-4 mb-5">
-                  <div className="h-12 w-12 rounded-2xl bg-violet-100 flex items-center justify-center shrink-0">
-                    <FileText className="h-6 w-6 text-violet-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[10px] uppercase tracking-widest text-violet-500 font-bold">Nouveau · Format DOCX</p>
-                    <h3 className="text-lg sm:text-xl font-extrabold text-gray-900">Télécharger le DOCX humanisé</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                      Remplace ~35% des mots des zones flaggées par des synonymes (style Rewordify). Police, mise en page et structure conservées à 100%. Homoglyphes cyrilliques injectés.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={startDocxRewordify}
-                  disabled={docxRewordifyLoading}
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {docxRewordifyLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" />Humanisation en cours…</>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      Télécharger DOCX humanisé (Rewordify)
-                      <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-black">−3 tokens</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
               <div className="flex items-start gap-4 mb-5">
                 <div className="h-12 w-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
@@ -1690,39 +1657,6 @@ export default function HumanizerPage() {
           <div className="space-y-5 mb-6">
             {/* Rapport unifié façon Compilatio */}
             <AnalysisReport result={analyzeOnlyResult} onReset={resetAll} language={language} />
-
-            {/* DOCX Rewordify — PDF et DOCX (PDF converti côté serveur) */}
-            {uploaded && (uploaded.name.toLowerCase().endsWith(".docx") || uploaded.name.toLowerCase().endsWith(".pdf")) && (
-              <div className="rounded-3xl bg-white border-2 border-violet-200 shadow-sm p-6 sm:p-8">
-                <div className="flex items-start gap-4 mb-5">
-                  <div className="h-12 w-12 rounded-2xl bg-violet-100 flex items-center justify-center shrink-0">
-                    <FileText className="h-6 w-6 text-violet-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[10px] uppercase tracking-widest text-violet-500 font-bold">Nouveau · Format DOCX</p>
-                    <h3 className="text-lg sm:text-xl font-extrabold text-gray-900">Télécharger le DOCX humanisé</h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                      Remplace ~35% des mots des zones flaggées par des synonymes (style Rewordify). Police, mise en page et structure conservées à 100%. Homoglyphes cyrilliques injectés.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={startDocxRewordify}
-                  disabled={docxRewordifyLoading}
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-700 px-5 py-4 text-sm font-black text-white shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {docxRewordifyLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" />Humanisation en cours…</>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      Télécharger DOCX humanisé (Rewordify)
-                      <span className="ml-2 rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[10px] font-black">−3 tokens</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
 
             {/* CTA Humaniser */}
             <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-xl p-6 sm:p-8">
@@ -1852,80 +1786,6 @@ export default function HumanizerPage() {
               )}
             </div>
 
-            {/* ── Comparateur API ML (gratuit, sans token) ─────────────────── */}
-            <div className="rounded-2xl border-2 border-cyan-200 bg-cyan-50/30 p-4 mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Cpu className="h-4 w-4 text-cyan-600 shrink-0" />
-                <span className="text-sm font-black text-cyan-900">Score API ML</span>
-                <span className="rounded-full bg-cyan-100 text-cyan-700 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest">Gratuit</span>
-              </div>
-              <p className="text-[11px] text-gray-500 mb-3 leading-snug">
-                Compare avec le moteur ML (xlm-roberta fine-tuné, sans token). Dépose le même fichier ici pour voir le score brut du détecteur.
-              </p>
-
-              {/* Hidden file input */}
-              <input
-                ref={mlFileInputRef}
-                type="file"
-                accept=".pdf,.docx,.doc,.txt"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleMlFile(f); }}
-              />
-
-              {mlResult ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-2xl font-black ${(mlResult.scoreGlobal ?? 0) < 15 ? "text-emerald-600" : (mlResult.scoreGlobal ?? 0) < 40 ? "text-orange-500" : "text-red-600"}`}>
-                      {mlResult.scoreGlobal !== null ? `${mlResult.scoreGlobal}%` : "N/A"}
-                    </div>
-                    <div className="flex-1 text-xs text-gray-500">
-                      <div>Semantic ML: {mlResult.signals.semantic?.toFixed(1) ?? "N/A"}</div>
-                      <div>Homoglyphes: {mlResult.signals.homoglyphs} chars ({mlResult.signals.homoglyphScore?.toFixed(0) ?? 0}/100)</div>
-                      {mlResult.signals.aiFavoriteTop?.length > 0 && (
-                        <div className="truncate">Mots IA: {mlResult.signals.aiFavoriteTop.slice(0, 3).join(", ")}</div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => { setMlUploaded(null); setMlResult(null); }}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setMlDragOver(true); }}
-                  onDragLeave={() => setMlDragOver(false)}
-                  onDrop={(e) => { e.preventDefault(); setMlDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleMlFile(f); }}
-                  onClick={() => mlFileInputRef.current?.click()}
-                  className={`rounded-xl border border-dashed cursor-pointer transition-all p-4 text-center ${mlDragOver ? "border-cyan-500 bg-cyan-100" : "border-cyan-300 hover:border-cyan-500 bg-white/60"}`}
-                >
-                  {mlScoring ? (
-                    <div className="flex items-center justify-center gap-2 text-cyan-600">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-xs font-bold">Analyse ML en cours…</span>
-                    </div>
-                  ) : mlUploaded ? (
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-gray-700 truncate">{mlUploaded.name}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); startMlScore(); }}
-                        className="shrink-0 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-black text-white hover:bg-cyan-700"
-                      >
-                        Scorer →
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-xs font-bold text-gray-600">Glisse ton doc ici</p>
-                      <p className="text-[10px] text-gray-400">PDF · DOCX · TXT</p>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            {/* ─────────────────────────────────────────────────────────────── */}
 
             {/* Réglages avancés (langue, préservation) — l'intensité d'humanisation
                 se choisit après l'analyse, dans la CTA "Humaniser". */}
