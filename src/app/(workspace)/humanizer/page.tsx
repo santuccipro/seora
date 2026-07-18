@@ -835,7 +835,7 @@ export default function HumanizerPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `humanized_rw_${uploaded.name}`;
+      a.download = `humanized_rw_${uploaded.name.replace(/\.pdf$/i, ".docx")}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
