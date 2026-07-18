@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -20,6 +20,10 @@ import {
   Zap,
   Info,
   FileSearch,
+  Wand2,
+  ClipboardCopy,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 type Language = "fr" | "en" | "es";
@@ -75,6 +79,12 @@ const LANG_META: Record<Language, { label: string; flag: string }> = {
   es: { label: "Español", flag: "🇪🇸" },
 };
 
+type HumanizedZone = {
+  text: string;
+  loading: boolean;
+  expanded: boolean;
+};
+
 export default function AiDetectorPage() {
   const { status } = useSession();
   const router = useRouter();
@@ -83,6 +93,8 @@ export default function AiDetectorPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [humanizedZones, setHumanizedZones] = useState<Record<number, HumanizedZone>>({});
+  const [humanizingAll, setHumanizingAll] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -130,7 +142,53 @@ export default function AiDetectorPage() {
   const resetAll = () => {
     setText("");
     setResult(null);
+    setHumanizedZones({});
   };
+
+  const humanizeZone = useCallback(async (paragraphIndex: number, zoneText: string) => {
+    setHumanizedZones(prev => ({
+      ...prev,
+      [paragraphIndex]: { text: "", loading: true, expanded: true },
+    }));
+    try {
+      const res = await fetch("/api/humanize/zone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: zoneText, language }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur");
+      setHumanizedZones(prev => ({
+        ...prev,
+        [paragraphIndex]: { text: data.humanizedText, loading: false, expanded: true },
+      }));
+      toast.success(`Zone ${paragraphIndex + 1} humanisée (−1 token)`);
+    } catch (err) {
+      setHumanizedZones(prev => {
+        const next = { ...prev };
+        delete next[paragraphIndex];
+        return next;
+      });
+      toast.error(err instanceof Error ? err.message : "Erreur");
+    }
+  }, [language]);
+
+  const humanizeAll = useCallback(async () => {
+    if (!result) return;
+    const flagged = result.paragraphs.filter(p => p.risk === "high" || p.risk === "medium");
+    if (flagged.length === 0) {
+      toast.info("Aucune zone à risque à humaniser.");
+      return;
+    }
+    setHumanizingAll(true);
+    toast.info(`Humanisation de ${flagged.length} zones… (−${flagged.length} tokens)`);
+    for (const p of flagged) {
+      if (humanizedZones[p.index]?.text) continue;
+      await humanizeZone(p.index, p.text);
+    }
+    setHumanizingAll(false);
+    toast.success("Toutes les zones humanisées !");
+  }, [result, humanizedZones, humanizeZone]);
 
   if (status === "loading") {
     return (
@@ -381,46 +439,176 @@ export default function AiDetectorPage() {
 
             {/* Highlighted paragraphs */}
             <div className="rounded-3xl bg-white shadow-xl border border-violet-100 p-6 sm:p-8">
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="text-lg font-bold text-gray-900">Texte annoté zone par zone</h2>
-                <div className="hidden sm:flex items-center gap-3 text-[11px]">
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Risque élevé (≥ 60%)</span>
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Moyen (30-60%)</span>
-                  <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Bas (&lt; 30%)</span>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Texte annoté zone par zone</h2>
+                  <div className="flex items-center gap-3 text-[11px] mt-1">
+                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Risque élevé (≥ 60%)</span>
+                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Moyen (30-60%)</span>
+                    <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Bas (&lt; 30%)</span>
+                  </div>
                 </div>
+                {result.paragraphs.some(p => p.risk === "high" || p.risk === "medium") && (
+                  <button
+                    onClick={humanizeAll}
+                    disabled={humanizingAll}
+                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:shadow-md transition-shadow disabled:opacity-60"
+                  >
+                    {humanizingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                    Humaniser tout
+                    <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
+                      {result.paragraphs.filter(p => p.risk === "high" || p.risk === "medium").length} zones
+                    </span>
+                  </button>
+                )}
               </div>
               <div className="space-y-3">
-                {result.paragraphs.map(p => (
-                  <div
-                    key={p.index}
-                    className={`rounded-2xl p-4 border-l-4 ${
-                      p.risk === "high"
-                        ? "bg-red-50/70 border-red-500"
-                        : p.risk === "medium"
-                        ? "bg-amber-50/70 border-amber-500"
-                        : "bg-emerald-50/50 border-emerald-500"
-                    }`}
-                  >
-                    <div className="flex items-baseline justify-between mb-2">
-                      <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
-                        Paragraphe {p.index + 1}
-                      </p>
-                      <span className={`text-xs font-extrabold ${
+                {result.paragraphs.map(p => {
+                  const hz = humanizedZones[p.index];
+                  const canHumanize = p.risk === "high" || p.risk === "medium";
+                  return (
+                    <div
+                      key={p.index}
+                      className={`rounded-2xl border-l-4 overflow-hidden ${
                         p.risk === "high"
-                          ? "text-red-600"
+                          ? "bg-red-50/70 border-red-500"
                           : p.risk === "medium"
-                          ? "text-amber-600"
-                          : "text-emerald-600"
-                      }`}>
-                        {p.score}%
-                      </span>
+                          ? "bg-amber-50/70 border-amber-500"
+                          : "bg-emerald-50/50 border-emerald-500"
+                      }`}
+                    >
+                      <div className="p-4">
+                        <div className="flex items-center justify-between mb-2 gap-2">
+                          <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+                            Paragraphe {p.index + 1}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-extrabold ${
+                              p.risk === "high"
+                                ? "text-red-600"
+                                : p.risk === "medium"
+                                ? "text-amber-600"
+                                : "text-emerald-600"
+                            }`}>
+                              {p.score}%
+                            </span>
+                            {canHumanize && !hz?.text && (
+                              <button
+                                onClick={() => humanizeZone(p.index, p.text)}
+                                disabled={hz?.loading}
+                                className="flex items-center gap-1 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-60"
+                              >
+                                {hz?.loading ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Wand2 className="h-3 w-3" />
+                                )}
+                                {hz?.loading ? "…" : "Humaniser"}
+                                <span className="text-violet-500">−1 token</span>
+                              </button>
+                            )}
+                            {hz?.text && (
+                              <button
+                                onClick={() => setHumanizedZones(prev => ({
+                                  ...prev,
+                                  [p.index]: { ...prev[p.index], expanded: !prev[p.index].expanded },
+                                }))}
+                                className="flex items-center gap-1 rounded-lg bg-emerald-100 text-emerald-700 px-2.5 py-1 text-[11px] font-bold"
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                Humanisé
+                                {hz.expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                          {p.text}
+                        </p>
+                      </div>
+
+                      {/* Humanized result panel */}
+                      {hz?.text && hz.expanded && (
+                        <div className="border-t border-emerald-200 bg-emerald-50 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] uppercase tracking-widest text-emerald-700 font-bold flex items-center gap-1">
+                              <Sparkles className="h-3 w-3" />
+                              Version humanisée
+                            </p>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(hz.text);
+                                toast.success("Copié !");
+                              }}
+                              className="flex items-center gap-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2.5 py-1 text-[11px] font-bold transition-colors"
+                            >
+                              <ClipboardCopy className="h-3 w-3" />
+                              Copier
+                            </button>
+                          </div>
+                          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                            {hz.text}
+                          </p>
+                          <button
+                            onClick={() => humanizeZone(p.index, p.text)}
+                            className="mt-2 text-[11px] text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            Régénérer (−1 token)
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                      {p.text}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {/* Recap panel */}
+              {Object.values(humanizedZones).some(z => z.text) && (
+                <div className="mt-6 rounded-2xl bg-violet-50 border border-violet-200 p-4">
+                  <p className="text-xs font-bold text-violet-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Récap — {Object.values(humanizedZones).filter(z => z.text).length} zone(s) humanisée(s)
+                  </p>
+                  <div className="space-y-2">
+                    {result.paragraphs
+                      .filter(p => humanizedZones[p.index]?.text)
+                      .map(p => (
+                        <div key={p.index} className="flex items-start justify-between gap-2 rounded-xl bg-white border border-violet-100 p-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-violet-500 font-semibold uppercase tracking-widest mb-1">Paragraphe {p.index + 1}</p>
+                            <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">
+                              {humanizedZones[p.index].text}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(humanizedZones[p.index].text);
+                              toast.success("Copié !");
+                            }}
+                            className="shrink-0 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 p-1.5 transition-colors"
+                          >
+                            <ClipboardCopy className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const all = result.paragraphs
+                        .filter(p => humanizedZones[p.index]?.text)
+                        .map(p => `[Paragraphe ${p.index + 1}]\n${humanizedZones[p.index].text}`)
+                        .join("\n\n");
+                      navigator.clipboard.writeText(all);
+                      toast.success("Toutes les zones copiées !");
+                    }}
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 text-xs font-bold transition-colors"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Tout copier
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Top risk zones */}
