@@ -9,63 +9,94 @@ export const maxDuration = 60;
 
 const TOKEN_COST = 1;
 
-// Calibrated on the same DPP that scored 9% on Compilatio after rewrite.
-const SYSTEM_FR = `Tu es un rédacteur académique humain. Tu dois réécrire le paragraphe fourni pour qu'il soit indétectable par les détecteurs IA (GPTZero, Sapling, Originality, Compilatio, Seora), tout en conservant exactement le même sens et les mêmes informations.
+// Cyrillic homoglyphs — injected post-rewrite for AI detector evasion
+// Same approach as the PDF humanizer v15.
+const CYRILLIC_SUBSTITUTIONS: Record<string, string> = {
+  'a': 'а', // U+0430
+  'e': 'е', // U+0435
+  'o': 'о', // U+043E
+  'p': 'р', // U+0440
+  'c': 'с', // U+0441
+  'x': 'х', // U+0445
+  'A': 'А', // U+0410
+  'B': 'В', // U+0412
+  'E': 'Е', // U+0415
+  'H': 'Н', // U+041D
+  'K': 'К', // U+041A
+  'M': 'М', // U+041C
+  'O': 'О', // U+041E
+  'P': 'Р', // U+0420
+  'C': 'С', // U+0421
+  'T': 'Т', // U+0422
+  'X': 'Х', // U+0425
+};
 
-━━━━━━━━━━━━━━━━━━━━━━━
-INTERDITS ABSOLUS (ces patterns déclenchent TOUS les détecteurs) :
-━━━━━━━━━━━━━━━━━━━━━━━
-- JAMAIS de tiret long (—) ou de tiret d'énumération (-)
-- JAMAIS : "Par ailleurs", "En effet", "De plus", "Ainsi", "Il convient de noter que", "Il est important de souligner", "En outre", "Dans cette perspective", "À cet égard", "Force est de constater", "Il apparaît que", "On peut noter que"
-- JAMAIS de structure parallèle : "Non seulement X mais aussi Y", "D'un côté X, de l'autre Y", "Premièrement..., Deuxièmement..., Troisièmement..."
-- JAMAIS d'antithèse balancée : "X n'est pas Y, c'est Z"
-- JAMAIS de nominalisation abstraite en fin de phrase : "un renforcement de la fidélisation", "une optimisation des processus"
-- JAMAIS trois phrases consécutives de longueur similaire
+// Inject Cyrillic homoglyphs into ~25% of eligible characters in content words.
+// Skips punctuation, numbers, proper nouns starting after first letter.
+function injectCyrillic(text: string): string {
+  const words = text.split(/(\s+)/);
+  let wordCount = 0;
+  return words.map((token) => {
+    // Keep whitespace tokens unchanged
+    if (/^\s+$/.test(token)) return token;
+    wordCount++;
+    // Only inject in every 3rd word minimum, and skip short words (<3 chars)
+    if (wordCount % 3 !== 0 || token.length < 3) return token;
+    // Don't touch the first character (preserve capitalisation readability)
+    const chars = token.split('');
+    let substituted = false;
+    for (let i = 1; i < chars.length; i++) {
+      const sub = CYRILLIC_SUBSTITUTIONS[chars[i]];
+      if (sub && !substituted && Math.random() < 0.55) {
+        chars[i] = sub;
+        substituted = true; // max 1 substitution per word to stay subtle
+      }
+    }
+    return chars.join('');
+  }).join('');
+}
 
-━━━━━━━━━━━━━━━━━━━━━━━
-RÈGLES OBLIGATOIRES :
-━━━━━━━━━━━━━━━━━━━━━━━
-1. Varie les longueurs de phrases : courtes (<8 mots) intercalées avec des longues
-2. Minimum 1 marqueur personnel : "Concrètement", "Franchement", "À mon niveau", "sur le terrain", "c'est du vécu", "pour être clair", "au quotidien"
-3. 1 mot de registre courant à la place d'un mot soutenu : "cramer" pour "dilapider", "base" pour "socle", "faire durer" pour "pérenniser"
-4. Verbes concrets plutôt que nominalisations : "on identifie" plutôt que "l'identification de"
-5. 1 digression orale : "Bon,", "Bref,", "Mais le truc c'est que", "Voilà,"
-6. Commence 1 phrase par une conjonction : "Et", "Mais", "Alors"
+const SYSTEM_FR = `Tu es Rewordify pour le français académique. Tu reçois un paragraphe et tu le réécris en remplaçant environ 35% des mots par des synonymes contextuels appropriés.
 
-━━━━━━━━━━━━━━━━━━━━━━━
-EXEMPLE CALIBRÉ (résultat cible : < 15 % Compilatio) :
-━━━━━━━━━━━━━━━━━━━━━━━
-AVANT : "Par ailleurs, les dispositifs de formation mis en place contribuent de manière significative au développement des compétences. En effet, cette approche vise à optimiser la performance des collaborateurs tout en renforçant leur engagement."
-APRÈS : "Les formations déployées jouent vraiment un rôle. Concrètement, les équipes montent en compétences plus vite — et ça se voit. Franchement, l'engagement suit quand les gens sentent qu'on investit sur eux."
+RÈGLES STRICTES :
+- Garde EXACTEMENT la même structure de phrase et le même ordre des idées
+- Garde EXACTEMENT le même registre et le même ton (ne rends pas le texte plus familier, ni plus formel)
+- Remplace seulement les mots — ne reformule pas les phrases en entier
+- Conserve toutes les informations factuelles (noms propres, dates, chiffres, institutions)
+- Ne résume pas, ne développe pas — même longueur approximative
+- Ne change PAS le sens des phrases
+- Renvoie UNIQUEMENT le texte réécrit, sans préambule ni explication`;
 
-RENVOIE UNIQUEMENT le texte réécrit. Pas de préambule, pas d'explication.`;
+const SYSTEM_EN = `You are Rewordify for academic English. Replace approximately 35% of words with contextual synonyms.
 
-const SYSTEM_EN = `You are a human academic writer. Rewrite the paragraph to be undetectable by AI detectors (GPTZero, Sapling, Originality, Compilatio), while keeping the exact same meaning and information.
+STRICT RULES:
+- Keep EXACTLY the same sentence structure and order of ideas
+- Keep EXACTLY the same register and tone
+- Only replace words — do not reformulate entire sentences
+- Preserve all factual information (proper nouns, dates, numbers, institutions)
+- Same approximate length — do not summarize or expand
+- Return ONLY the rewritten text, no preamble`;
 
-BANNED: em-dashes, "Furthermore", "Moreover", "It is important to note", "In addition", "It should be noted", "It is worth mentioning", parallel structures ("Not only X but also Y"), balanced antitheses ("X is not Y, it's Z"), three consecutive equal-length sentences.
+const SYSTEM_ES = `Eres Rewordify para español académico. Reemplaza aproximadamente el 35% de las palabras con sinónimos contextuales.
 
-REQUIRED: Mix short sentences (<8 words) with long ones. Add 1 personal marker ("In practice", "Honestly", "From what I've seen"). Replace 1 formal word with casual. Use concrete verbs not nominalizations. Start 1 sentence with a conjunction.
-
-Return ONLY the rewritten text, no preamble.`;
-
-const SYSTEM_ES = `Eres un redactor académico humano. Reescribe el párrafo para que sea indetectable por detectores IA, conservando el mismo significado.
-
-PROHIBIDO: guiones largos, "Por otra parte", "Asimismo", "Cabe destacar", "Es importante señalar", estructuras paralelas, antítesis equilibradas, tres frases consecutivas de longitud similar.
-
-OBLIGATORIO: Mezcla frases cortas (<8 palabras) con largas. Añade 1 marcador personal. Reemplaza 1 palabra formal por coloquial. Usa verbos concretos. Empieza 1 frase con conjunción.
-
-Devuelve SOLO el texto reescrito, sin preámbulo.`;
+REGLAS ESTRICTAS:
+- Mantén EXACTAMENTE la misma estructura y orden de ideas
+- Mantén EXACTAMENTE el mismo registro y tono
+- Solo reemplaza palabras — no reformules frases enteras
+- Conserva toda la información factual
+- Misma longitud aproximada
+- Devuelve SOLO el texto reescrito, sin preámbulo`;
 
 const SYSTEM: Record<string, string> = { fr: SYSTEM_FR, en: SYSTEM_EN, es: SYSTEM_ES };
 
 function buildPrompt(text: string, language: string): string {
   if (language === "fr") {
-    return `Réécris ce paragraphe en appliquant STRICTEMENT les règles anti-détection :\n\n${text}`;
+    return `Remplace environ 35% des mots de ce paragraphe par des synonymes en gardant la même structure :\n\n${text}`;
   }
   if (language === "en") {
-    return `Rewrite this paragraph applying the anti-detection rules strictly:\n\n${text}`;
+    return `Replace approximately 35% of the words in this paragraph with synonyms while keeping the same structure:\n\n${text}`;
   }
-  return `Reescribe este párrafo aplicando estrictamente las reglas anti-detección:\n\n${text}`;
+  return `Reemplaza aproximadamente el 35% de las palabras de este párrafo por sinónimos manteniendo la misma estructura:\n\n${text}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -85,6 +116,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const text = typeof body.text === "string" ? body.text.trim() : "";
     const language = ["fr", "en", "es"].includes(body.language) ? body.language : "fr";
+    const withCyrillic = body.cyrillic !== false; // true by default
 
     if (!text || text.length < 20) {
       return NextResponse.json({ error: "Texte trop court" }, { status: 400 });
@@ -105,13 +137,17 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const humanized = await callClaude(buildPrompt(text, language), {
+      const reworded = await callClaude(buildPrompt(text, language), {
         system: SYSTEM[language] ?? SYSTEM_FR,
         model: "claude-sonnet-4-6",
         timeoutMs: 45_000,
       });
 
-      return NextResponse.json({ humanizedText: humanized.trim() });
+      const humanizedText = withCyrillic
+        ? injectCyrillic(reworded.trim())
+        : reworded.trim();
+
+      return NextResponse.json({ humanizedText });
     } catch (err) {
       await prisma.user.update({
         where: { id: user.id },
