@@ -57,7 +57,28 @@ export default function Home() {
   const [companySuggestions, setCompanySuggestions] = useState<string[]>([]);
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
   const [liveCount, setLiveCount] = useState(847);
-  const [activeTab, setActiveTab] = useState<"detect" | "memoire" | "create" | "photo" | "letter">("detect");
+  const [activeTab, setActiveTab] = useState<"detect" | "memoire" | "create" | "photo" | "letter" | "humanize">("detect");
+  const [humanizeInput, setHumanizeInput] = useState("");
+  const [humanizeOutput, setHumanizeOutput] = useState("");
+  const [humanizeLoading, setHumanizeLoading] = useState(false);
+  const [humanizeLang, setHumanizeLang] = useState<"fr" | "en" | "es">("fr");
+  const startHumanize = async () => {
+    if (!humanizeInput.trim() || humanizeInput.length < 50) { toast.error("Texte trop court (min 50 caractères)"); return; }
+    if (!session) { openAuthModal(); return; }
+    setHumanizeLoading(true);
+    setHumanizeOutput("");
+    try {
+      const res = await fetch("/api/humanize/zone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: humanizeInput, language: humanizeLang }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setHumanizeOutput(data.humanizedText ?? "");
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Erreur"); }
+    finally { setHumanizeLoading(false); }
+  };
 
   const topCompanies = [
     "L'Oréal", "LVMH", "TotalEnergies", "Sanofi", "BNP Paribas", "Airbus", "Danone", "Société Générale",
@@ -254,7 +275,8 @@ export default function Home() {
               const TABS = [
                 { id: "detect" as const, label: "Détection IA", shortLabel: "Détection", icon: Search, tokens: "1 token", tokenColor: "bg-violet-100 text-violet-700" },
                 { id: "memoire" as const, label: "Analyse doc", shortLabel: "Doc", icon: Bot, tokens: "3 tokens", tokenColor: "bg-orange-100 text-orange-600" },
-                { id: "create" as const, label: "Mon CV", shortLabel: "CV", icon: Plus, tokens: "", tokenColor: "bg-emerald-100 text-emerald-600" },
+                { id: "humanize" as const, label: "Humaniser", shortLabel: "Humaniser", icon: Sparkles, tokens: "1 token", tokenColor: "bg-emerald-100 text-emerald-600" },
+                { id: "create" as const, label: "Mon CV", shortLabel: "CV", icon: Plus, tokens: "", tokenColor: "bg-gray-100 text-gray-600" },
                 { id: "photo" as const, label: "Photo pro", shortLabel: "Photo", icon: Camera, tokens: "1 token", tokenColor: "bg-pink-100 text-pink-600" },
                 { id: "letter" as const, label: "Lettre motiv.", shortLabel: "Lettre", icon: PenTool, tokens: "3 tokens", tokenColor: "bg-blue-100 text-blue-600" },
               ];
@@ -579,6 +601,83 @@ export default function Home() {
                             </div>
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* === Humaniser (avant/après) === */}
+                  {activeTab === "humanize" && (
+                    <div className="relative rounded-3xl bg-white border-2 border-emerald-200/60 shadow-2xl shadow-emerald-500/[0.06] overflow-hidden transition-[border-color] duration-300 hover:border-emerald-300">
+                      <div className="p-5 sm:p-8">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                            <Sparkles className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900">Humaniser un texte</h3>
+                            <p className="text-xs text-gray-400">Colle un paragraphe, on le réécrit pour passer sous les détecteurs IA</p>
+                          </div>
+                          <span className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-600">1 token</span>
+                        </div>
+
+                        {/* Langue */}
+                        <div className="flex gap-2 mb-4">
+                          {(["fr", "en", "es"] as const).map(l => (
+                            <button key={l} onClick={() => setHumanizeLang(l)}
+                              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${humanizeLang === l ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-500 border-gray-200 hover:border-emerald-400"}`}>
+                              {l === "fr" ? "🇫🇷 FR" : l === "en" ? "🇬🇧 EN" : "🇪🇸 ES"}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Avant / Après split */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                          {/* Avant */}
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1.5">Avant</p>
+                            <textarea
+                              value={humanizeInput}
+                              onChange={e => setHumanizeInput(e.target.value)}
+                              placeholder="Colle ici ton paragraphe à humaniser…"
+                              rows={9}
+                              className="w-full rounded-2xl border-2 border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 placeholder:text-gray-300 focus:outline-none focus:border-emerald-400 resize-none transition-colors"
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">{humanizeInput.length} / 2000 caractères</p>
+                          </div>
+
+                          {/* Après */}
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-bold mb-1.5">Après</p>
+                            <div className={`relative w-full rounded-2xl border-2 p-4 text-sm min-h-[200px] transition-colors ${humanizeOutput ? "border-emerald-300 bg-emerald-50/40 text-gray-800" : "border-dashed border-gray-200 bg-gray-50/50 text-gray-300 italic"}`}>
+                              {humanizeLoading ? (
+                                <div className="flex items-center gap-2 text-emerald-600">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span className="text-sm font-medium">Réécriture en cours…</span>
+                                </div>
+                              ) : humanizeOutput ? (
+                                <>
+                                  <p className="whitespace-pre-wrap leading-relaxed">{humanizeOutput}</p>
+                                  <button
+                                    onClick={() => { navigator.clipboard.writeText(humanizeOutput); toast.success("Copié !"); }}
+                                    className="absolute top-3 right-3 rounded-lg bg-white border border-emerald-200 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                  >
+                                    Copier
+                                  </button>
+                                </>
+                              ) : (
+                                <span>Le texte humanisé apparaîtra ici</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={startHumanize}
+                          disabled={humanizeLoading || humanizeInput.length < 50}
+                          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {humanizeLoading ? <><Loader2 className="h-4 w-4 animate-spin" />Humanisation…</> : <><Sparkles className="h-4 w-4" />Humaniser ce texte — 1 token</>}
+                        </button>
                       </div>
                     </div>
                   )}
