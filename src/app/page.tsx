@@ -59,6 +59,7 @@ export default function Home() {
   const [liveCount, setLiveCount] = useState(847);
   const [activeTab, setActiveTab] = useState<"detect" | "memoire" | "create" | "photo" | "letter" | "humanize">("detect");
   const [detectText, setDetectText] = useState("");
+  const [letterTone, setLetterTone] = useState<"finance" | "startup" | "conseil" | "sante">("finance");
   const [humanizeInput, setHumanizeInput] = useState("");
   const [humanizeOutput, setHumanizeOutput] = useState("");
   const [humanizeLoading, setHumanizeLoading] = useState(false);
@@ -489,11 +490,26 @@ export default function Home() {
                               </div>
                             )}
                           </div>
+                          {/* Sélecteur de ton/secteur */}
+                          <div className="flex flex-wrap gap-2">
+                            {([
+                              { id: "finance" as const, label: "🏦 Banque / Finance" },
+                              { id: "startup" as const, label: "🚀 Startup / Tech" },
+                              { id: "conseil" as const, label: "💼 Conseil" },
+                              { id: "sante" as const, label: "🏥 Santé / Public" },
+                            ]).map(t => (
+                              <button key={t.id} type="button" onClick={() => setLetterTone(t.id)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${letterTone === t.id ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-200 hover:border-blue-400"}`}>
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
                           <button
                             onClick={() => {
                               if (!landingCompany.trim() || !landingJob.trim()) { toast.error("Remplis l'entreprise et l'offre"); return; }
                               sessionStorage.setItem("seora_cl_company", landingCompany);
                               sessionStorage.setItem("seora_cl_job", landingJob);
+                              sessionStorage.setItem("seora_cl_tone", letterTone);
                               if (session) { router.push("/cover-letter"); } else { setResultPreviewType("letter"); setShowResultPreview(true); }
                             }}
                             className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:shadow-lg transition-shadow"

@@ -52,6 +52,7 @@ export default function CoverLetterPage() {
   const [companyName, setCompanyName] = useState("");
   const [companyUrl, setCompanyUrl] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [letterTone, setLetterTone] = useState<"finance" | "startup" | "conseil" | "sante">("finance");
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [researching, setResearching] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -89,12 +90,17 @@ export default function CoverLetterPage() {
     if (hasAutoProcessed.current) return;
     const company = sessionStorage.getItem("seora_cl_company");
     const job = sessionStorage.getItem("seora_cl_job");
+    const tone = sessionStorage.getItem("seora_cl_tone");
     if (company && job) {
       hasAutoProcessed.current = true;
       sessionStorage.removeItem("seora_cl_company");
       sessionStorage.removeItem("seora_cl_job");
+      sessionStorage.removeItem("seora_cl_tone");
       setCompanyName(company);
       setJobDescription(job);
+      if (tone && ["finance", "startup", "conseil", "sante"].includes(tone)) {
+        setLetterTone(tone as "finance" | "startup" | "conseil" | "sante");
+      }
       setActiveTab("generate");
       setPendingAutoGenerate(true);
     }
@@ -162,6 +168,7 @@ export default function CoverLetterPage() {
           jobDescription,
           companyName,
           companyUrl: companyUrl || undefined,
+          tone: letterTone,
         }),
       });
       const data = await res.json();

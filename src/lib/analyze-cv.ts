@@ -225,13 +225,24 @@ Minimum 3 forces et 3 faiblesses. Sois spécifique.`, 2500);
 
 // ===== COVER LETTER GENERATION (avec recherche entreprise) =====
 
+const TONE_INSTRUCTIONS: Record<string, string> = {
+  finance: `TON : Sobre, précis, formel. Pas de superlatifs. Vocabulaire financier/bancaire si pertinent. Structure classique. Montre la rigueur et la fiabilité.`,
+  startup: `TON : Dynamique, direct, enthousiaste (sans excès). Phrases courtes percutantes. Montre l'adaptabilité, l'esprit d'initiative, la culture du résultat. Accroche audacieuse.`,
+  conseil: `TON : Ambitieux, structuré, analytique. Montre la capacité à problématiser. Vocabulaire conseil (impact, valeur ajoutée, parties prenantes). Conclusion orientée résultats mesurables.`,
+  sante: `TON : Sérieux, engagé, humain. Met en avant les valeurs (service public, bien commun, rigueur). Ton professionnel mais chaleureux. Évite le jargon trop technique sauf si le poste l'exige.`,
+};
+
 export async function generateCoverLetter(
   cvText: string,
   jobDescription: string,
   companyName: string,
-  companyInfo: string
+  companyInfo: string,
+  tone: "finance" | "startup" | "conseil" | "sante" = "finance"
 ): Promise<CoverLetterGenerationResult> {
+  const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.finance;
   const text = await generateJSON(`Tu es un expert RH français spécialisé dans la rédaction de lettres de motivation percutantes.
+
+${toneInstruction}
 
 Génère une lettre de motivation personnalisée en utilisant ces informations:
 
@@ -258,7 +269,7 @@ La lettre doit:
 - Avoir une accroche qui capte l'attention (pas "Par la présente...")
 - Être structurée: accroche, motivation, adéquation, conclusion avec call-to-action
 - Sonner authentique, pas robotique
-- Utiliser un ton professionnel mais pas trop formel`);
+- Respecter scrupuleusement le ton demandé`);
 
   return JSON.parse(text);
 }

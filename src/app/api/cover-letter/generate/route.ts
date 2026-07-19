@@ -32,7 +32,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { cvAnalysisId, jobDescription, companyName, companyUrl } = await req.json();
+    const { cvAnalysisId, jobDescription, companyName, companyUrl, tone } = await req.json();
+    const letterTone = (["finance", "startup", "conseil", "sante"].includes(tone) ? tone : "finance") as "finance" | "startup" | "conseil" | "sante";
 
     if (!jobDescription || !companyName) {
       return NextResponse.json(
@@ -83,7 +84,8 @@ Taille: ${companyInfo.size}
         cvText,
         jobDescription,
         companyName,
-        companyInfoText
+        companyInfoText,
+        letterTone
       );
 
       // Save to DB
