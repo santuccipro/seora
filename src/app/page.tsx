@@ -58,6 +58,7 @@ export default function Home() {
   const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
   const [liveCount, setLiveCount] = useState(847);
   const [activeTab, setActiveTab] = useState<"detect" | "memoire" | "create" | "photo" | "letter" | "humanize">("detect");
+  const [detectText, setDetectText] = useState("");
   const [humanizeInput, setHumanizeInput] = useState("");
   const [humanizeOutput, setHumanizeOutput] = useState("");
   const [humanizeLoading, setHumanizeLoading] = useState(false);
@@ -332,8 +333,8 @@ export default function Home() {
                           <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${active.tokenColor}`}>{active.tokens}</span>
                         </div>
                         <textarea
-                          value={landingJob}
-                          onChange={(e) => setLandingJob(e.target.value.slice(0, 10000))}
+                          value={detectText}
+                          onChange={(e) => setDetectText(e.target.value.slice(0, 10000))}
                           placeholder="Colle ici le texte que tu veux vérifier (mémoire, dissertation, article, email...)"
                           rows={6}
                           maxLength={10000}
@@ -341,14 +342,14 @@ export default function Home() {
                         />
                         <div className="mt-2 flex items-center justify-between">
                           <p className="text-[10px] text-gray-500">
-                            {landingJob.length.toLocaleString("fr-FR")} / 10 000 caractères
+                            {detectText.length.toLocaleString("fr-FR")} / 10 000 caractères
                           </p>
                           <p className="text-[10px] text-gray-400">Min. 100 caractères pour lancer</p>
                         </div>
                         <button
                           onClick={() => {
-                            if (landingJob.trim().length < 100) { toast.error("Texte trop court (min. 100 caractères)."); return; }
-                            sessionStorage.setItem("seora_ai_text", landingJob);
+                            if (detectText.trim().length < 100) { toast.error("Texte trop court (min. 100 caractères)."); return; }
+                            sessionStorage.setItem("seora_ai_text", detectText);
                             if (session) { router.push("/ai-detector"); } else { openAuthModal(() => { window.location.href = "/ai-detector"; }); }
                           }}
                           className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-violet-500/25 hover:shadow-lg transition-shadow"
