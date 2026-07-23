@@ -5,7 +5,7 @@ import { callClaude } from "@/lib/claude-client";
 import { briefForClaude, CvSectorKey } from "@/lib/cv-criteria";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -36,7 +36,7 @@ Règles :
     const raw = (await callClaude(prompt, {
       system: "Tu es expert RH et rédaction de CV français. Réponds en français.",
       model: "claude-haiku-4-5",
-      timeoutMs: 20_000,
+      timeoutMs: 55_000,
     })).trim();
 
     const skills = raw
