@@ -706,6 +706,8 @@ export default function CvBuilderPage() {
               setExperiences={(exps) => updateDraft("experiences", exps)}
               polishing={polishing}
               onPolish={polishBullet}
+              sector={draft.sector}
+              targetRole={draft.targetRole}
             />
           )}
 
@@ -811,14 +813,25 @@ function FieldInput({
 
 // ─── Experiences ──────────────────────────────────────────────────────────────
 
+function bulletQuality(text: string): "good" | "warn" | null {
+  const t = text.trim();
+  if (t.length < 20) return null;
+  if (/\d/.test(t)) return "good";
+  return "warn";
+}
+
 function ExperiencesEditor({
-  experiences, setExperiences, polishing, onPolish,
+  experiences, setExperiences, polishing, onPolish, sector, targetRole,
 }: {
   experiences: Experience[];
   setExperiences: (e: Experience[]) => void;
   polishing: string | null;
   onPolish: (expIdx: number, bulletIdx: number) => void;
+  sector: string;
+  targetRole: string;
 }) {
+  const [generating, setGenerating] = useState<string | null>(null);
+
   const add = () =>
     setExperiences([
       ...experiences,
@@ -827,6 +840,25 @@ function ExperiencesEditor({
   const remove = (id: string) => setExperiences(experiences.filter((e) => e.id !== id));
   const update = (id: string, patch: Partial<Experience>) =>
     setExperiences(experiences.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+
+  const generateBullets = async (expId: string, role: string, company: string) => {
+    if (!role.trim()) return;
+    setGenerating(expId);
+    try {
+      const res = await fetch("/api/cv-build/generate-bullets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, company, sector, targetRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur");
+      update(expId, { bullets: data.bullets });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGenerating(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -848,41 +880,72 @@ function ExperiencesEditor({
             </div>
           </div>
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-widest text-gray-500 font-semibold">Missions (bullets)</p>
-            {exp.bullets.map((b, bi) => (
-              <div key={bi} className="flex gap-2">
-                <textarea
-                  value={b}
-                  onChange={(e) => {
-                    const next = [...exp.bullets];
-                    next[bi] = e.target.value;
-                    update(exp.id, { bullets: next });
-                  }}
-                  rows={2}
-                  placeholder="Ex : Réalisé le reporting mensuel du portefeuille clients (30 M€ d'encours)"
-                  className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 resize-none transition-colors"
-                />
-                <div className="flex flex-col gap-1">
-                  <button
-                    onClick={() => onPolish(i, bi)}
-                    disabled={polishing === "bullet"}
-                    className="rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-2.5 py-1.5 text-[10px] font-bold hover:shadow-md transition-shadow disabled:opacity-50"
-                    title="Améliorer avec l'IA"
-                  >
-                    {polishing === "bullet" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const next = exp.bullets.filter((_, x) => x !== bi);
-                      update(exp.id, { bullets: next.length ? next : [""] });
-                    }}
-                    className="rounded-lg bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 px-2.5 py-1.5 text-[10px]"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-widest text-gray-500 font-semibold">Missions (bullets)</p>
+              {exp.title && (
+                <button
+                  type="button"
+                  onClick={() => generateBullets(exp.id, exp.title, exp.company)}
+                  disabled={generating === exp.id}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow hover:shadow-md transition-shadow disabled:opacity-50"
+                >
+                  {generating === exp.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                  {generating === exp.id ? "Génération…" : "Générer avec l'IA"}
+                </button>
+              )}
+            </div>
+            {exp.bullets.map((b, bi) => {
+              const quality = bulletQuality(b);
+              return (
+                <div key={bi}>
+                  <div className="flex gap-2">
+                    <textarea
+                      value={b}
+                      onChange={(e) => {
+                        const next = [...exp.bullets];
+                        next[bi] = e.target.value;
+                        update(exp.id, { bullets: next });
+                      }}
+                      rows={2}
+                      placeholder="Ex : Réalisé le reporting mensuel du portefeuille clients (30 M€ d'encours)"
+                      className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 resize-none transition-colors"
+                    />
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={() => onPolish(i, bi)}
+                        disabled={polishing === "bullet"}
+                        className="rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-2.5 py-1.5 text-[10px] font-bold hover:shadow-md transition-shadow disabled:opacity-50"
+                        title="Améliorer avec l'IA"
+                      >
+                        {polishing === "bullet" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const next = exp.bullets.filter((_, x) => x !== bi);
+                          update(exp.id, { bullets: next.length ? next : [""] });
+                        }}
+                        className="rounded-lg bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 px-2.5 py-1.5 text-[10px]"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                  {quality && (
+                    <div className="mt-1 ml-1">
+                      {quality === "good" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                          ✓ Chiffré
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          ⚠ Ajoute un chiffre ou un %
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <button
               onClick={() => update(exp.id, { bullets: [...exp.bullets, ""] })}
               className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
