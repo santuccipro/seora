@@ -772,6 +772,8 @@ export default function CvBuilderPage() {
               interests={draft.interests}
               setInterests={(i) => updateDraft("interests", i)}
               offerKeywords={draft.offerKeywords}
+              sector={draft.sector}
+              targetRole={draft.targetRole}
             />
           )}
 
@@ -1257,7 +1259,7 @@ function OfferAnalyzer({
 // ─── Skills + Languages ───────────────────────────────────────────────────────
 
 function SkillsLanguagesEditor({
-  skills, setSkills, languages, setLanguages, interests, setInterests, offerKeywords = [],
+  skills, setSkills, languages, setLanguages, interests, setInterests, offerKeywords = [], sector = "", targetRole = "",
 }: {
   skills: string[];
   setSkills: (s: string[]) => void;
@@ -1266,10 +1268,29 @@ function SkillsLanguagesEditor({
   interests: string[];
   setInterests: (i: string[]) => void;
   offerKeywords?: string[];
+  sector?: string;
+  targetRole?: string;
 }) {
   const [skillDraft, setSkillDraft] = useState("");
   const [interestDraft, setInterestDraft] = useState("");
   const [langDraft, setLangDraft] = useState<{ name: string; level: LanguageEntry["level"] }>({ name: "", level: "B2" });
+  const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!sector || suggestionsLoaded) return;
+    setLoadingSuggestions(true);
+    fetch("/api/cv-build/suggest-skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sector, targetRole }),
+    })
+      .then((r) => r.json())
+      .then((data) => { if (data?.skills?.length) setSuggestedSkills(data.skills); })
+      .catch(() => {})
+      .finally(() => { setLoadingSuggestions(false); setSuggestionsLoaded(true); });
+  }, [sector, targetRole, suggestionsLoaded]);
 
   return (
     <div className="space-y-6">
@@ -1277,6 +1298,38 @@ function SkillsLanguagesEditor({
         <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 flex items-center gap-1">
           <Wrench className="h-3 w-3" /> Compétences techniques
         </label>
+        {(loadingSuggestions || suggestedSkills.length > 0) && (
+          <div className="mb-3">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
+              {loadingSuggestions ? "Suggestions en cours…" : "Suggestions pour ton secteur"}
+            </p>
+            {loadingSuggestions ? (
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>L&apos;IA analyse ton profil…</span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {suggestedSkills.filter((s) => !skills.includes(s)).length === 0 ? (
+                  <p className="text-[11px] text-gray-400 italic">Toutes les suggestions sont déjà ajoutées ✓</p>
+                ) : (
+                  suggestedSkills
+                    .filter((s) => !skills.includes(s))
+                    .map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSkills([...skills, s])}
+                        className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 hover:border-violet-300 transition-colors"
+                      >
+                        + {s}
+                      </button>
+                    ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {offerKeywords.filter((kw) => !skills.includes(kw)).length > 0 && (
           <div className="mb-3">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-1.5">
