@@ -359,8 +359,9 @@ export default function CvBuilderPage() {
   );
 
   const polishSummary = async () => {
-    if (!draft.summary.trim()) { toast.error("Écris d'abord ton résumé"); return; }
-    const data = await polishField("summary", { text: draft.summary });
+    const seedText = draft.summary.trim() ||
+      `Candidat : ${draft.firstName || "Prénom"} ${draft.lastName || "Nom"}, poste visé : ${draft.targetRole || "non précisé"}, secteur : ${draft.sector}.`;
+    const data = await polishField("summary", { text: seedText });
     if (data?.text) updateDraft("summary", data.text as string);
   };
 
@@ -499,7 +500,7 @@ export default function CvBuilderPage() {
     1: { icon: User, title: "Tes coordonnées", hint: "Prénom, nom, email, téléphone, ville." },
     2: { icon: Camera, title: "Ta photo", hint: "Facultatif selon ton secteur." },
     3: { icon: Briefcase, title: "Ton secteur et poste visé", hint: "Conditionne le template et les mots-clés du secteur." },
-    4: { icon: Sparkles, title: "Ton accroche pro", hint: "2-3 phrases percutantes. Claude peut repaufiner." },
+    4: { icon: Sparkles, title: "Ton accroche pro", hint: "2-3 phrases percutantes. L'IA peut l'améliorer pour toi." },
     5: { icon: Briefcase, title: "Tes expériences", hint: "Avec impact chiffré. Claude reformule les bullets." },
     6: { icon: GraduationCap, title: "Tes formations", hint: "Diplômes, mentions, années." },
     7: { icon: Wrench, title: "Compétences + langues", hint: "Skills techniques + langues avec niveau CECRL." },
@@ -658,25 +659,44 @@ export default function CvBuilderPage() {
           )}
 
           {step === 4 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* IA generate / improve CTA */}
+              <div className="rounded-2xl bg-gradient-to-r from-pink-50 to-violet-50 border border-pink-100 p-4 flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-violet-600 shadow-sm">
+                  <Wand2 className="h-4 w-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-800">
+                    {draft.summary.trim() ? "L'IA retravaille ton accroche" : "L'IA écrit ton accroche à ta place"}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {draft.summary.trim()
+                      ? "Elle la rend plus percutante, ATS-friendly et adaptée à ton secteur."
+                      : "Clique ci-dessous — elle génère 2-3 phrases pro à partir de ton profil, sans rien écrire."}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-1 italic">
+                    Ex : &quot;Business developer avec 5 ans d&apos;expérience en SaaS B2B. Spécialisé en acquisition grand compte, j&apos;ai dépassé mes objectifs de 35 % en 2023. Orienté résultats, je cherche à rejoindre une scale-up ambitieuse.&quot;
+                  </p>
+                </div>
+                <button
+                  onClick={polishSummary}
+                  disabled={polishing === "summary"}
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 text-white px-4 py-2 text-xs font-bold shadow hover:shadow-md transition-shadow disabled:opacity-50"
+                >
+                  {polishing === "summary" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                  {draft.summary.trim() ? "Améliorer" : "Générer"}
+                </button>
+              </div>
+
+              {/* Textarea */}
               <textarea
                 value={draft.summary}
                 onChange={(e) => updateDraft("summary", e.target.value)}
                 rows={6}
-                placeholder="Ex : Étudiant en Master 2 Finance à Dauphine, alternant en banque privée à la Société Générale, passionné par la gestion de patrimoine..."
-                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 resize-none transition-colors"
+                placeholder="Décris-toi en 2-3 phrases : ton expérience, ta spécialité, et ce que tu apportes. L'IA peut aussi le faire pour toi →"
+                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none focus:border-pink-400 focus:ring-2 focus:ring-pink-100 resize-none transition-colors"
               />
-              <div className="flex justify-between items-center">
-                <p className="text-[11px] text-gray-500">{draft.summary.length} / 500 caractères — min. 40</p>
-                <button
-                  onClick={polishSummary}
-                  disabled={polishing === "summary"}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 py-2 text-xs font-bold hover:shadow-lg transition-shadow disabled:opacity-50"
-                >
-                  {polishing === "summary" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                  Repaufiner avec Claude
-                </button>
-              </div>
+              <p className="text-[11px] text-gray-400">{draft.summary.length} / 500 caractères — min. 40</p>
             </div>
           )}
 
@@ -847,7 +867,7 @@ function ExperiencesEditor({
                     onClick={() => onPolish(i, bi)}
                     disabled={polishing === "bullet"}
                     className="rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-2.5 py-1.5 text-[10px] font-bold hover:shadow-md transition-shadow disabled:opacity-50"
-                    title="Repaufiner avec Claude"
+                    title="Améliorer avec l'IA"
                   >
                     {polishing === "bullet" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
                   </button>
