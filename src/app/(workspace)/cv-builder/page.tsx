@@ -81,6 +81,8 @@ interface CvDraft {
   languages: LanguageEntry[];
   interests: string[];
   customization: Record<string, string | boolean>;
+  offerText: string;
+  offerKeywords: string[];
 }
 
 const EMPTY_DRAFT: CvDraft = {
@@ -101,6 +103,8 @@ const EMPTY_DRAFT: CvDraft = {
   languages: [],
   interests: [],
   customization: {},
+  offerText: "",
+  offerKeywords: [],
 };
 
 const STORAGE_KEY = "seora_cv_builder_draft_v2";
@@ -621,6 +625,16 @@ export default function CvBuilderPage() {
 
           {step === 3 && (
             <div className="space-y-5">
+              <OfferAnalyzer
+                offerText={draft.offerText}
+                offerKeywords={draft.offerKeywords}
+                onResult={(sector, jobTitle, keywords, offerText) => {
+                  updateDraft("sector", sector as CvSectorKey);
+                  updateDraft("targetRole", jobTitle);
+                  updateDraft("offerKeywords", keywords);
+                  updateDraft("offerText", offerText);
+                }}
+              />
               <div>
                 <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 block">Secteur cible *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -690,6 +704,7 @@ export default function CvBuilderPage() {
               setLanguages={(l) => updateDraft("languages", l)}
               interests={draft.interests}
               setInterests={(i) => updateDraft("interests", i)}
+              offerKeywords={draft.offerKeywords}
             />
           )}
 
@@ -914,10 +929,117 @@ function EducationsEditor({
   );
 }
 
+// ─── Offer Analyzer ──────────────────────────────────────────────────────────
+
+function OfferAnalyzer({
+  offerText,
+  offerKeywords,
+  onResult,
+}: {
+  offerText: string;
+  offerKeywords: string[];
+  onResult: (sector: string, jobTitle: string, keywords: string[], offerText: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(offerText);
+  const [analyzing, setAnalyzing] = useState(false);
+  const analyzed = offerKeywords.length > 0;
+
+  const handleAnalyze = async () => {
+    if (!text.trim() || text.length < 50) {
+      toast.error("Colle le texte complet de l'offre (min. 50 caractères)");
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const res = await fetch("/api/cv-build/analyze-offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offerText: text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur d'analyse");
+      onResult(data.sector, data.jobTitle, data.keywords, text);
+      setOpen(false);
+      toast.success("Offre analysée — secteur et poste auto-remplis !");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur d'analyse");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-violet-50/60 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-indigo-50/60 transition-colors"
+      >
+        <span className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 shadow-sm">
+            <Sparkles className="h-4 w-4 text-white" />
+          </span>
+          <span>
+            <span className="block text-sm font-bold text-gray-800">
+              {analyzed ? "Offre analysée ✓" : "Analyser une offre d'emploi"}
+            </span>
+            <span className="block text-[11px] text-gray-500">
+              {analyzed
+                ? `${offerKeywords.length} compétences clés extraites — gratuit`
+                : "Colle l'offre → secteur et mots-clés auto-remplis — gratuit"}
+            </span>
+          </span>
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {analyzed && !open && (
+        <div className="border-t border-indigo-100 px-4 pb-3 pt-2 flex flex-wrap gap-1.5">
+          {offerKeywords.map((kw) => (
+            <span key={kw} className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700">
+              {kw}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="border-t border-indigo-100 px-4 py-4 flex flex-col gap-3">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={6}
+            placeholder="Colle ici le texte complet de l'offre d'emploi (description du poste, missions, profil recherché, compétences requises…)"
+            className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 placeholder-gray-300 focus:border-indigo-400 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={analyzing || !text.trim()}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-bold text-white shadow-md hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {analyzing ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Analyse en cours…</>
+            ) : (
+              <><Sparkles className="h-4 w-4" /> Analyser avec l&apos;IA →</>
+            )}
+          </button>
+          <p className="text-center text-[11px] text-gray-400">
+            Gratuit · Extrait secteur, intitulé de poste et compétences clés · Aucun token débité
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Skills + Languages ───────────────────────────────────────────────────────
 
 function SkillsLanguagesEditor({
-  skills, setSkills, languages, setLanguages, interests, setInterests,
+  skills, setSkills, languages, setLanguages, interests, setInterests, offerKeywords = [],
 }: {
   skills: string[];
   setSkills: (s: string[]) => void;
@@ -925,6 +1047,7 @@ function SkillsLanguagesEditor({
   setLanguages: (l: LanguageEntry[]) => void;
   interests: string[];
   setInterests: (i: string[]) => void;
+  offerKeywords?: string[];
 }) {
   const [skillDraft, setSkillDraft] = useState("");
   const [interestDraft, setInterestDraft] = useState("");
@@ -936,6 +1059,27 @@ function SkillsLanguagesEditor({
         <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 flex items-center gap-1">
           <Wrench className="h-3 w-3" /> Compétences techniques
         </label>
+        {offerKeywords.filter((kw) => !skills.includes(kw)).length > 0 && (
+          <div className="mb-3">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-1.5">
+              Compétences clés de ton offre — clique pour ajouter
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {offerKeywords
+                .filter((kw) => !skills.includes(kw))
+                .map((kw) => (
+                  <button
+                    key={kw}
+                    type="button"
+                    onClick={() => setSkills([...skills, kw])}
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                  >
+                    + {kw}
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
         <div className="flex gap-2 mb-2">
           <input
             value={skillDraft}
