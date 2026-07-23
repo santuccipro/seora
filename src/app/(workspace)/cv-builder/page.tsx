@@ -365,14 +365,14 @@ export default function CvBuilderPage() {
   });
   const goPrev = () => setStep((s) => (Math.max(1, (s - 1) as Step)) as Step);
 
-  const loadPreview = async () => {
+  const loadPreview = async (draftOverride?: CvDraft) => {
     setPreviewLoading(true);
     setPreviewHtml(null);
     try {
       const res = await fetch("/api/cv-build/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(draftOverride ?? draft),
       });
       if (res.ok) {
         const html = await res.text();
@@ -802,6 +802,12 @@ export default function CvBuilderPage() {
               onRefreshPreview={loadPreview}
               onDownload={generatePdf}
               generating={generating}
+              choices={draft.customization}
+              onChoiceChange={(id, value) => {
+                const newDraft = { ...draft, customization: { ...draft.customization, [id]: value } };
+                setDraft(newDraft);
+                loadPreview(newDraft);
+              }}
             />
           )}
         </div>
@@ -1631,6 +1637,140 @@ function CustomizationStep({
   );
 }
 
+// ─── Refinement panel (step 9) ────────────────────────────────────────────────
+
+const ACCENT_SWATCHES = [
+  { value: '#0B2447', label: 'Marine' },
+  { value: '#0D9488', label: 'Teal' },
+  { value: '#7C3AED', label: 'Violet' },
+  { value: '#9B1C1C', label: 'Bordeaux' },
+  { value: '#334155', label: 'Slate' },
+  { value: '#92400E', label: 'Or foncé' },
+];
+
+function RefinementPanel({
+  choices,
+  onChange,
+}: {
+  choices: Record<string, string | boolean>;
+  onChange: (id: string, value: string | boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const cur = (id: string, fallback: string) => (choices[id] as string) ?? fallback;
+
+  return (
+    <div className="rounded-2xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Palette className="h-4 w-4 text-emerald-600" />
+          <span className="text-sm font-bold text-gray-900">Peaufiner votre CV</span>
+          <span className="text-xs text-gray-400 hidden sm:inline">— couleurs, police, photo</span>
+        </div>
+        {open ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-gray-100 px-4 py-4 bg-gray-50 space-y-4">
+          {/* Accent colour */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Couleur principale</p>
+            <div className="flex gap-2.5 flex-wrap">
+              {ACCENT_SWATCHES.map((c) => (
+                <button
+                  key={c.value}
+                  title={c.label}
+                  onClick={() => onChange("accent", c.value)}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${
+                    cur("accent", "#0B2447") === c.value
+                      ? "border-gray-900 scale-110 ring-2 ring-offset-1 ring-gray-400"
+                      : "border-white shadow-sm hover:scale-105"
+                  }`}
+                  style={{ background: c.value }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Font */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Police</p>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: "sans", label: "Sans-serif", desc: "Moderne" },
+                { value: "serif", label: "Serif", desc: "Classique" },
+                { value: "mixed", label: "Mixte", desc: "Prestige" },
+              ].map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => onChange("font", f.value)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                    cur("font", "sans") === f.value
+                      ? "bg-emerald-100 border-emerald-500 text-emerald-900"
+                      : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  {f.label} <span className="text-gray-400 font-normal">· {f.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Photo style */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Photo</p>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: "50%", label: "Ronde" },
+                { value: "8px", label: "Arrondie" },
+                { value: "none", label: "Sans photo" },
+              ].map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => onChange("photoShape", p.value)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                    cur("photoShape", "50%") === p.value
+                      ? "bg-emerald-100 border-emerald-500 text-emerald-900"
+                      : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Density */}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Espacement</p>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: "compact", label: "Compact" },
+                { value: "standard", label: "Standard" },
+                { value: "airy", label: "Aéré" },
+              ].map((d) => (
+                <button
+                  key={d.value}
+                  onClick={() => onChange("density", d.value)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                    cur("density", "standard") === d.value
+                      ? "bg-emerald-100 border-emerald-500 text-emerald-900"
+                      : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Preview step ─────────────────────────────────────────────────────────────
 
 function CvPreview({
@@ -1640,6 +1780,8 @@ function CvPreview({
   onRefreshPreview,
   onDownload,
   generating,
+  choices,
+  onChoiceChange,
 }: {
   draft: CvDraft;
   previewHtml: string | null;
@@ -1647,6 +1789,8 @@ function CvPreview({
   onRefreshPreview: () => void;
   onDownload: () => void;
   generating: boolean;
+  choices: Record<string, string | boolean>;
+  onChoiceChange: (id: string, value: string | boolean) => void;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -1713,6 +1857,8 @@ function CvPreview({
           <p className="text-gray-500 text-xs">{draft.experiences.length} expérience(s) · {draft.educations.length} formation(s) · {draft.skills.length} compétence(s)</p>
         </div>
       </div>
+
+      <RefinementPanel choices={choices} onChange={onChoiceChange} />
 
       <AtsScoreBadge draft={draft} />
 
