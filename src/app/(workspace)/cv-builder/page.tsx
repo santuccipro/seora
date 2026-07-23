@@ -55,6 +55,7 @@ interface Education {
   startDate: string;
   endDate: string;
   mention?: string;
+  project?: string;
 }
 
 interface LanguageEntry {
@@ -108,6 +109,48 @@ const EMPTY_DRAFT: CvDraft = {
 };
 
 const STORAGE_KEY = "seora_cv_builder_draft_v2";
+
+const FRENCH_SCHOOLS: { name: string; city: string }[] = [
+  { name: "HEC Paris", city: "Jouy-en-Josas" },
+  { name: "ESSEC Business School", city: "Cergy" },
+  { name: "ESCP Business School", city: "Paris" },
+  { name: "Sciences Po Paris", city: "Paris" },
+  { name: "École Polytechnique", city: "Palaiseau" },
+  { name: "CentraleSupélec", city: "Gif-sur-Yvette" },
+  { name: "École Normale Supérieure", city: "Paris" },
+  { name: "Mines Paris - PSL", city: "Paris" },
+  { name: "INSA Lyon", city: "Lyon" },
+  { name: "Université Paris-Dauphine", city: "Paris" },
+  { name: "Université Paris-Sorbonne", city: "Paris" },
+  { name: "Université Panthéon-Assas (Paris 2)", city: "Paris" },
+  { name: "IAE Paris - Sorbonne Business School", city: "Paris" },
+  { name: "EMLYON Business School", city: "Lyon" },
+  { name: "Grenoble École de Management", city: "Grenoble" },
+  { name: "KEDGE Business School", city: "Bordeaux" },
+  { name: "SKEMA Business School", city: "Sophia Antipolis" },
+  { name: "EDHEC Business School", city: "Lille" },
+  { name: "Audencia Business School", city: "Nantes" },
+  { name: "Toulouse Business School", city: "Toulouse" },
+  { name: "ICN Business School", city: "Nancy" },
+  { name: "Montpellier Business School", city: "Montpellier" },
+  { name: "NEOMA Business School", city: "Reims" },
+  { name: "ESC Pau", city: "Pau" },
+  { name: "Aix-Marseille Université", city: "Marseille" },
+  { name: "Université de Lyon", city: "Lyon" },
+  { name: "Université de Bordeaux", city: "Bordeaux" },
+  { name: "Université de Strasbourg", city: "Strasbourg" },
+  { name: "Université Grenoble Alpes", city: "Grenoble" },
+  { name: "Université Toulouse III", city: "Toulouse" },
+  { name: "Université de Nantes", city: "Nantes" },
+  { name: "École de Management de Normandie", city: "Caen" },
+  { name: "Excelia Group", city: "La Rochelle" },
+  { name: "IPAG Business School", city: "Paris" },
+  { name: "IESEG School of Management", city: "Lille" },
+  { name: "Université Paris-Saclay", city: "Gif-sur-Yvette" },
+  { name: "Université de Technologie de Compiègne", city: "Compiègne" },
+  { name: "Arts et Métiers ParisTech", city: "Paris" },
+  { name: "ENSTA Paris", city: "Palaiseau" },
+];
 
 // ─── Customization schema (mirrors customize.ts) ─────────────────────────────
 const CUSTOMIZATION_OPTIONS = [
@@ -715,6 +758,8 @@ export default function CvBuilderPage() {
             <EducationsEditor
               educations={draft.educations}
               setEducations={(edu) => updateDraft("educations", edu)}
+              sector={draft.sector}
+              targetRole={draft.targetRole}
             />
           )}
 
@@ -968,11 +1013,15 @@ function ExperiencesEditor({
 // ─── Educations ───────────────────────────────────────────────────────────────
 
 function EducationsEditor({
-  educations, setEducations,
+  educations, setEducations, sector, targetRole,
 }: {
   educations: Education[];
   setEducations: (e: Education[]) => void;
+  sector: string;
+  targetRole: string;
 }) {
+  const [polishingDegree, setPolishingDegree] = useState<string | null>(null);
+
   const add = () =>
     setEducations([
       ...educations,
@@ -982,8 +1031,26 @@ function EducationsEditor({
   const update = (id: string, patch: Partial<Education>) =>
     setEducations(educations.map((e) => (e.id === id ? { ...e, ...patch } : e)));
 
+  const polishDegree = async (eduId: string, degree: string) => {
+    if (!degree.trim()) return;
+    setPolishingDegree(eduId);
+    try {
+      const res = await fetch("/api/cv-build/polish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "diploma", text: degree, sector, targetRole }),
+      });
+      const data = await res.json();
+      if (data?.text) update(eduId, { degree: data.text });
+    } catch { /* silent */ }
+    finally { setPolishingDegree(null); }
+  };
+
   return (
     <div className="space-y-4">
+      <datalist id="schools-datalist">
+        {FRENCH_SCHOOLS.map(s => <option key={s.name} value={s.name} />)}
+      </datalist>
       {educations.map((edu, i) => (
         <div key={edu.id} className="rounded-2xl border border-gray-200 p-4 bg-white">
           <div className="flex items-center justify-between mb-3">
@@ -993,12 +1060,80 @@ function EducationsEditor({
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FieldInput label="Diplôme" value={edu.degree} onChange={(v) => update(edu.id, { degree: v })} placeholder="Master Gestion de Patrimoine" />
-            <FieldInput label="Établissement" value={edu.school} onChange={(v) => update(edu.id, { school: v })} placeholder="Financia Business School" />
+            {/* Diplôme + bouton IA reformulation */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-1.5 block">Diplôme</label>
+                <input
+                  type="text"
+                  value={edu.degree}
+                  onChange={(e) => update(edu.id, { degree: e.target.value })}
+                  placeholder="Master Gestion de Patrimoine"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-colors"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => polishDegree(edu.id, edu.degree)}
+                disabled={polishingDegree === edu.id || !edu.degree.trim()}
+                title="Reformuler avec l'IA"
+                className="shrink-0 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 text-white p-2.5 shadow hover:shadow-md disabled:opacity-40 transition-all mb-0.5"
+              >
+                {polishingDegree === edu.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+            {/* Établissement avec autocomplete */}
+            <div>
+              <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-1.5 block">Établissement</label>
+              <input
+                type="text"
+                list="schools-datalist"
+                value={edu.school}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const match = FRENCH_SCHOOLS.find(s => s.name.toLowerCase() === v.toLowerCase());
+                  update(edu.id, { school: v, ...(match && !edu.location ? { location: match.city } : {}) });
+                }}
+                placeholder="Financia Business School"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-colors"
+              />
+            </div>
             <FieldInput label="Ville" value={edu.location} onChange={(v) => update(edu.id, { location: v })} placeholder="Paris" />
             <FieldInput label="Mention" value={edu.mention ?? ""} onChange={(v) => update(edu.id, { mention: v })} placeholder="Bien / Très Bien" />
             <FieldInput label="Début" value={edu.startDate} onChange={(v) => update(edu.id, { startDate: v })} placeholder="2024" />
             <FieldInput label="Fin" value={edu.endDate} onChange={(v) => update(edu.id, { endDate: v })} placeholder="2026" />
+            {/* Projet / Mémoire optionnel */}
+            {edu.project !== undefined ? (
+              <div className="col-span-1 sm:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold">Projet / Mémoire</label>
+                  <button
+                    type="button"
+                    onClick={() => update(edu.id, { project: undefined })}
+                    className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+                <textarea
+                  value={edu.project}
+                  onChange={(e) => update(edu.id, { project: e.target.value })}
+                  rows={2}
+                  placeholder="Ex : Mémoire sur l'impact ESG dans les fonds d'investissement (note : 17/20)"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none transition-colors"
+                />
+              </div>
+            ) : (
+              <div className="col-span-1 sm:col-span-2">
+                <button
+                  type="button"
+                  onClick={() => update(edu.id, { project: "" })}
+                  className="text-[11px] text-gray-400 hover:text-violet-600 transition-colors"
+                >
+                  + Ajouter un projet / mémoire (optionnel)
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ))}
