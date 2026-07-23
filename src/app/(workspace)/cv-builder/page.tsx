@@ -339,6 +339,10 @@ export default function CvBuilderPage() {
     setDraft((d) => ({ ...d, customization: { ...d.customization, [id]: value } }));
   };
 
+  const applyCustomizationPreset = (preset: Record<string, string | boolean>) => {
+    setDraft((d) => ({ ...d, customization: { ...d.customization, ...preset } }));
+  };
+
   const canGoNext = useMemo(() => {
     switch (step) {
       case 1: return Boolean(draft.firstName && draft.lastName && draft.email);
@@ -681,6 +685,7 @@ export default function CvBuilderPage() {
                   updateDraft("offerText", offerText);
                 }}
               />
+              <AtsScoreBadge draft={draft} />
               <div>
                 <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 block">Secteur cible *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -785,6 +790,7 @@ export default function CvBuilderPage() {
             <CustomizationStep
               choices={draft.customization}
               onChange={setCustomization}
+              onPreset={applyCustomizationPreset}
             />
           )}
 
@@ -858,6 +864,32 @@ function FieldInput({
         placeholder={placeholder}
         className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-colors"
       />
+    </div>
+  );
+}
+
+// ─── ATS Score helper ─────────────────────────────────────────────────────────
+
+function AtsScoreBadge({ draft }: { draft: CvDraft }) {
+  if (!draft.offerKeywords?.length) return null;
+  const fullText = [
+    draft.summary ?? "",
+    ...(draft.experiences ?? []).flatMap(e => e.bullets ?? []),
+    ...(draft.skills ?? []),
+    ...(draft.experiences ?? []).map(e => `${e.title ?? ""} ${e.company ?? ""}`),
+  ].join(" ").toLowerCase();
+  const matched = draft.offerKeywords.filter(kw => fullText.includes(kw.toLowerCase()));
+  const score = Math.round((matched.length / draft.offerKeywords.length) * 100);
+  const color = score >= 70 ? "#059669" : score >= 40 ? "#D97706" : "#DC2626";
+  const bgColor = score >= 70 ? "#ECFDF5" : score >= 40 ? "#FFFBEB" : "#FEF2F2";
+  const borderColor = score >= 70 ? "#A7F3D0" : score >= 40 ? "#FDE68A" : "#FECACA";
+  return (
+    <div style={{ background: bgColor, border: `1px solid ${borderColor}` }} className="mt-3 rounded-xl p-3 flex items-center gap-3">
+      <div style={{ color, fontSize: "1.5rem", fontWeight: 900, lineHeight: 1 }}>{score}%</div>
+      <div>
+        <p style={{ color }} className="text-xs font-bold">Score ATS</p>
+        <p className="text-[11px] text-gray-500">{matched.length} / {draft.offerKeywords.length} mots-clés de l&apos;offre présents dans ton CV</p>
+      </div>
     </div>
   );
 }
@@ -1484,12 +1516,37 @@ function SkillsLanguagesEditor({
 
 // ─── Customization step ───────────────────────────────────────────────────────
 
+const STYLE_PRESETS: { label: string; emoji: string; values: Record<string, string> }[] = [
+  {
+    label: "Classique",
+    emoji: "🎩",
+    values: { accent: "#1A1A2E", font: "serif", background: "#FDFBF7", borderRadius: "0px", photoShape: "50%", density: "standard", nameSize: "18pt", accentUsage: "medium" },
+  },
+  {
+    label: "Moderne",
+    emoji: "✨",
+    values: { accent: "#0F766E", font: "sans", background: "#F9FAFB", borderRadius: "8px", photoShape: "50%", density: "standard", nameSize: "22pt", accentUsage: "medium" },
+  },
+  {
+    label: "Bold",
+    emoji: "🔥",
+    values: { accent: "#EA580C", font: "sans", background: "#ffffff", borderRadius: "20px", photoShape: "4px", density: "airy", nameSize: "28pt", accentUsage: "rich" },
+  },
+  {
+    label: "Minimal",
+    emoji: "🧘",
+    values: { accent: "#111111", font: "sans", background: "#ffffff", borderRadius: "0px", photoShape: "none", density: "compact", nameSize: "18pt", accentUsage: "minimal" },
+  },
+];
+
 function CustomizationStep({
   choices,
   onChange,
+  onPreset,
 }: {
   choices: Record<string, string | boolean>;
   onChange: (id: string, value: string | boolean) => void;
+  onPreset: (preset: Record<string, string | boolean>) => void;
 }) {
   const DEFAULTS: Record<string, string> = {
     accent: "#1A1A2E",
@@ -1504,8 +1561,31 @@ function CustomizationStep({
 
   const get = (id: string) => choices[id] ?? DEFAULTS[id] ?? "";
 
+  const isPresetActive = (preset: Record<string, string>) =>
+    Object.entries(preset).every(([k, v]) => get(k) === v);
+
   return (
     <div className="space-y-6">
+      {/* Style rapide presets */}
+      <div>
+        <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 block">Style rapide</label>
+        <div className="flex flex-wrap gap-2">
+          {STYLE_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => onPreset(p.values)}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                isPresetActive(p.values)
+                  ? "bg-emerald-100 border-emerald-500 text-emerald-900"
+                  : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              {p.emoji} {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
       {CUSTOMIZATION_OPTIONS.map((opt) => (
         <div key={opt.id}>
           <label className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 block">{opt.label}</label>
@@ -1633,6 +1713,8 @@ function CvPreview({
           <p className="text-gray-500 text-xs">{draft.experiences.length} expérience(s) · {draft.educations.length} formation(s) · {draft.skills.length} compétence(s)</p>
         </div>
       </div>
+
+      <AtsScoreBadge draft={draft} />
 
       <button
         onClick={onDownload}
