@@ -79,6 +79,7 @@ interface CvDraft {
   experiences: Experience[];
   educations: Education[];
   skills: string[];
+  skillLevels: Record<string, string>;
   languages: LanguageEntry[];
   interests: string[];
   customization: Record<string, string | boolean>;
@@ -101,6 +102,7 @@ const EMPTY_DRAFT: CvDraft = {
   experiences: [],
   educations: [],
   skills: [],
+  skillLevels: {},
   languages: [],
   interests: [],
   customization: {},
@@ -767,6 +769,8 @@ export default function CvBuilderPage() {
             <SkillsLanguagesEditor
               skills={draft.skills}
               setSkills={(s) => updateDraft("skills", s)}
+              skillLevels={draft.skillLevels}
+              setSkillLevels={(sl) => updateDraft("skillLevels", sl)}
               languages={draft.languages}
               setLanguages={(l) => updateDraft("languages", l)}
               interests={draft.interests}
@@ -1259,10 +1263,12 @@ function OfferAnalyzer({
 // ─── Skills + Languages ───────────────────────────────────────────────────────
 
 function SkillsLanguagesEditor({
-  skills, setSkills, languages, setLanguages, interests, setInterests, offerKeywords = [], sector = "", targetRole = "",
+  skills, setSkills, skillLevels = {}, setSkillLevels, languages, setLanguages, interests, setInterests, offerKeywords = [], sector = "", targetRole = "",
 }: {
   skills: string[];
   setSkills: (s: string[]) => void;
+  skillLevels?: Record<string, string>;
+  setSkillLevels?: (sl: Record<string, string>) => void;
   languages: LanguageEntry[];
   setLanguages: (l: LanguageEntry[]) => void;
   interests: string[];
@@ -1292,6 +1298,11 @@ function SkillsLanguagesEditor({
       .finally(() => { setLoadingSuggestions(false); setSuggestionsLoaded(true); });
   }, [sector, targetRole, suggestionsLoaded]);
 
+  const refreshSuggestions = () => {
+    setSuggestedSkills([]);
+    setSuggestionsLoaded(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -1300,9 +1311,16 @@ function SkillsLanguagesEditor({
         </label>
         {(loadingSuggestions || suggestedSkills.length > 0) && (
           <div className="mb-3">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
-              {loadingSuggestions ? "Suggestions en cours…" : "Suggestions pour ton secteur"}
-            </p>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                {loadingSuggestions ? "Suggestions en cours…" : "Suggestions pour ton secteur"}
+              </p>
+              {!loadingSuggestions && suggestionsLoaded && (
+                <button type="button" onClick={refreshSuggestions} title="Regénérer les suggestions" className="text-gray-400 hover:text-violet-600 transition-colors">
+                  <RefreshCw className="h-3 w-3" />
+                </button>
+              )}
+            </div>
             {loadingSuggestions ? (
               <div className="flex items-center gap-2 text-xs text-gray-400">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -1369,12 +1387,24 @@ function SkillsLanguagesEditor({
           </button>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {skills.map((s, i) => (
-            <span key={i} className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 rounded-full px-3 py-1 text-xs font-medium">
-              {s}
-              <button onClick={() => setSkills(skills.filter((_, x) => x !== i))} className="hover:text-emerald-950">×</button>
-            </span>
-          ))}
+          {skills.map((s, i) => {
+            const level = skillLevels[s] ?? "intermédiaire";
+            const dots = level === "avancé" ? "●●●" : level === "intermédiaire" ? "●●○" : "●○○";
+            const cycleLevel = () => {
+              if (!setSkillLevels) return;
+              const next = level === "débutant" ? "intermédiaire" : level === "intermédiaire" ? "avancé" : "débutant";
+              setSkillLevels({ ...skillLevels, [s]: next });
+            };
+            return (
+              <span key={i} className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full px-2.5 py-1 text-xs font-medium">
+                {s}
+                <button type="button" onClick={cycleLevel} title={`Niveau : ${level} — cliquer pour changer`} className="ml-0.5 text-[9px] text-emerald-500 hover:text-emerald-700 transition-colors font-mono tracking-tighter">
+                  {dots}
+                </button>
+                <button type="button" onClick={() => { setSkills(skills.filter((_, x) => x !== i)); if (setSkillLevels) { const nl = { ...skillLevels }; delete nl[s]; setSkillLevels(nl); } }} className="ml-0.5 text-emerald-400 hover:text-red-500 transition-colors text-xs leading-none">×</button>
+              </span>
+            );
+          })}
         </div>
       </div>
 
