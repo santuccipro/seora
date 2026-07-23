@@ -501,7 +501,7 @@ export default function CvBuilderPage() {
     2: { icon: Camera, title: "Ta photo", hint: "Facultatif selon ton secteur." },
     3: { icon: Briefcase, title: "Ton secteur et poste visé", hint: "Conditionne le template et les mots-clés du secteur." },
     4: { icon: Sparkles, title: "Ton accroche pro", hint: "2-3 phrases percutantes. L'IA peut l'améliorer pour toi." },
-    5: { icon: Briefcase, title: "Tes expériences", hint: "Avec impact chiffré. Claude reformule les bullets." },
+    5: { icon: Briefcase, title: "Tes expériences", hint: "Avec impact chiffré. L'IA reformule les bullets." },
     6: { icon: GraduationCap, title: "Tes formations", hint: "Diplômes, mentions, années." },
     7: { icon: Wrench, title: "Compétences + langues", hint: "Skills techniques + langues avec niveau CECRL." },
     8: { icon: Palette, title: "Personnalise ton CV", hint: "Couleur, police, fond, bords, densité — à toi de jouer." },
@@ -1363,7 +1363,7 @@ function CvPreview({
       </button>
       <div className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
         <Check className="h-3 w-3 text-emerald-500" />
-        Template adapté à ton secteur · Claude a retravaillé chaque ligne · Prêt à envoyer
+        Template adapté à ton secteur · L'IA a retravaillé chaque ligne · Prêt à envoyer
       </div>
 
       {/* Cross-link cover letter */}
