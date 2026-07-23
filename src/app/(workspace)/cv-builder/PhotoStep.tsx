@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -19,7 +18,6 @@ import {
   X,
   ZoomIn,
 } from "lucide-react";
-import { PHOTO_STYLES, type PhotoStyle } from "@/lib/photo-styles";
 
 // ─── Canvas crop helper ─────────────────────────────────────────────────────
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<string> {
@@ -69,12 +67,57 @@ async function toSafeDataUrl(src: string): Promise<string> {
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
-const GENERATING_STEPS = [
-  "Analyse du style sélectionné...",
-  "Traitement de ta photo...",
-  "Transformation professionnelle en cours...",
-  "Application de l'éclairage studio...",
-  "Finalisation HD...",
+// ─── Photo Pro IA types & options ───────────────────────────────────────────
+type PhotoFond = "neutre" | "blanc" | "sombre" | "nature" | "bureau" | "colore";
+type PhotoTonalite = "classique" | "chaleureux" | "decontracte" | "dynamique";
+type PhotoPose = "face" | "trois_quarts" | "bras_croises";
+type PhotoExpression = "souriant" | "neutre" | "serieux" | "confiant";
+type PhotoTenue = "costume_noir" | "costume_gris" | "costume_bleu" | "chemise_blanche" | "polo" | "decontracte";
+
+const FOND_OPTIONS: { id: PhotoFond; label: string; desc: string }[] = [
+  { id: "neutre", label: "Gris neutre", desc: "LinkedIn" },
+  { id: "blanc", label: "Blanc épuré", desc: "Studio" },
+  { id: "sombre", label: "Sombre", desc: "Premium" },
+  { id: "nature", label: "Nature", desc: "Outdoor" },
+  { id: "bureau", label: "Bureau", desc: "Open space" },
+  { id: "colore", label: "Coloré", desc: "Créatif" },
+];
+
+const TONALITE_OPTIONS: { id: PhotoTonalite; label: string; desc: string }[] = [
+  { id: "classique", label: "Classique", desc: "Sérieux · corporate" },
+  { id: "chaleureux", label: "Chaleureux", desc: "Souriant · accueillant" },
+  { id: "decontracte", label: "Décontracté", desc: "Casual · startup" },
+  { id: "dynamique", label: "Dynamique", desc: "Impactant · énergique" },
+];
+
+const POSE_OPTIONS: { id: PhotoPose; label: string; desc: string }[] = [
+  { id: "face", label: "Face caméra", desc: "Classique frontale" },
+  { id: "trois_quarts", label: "3/4 tourné", desc: "Légèrement de côté" },
+  { id: "bras_croises", label: "Bras croisés", desc: "Posture de confiance" },
+];
+
+const EXPRESSION_OPTIONS: { id: PhotoExpression; label: string; desc: string }[] = [
+  { id: "souriant", label: "Souriant", desc: "Sourire chaleureux" },
+  { id: "neutre", label: "Neutre", desc: "Expression naturelle" },
+  { id: "serieux", label: "Sérieux", desc: "Regard direct, fort" },
+  { id: "confiant", label: "Confiant", desc: "Léger sourire, charisme" },
+];
+
+const TENUE_OPTIONS: { id: PhotoTenue; label: string; desc: string }[] = [
+  { id: "costume_noir", label: "Costume noir", desc: "Executive · banque" },
+  { id: "costume_gris", label: "Costume gris", desc: "Corporate classique" },
+  { id: "costume_bleu", label: "Costume bleu", desc: "Business formel" },
+  { id: "chemise_blanche", label: "Chemise blanche", desc: "Smart casual" },
+  { id: "polo", label: "Polo", desc: "Casual pro" },
+  { id: "decontracte", label: "Décontracté", desc: "Startup · créatif" },
+];
+
+const AI_LOADING_MSGS = [
+  "Génération en cours… chaque photo est unique",
+  "L'IA personnalise chaque photo avec ton style…",
+  "4 photos haute qualité en cours…",
+  "Tes photos arrivent bientôt…",
+  "Finalisation…",
 ];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -84,7 +127,6 @@ interface Props {
 }
 
 type Mode = "idle" | "cropping" | "done";
-type AiWizardStep = "pick-style" | "upload" | "result";
 
 interface PhotoGeneration {
   id: string;
@@ -108,18 +150,30 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
 
   // AI accordion state
   const [aiOpen, setAiOpen] = useState(false);
-  const [aiWizardStep, setAiWizardStep] = useState<AiWizardStep>("pick-style");
-  const [aiSelectedStyle, setAiSelectedStyle] = useState<PhotoStyle | null>(null);
   const [aiSelfie, setAiSelfie] = useState<string | null>(null);
+  const [aiSelfieFile, setAiSelfieFile] = useState<File | null>(null);
+  const [aiDragOver, setAiDragOver] = useState(false);
+  const aiSelfieRef = useRef<HTMLInputElement>(null);
+
+  // Photo Pro IA criteria
+  const [photoFond, setPhotoFond] = useState<PhotoFond>("neutre");
+  const [photoTonalite, setPhotoTonalite] = useState<PhotoTonalite>("classique");
+  const [photoPose, setPhotoPose] = useState<PhotoPose>("face");
+  const [photoExpression, setPhotoExpression] = useState<PhotoExpression>("neutre");
+  const [photoTenue, setPhotoTenue] = useState<PhotoTenue>("costume_noir");
+  const [photoNotes, setPhotoNotes] = useState("");
+
+  // AI generation state
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiGenStepIndex, setAiGenStepIndex] = useState(0);
-  const [aiResultUrl, setAiResultUrl] = useState<string | null>(null);
+  const [aiProgress, setAiProgress] = useState(0);
+  const [aiProgressMsg, setAiProgressMsg] = useState(0);
+  const [aiResultUrls, setAiResultUrls] = useState<string[] | null>(null);
 
   // Gallery state
   const [gallery, setGallery] = useState<PhotoGeneration[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(true);
 
-  // ── Load the user's past AI generations on mount ──
+  // ── Load past AI generations on mount ──
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -134,12 +188,10 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
         if (!cancelled) setGalleryLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  // ── Enter crop mode with any image source ──
+  // ── Enter crop mode ──
   const startCropping = useCallback(
     async (src: string) => {
       setCropLoading(true);
@@ -170,10 +222,7 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
         return;
       }
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const src = e.target?.result as string;
-        void startCropping(src);
-      };
+      reader.onload = (e) => { void startCropping(e.target?.result as string); };
       reader.readAsDataURL(f);
     },
     [startCropping],
@@ -191,36 +240,7 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
     noKeyboard: true,
   });
 
-  // ── AI selfie drop zone ──
-  const onAiSelfieDrop = useCallback((files: File[]) => {
-    const f = files[0];
-    if (!f) return;
-    if (f.size > 5 * 1024 * 1024) {
-      toast.error("Réduis la taille de ta photo (max 5 Mo)");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => setAiSelfie(e.target?.result as string);
-    reader.readAsDataURL(f);
-  }, []);
-
-  const {
-    getRootProps: getAiRootProps,
-    getInputProps: getAiInputProps,
-    isDragActive: isAiDragActive,
-  } = useDropzone({
-    onDrop: onAiSelfieDrop,
-    accept: {
-      "image/jpeg": [".jpg", ".jpeg"],
-      "image/png": [".png"],
-      "image/webp": [".webp"],
-      "image/heic": [".heic"],
-    },
-    maxFiles: 1,
-    multiple: false,
-  });
-
-  // ── Confirm crop → produce data URL and commit ──
+  // ── Confirm crop ──
   const confirmCrop = async () => {
     if (!rawSrc || !croppedAreaPixels) return;
     setConfirming(true);
@@ -240,47 +260,71 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
     setMode(photoUrl ? "done" : "idle");
   };
 
-  // ── Reset AI wizard ──
-  const resetAiWizard = () => {
-    setAiWizardStep("pick-style");
-    setAiSelectedStyle(null);
-    setAiSelfie(null);
-    setAiResultUrl(null);
-    setAiGenStepIndex(0);
+  // ── AI selfie file handler ──
+  const handleAiSelfieFile = (file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error("Format non supporté"); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error("Image trop lourde (max 10 Mo)"); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => setAiSelfie(e.target?.result as string);
+    reader.readAsDataURL(file);
+    setAiSelfieFile(file);
   };
 
-  // ── AI: generate → route result through crop modal ──
-  const handleAiGenerate = async () => {
-    if (!aiSelfie || !aiSelectedStyle) return;
-    setAiGenerating(true);
-    setAiGenStepIndex(0);
+  // ── Reset AI wizard ──
+  const resetAiWizard = () => {
+    setAiSelfie(null);
+    setAiSelfieFile(null);
+    setPhotoFond("neutre");
+    setPhotoTonalite("classique");
+    setPhotoPose("face");
+    setPhotoExpression("neutre");
+    setPhotoTenue("costume_noir");
+    setPhotoNotes("");
+    setAiProgress(0);
+    setAiResultUrls(null);
+  };
 
-    const stepInterval = setInterval(() => {
-      setAiGenStepIndex((prev) =>
-        prev < GENERATING_STEPS.length - 1 ? prev + 1 : prev,
-      );
-    }, 8000);
+  // ── AI generate via Photo Pro IA API ──
+  const handleAiGenerate = async () => {
+    if (!aiSelfieFile) return;
+    setAiGenerating(true);
+    setAiProgress(0);
+    setAiProgressMsg(0);
+    setAiResultUrls(null);
+
+    const start = Date.now();
+    const progIv = setInterval(() => {
+      const elapsed = Date.now() - start;
+      setAiProgress(() => {
+        if (elapsed < 44000) return (elapsed / 44000) * 85;
+        return Math.min(98, (elapsed - 44000) * 0.04 / 300 + 85);
+      });
+    }, 300);
+    const msgIv = setInterval(() => setAiProgressMsg((p) => (p + 1) % AI_LOADING_MSGS.length), 4000);
 
     try {
-      const res = await fetch("/api/photo-studio/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photo: aiSelfie, styleKey: aiSelectedStyle.key }),
-      });
+      const fd = new FormData();
+      fd.append("photo", aiSelfieFile);
+      fd.append("fond", photoFond);
+      fd.append("tonalite", photoTonalite);
+      fd.append("pose", photoPose);
+      fd.append("expression", photoExpression);
+      fd.append("tenue", photoTenue);
+      if (photoNotes.trim()) fd.append("notes", photoNotes.trim());
+
+      const res = await fetch("/api/photo-pro", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
-      if (res.status === 403) {
-        toast.error(data.error || "Pas assez de tokens");
-        return;
-      }
-      if (!res.ok || !data.resultUrl) {
-        throw new Error(data.error || "Erreur de génération");
-      }
-      setAiResultUrl(data.resultUrl as string);
-      setAiWizardStep("result");
+      if (res.status === 403) { toast.error(data.error || "Pas assez de tokens"); return; }
+      if (!res.ok) throw new Error(data.error || "Erreur de génération");
+      setAiProgress(100);
+      setTimeout(() => setAiResultUrls(data.urls ?? []), 400);
+      toast.success("Photos générées !");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur de génération");
+      setAiProgress(0);
     } finally {
-      clearInterval(stepInterval);
+      clearInterval(progIv);
+      clearInterval(msgIv);
       setAiGenerating(false);
     }
   };
@@ -330,13 +374,9 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 py-3 text-sm font-bold text-white shadow-md transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
           >
             {confirming ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Recadrage…
-              </>
+              <><Loader2 className="h-4 w-4 animate-spin" /> Recadrage…</>
             ) : (
-              <>
-                <Check className="h-4 w-4" /> Valider le recadrage
-              </>
+              <><Check className="h-4 w-4" /> Valider le recadrage</>
             )}
           </button>
           <button
@@ -377,20 +417,14 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setRawSrc(null);
-              setMode("idle");
-            }}
+            onClick={() => { setRawSrc(null); setMode("idle"); }}
             className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50"
           >
             <RotateCcw className="h-3.5 w-3.5" /> Changer
           </button>
           <button
             type="button"
-            onClick={() => {
-              onPhotoChange(null);
-              setMode("idle");
-            }}
+            onClick={() => { onPhotoChange(null); setMode("idle"); }}
             className="inline-flex items-center gap-1.5 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
           >
             <X className="h-3.5 w-3.5" /> Supprimer
@@ -410,10 +444,7 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            open();
-          }
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
         }}
         className={`relative flex cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-10 transition-all ${
           isDragActive
@@ -467,254 +498,289 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
 
         {aiOpen && (
           <>
-            {/* ── Wizard step: pick-style ── */}
-            {aiWizardStep === "pick-style" && (
+            {/* ── Generating overlay ── */}
+            {aiGenerating && (
               <div className="border-t border-pink-100 px-4 py-4">
-                <p className="mb-4 text-sm font-semibold text-gray-700">
-                  Choisis ton secteur professionnel
-                </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {PHOTO_STYLES.map((style) => (
+                <div className="rounded-2xl border border-gray-100 bg-white p-5">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-500">
+                      <Sparkles className="h-4 w-4 animate-pulse text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">Génération IA en cours</p>
+                      <p className="text-xs text-gray-400">4 photos haute qualité · ~45 secondes</p>
+                    </div>
+                    <span className="ml-auto text-sm font-bold text-pink-600">
+                      {Math.round(aiProgress)}%
+                    </span>
+                  </div>
+                  <div className="mb-4">
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-pink-400 to-rose-500 transition-all duration-300"
+                        style={{ width: `${aiProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center rounded-xl border border-pink-200 bg-pink-50 px-3 py-2">
+                    <p className="text-center text-sm font-medium text-pink-700">
+                      {AI_LOADING_MSGS[aiProgressMsg]}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Result: 2×2 grid ── */}
+            {!aiGenerating && aiResultUrls && (
+              <div className="flex flex-col gap-3 border-t border-pink-100 px-4 py-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <p className="text-sm font-bold text-gray-900">
+                    {aiResultUrls.length} photo{aiResultUrls.length > 1 ? "s" : ""} générée{aiResultUrls.length > 1 ? "s" : ""} — clique pour importer
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {aiResultUrls.map((url, i) => (
                     <button
-                      key={style.key}
+                      key={i}
                       type="button"
                       onClick={() => {
-                        setAiSelectedStyle(style);
-                        setAiWizardStep("upload");
+                        setAiOpen(false);
+                        resetAiWizard();
+                        void startCropping(url);
                       }}
-                      className="group relative overflow-hidden rounded-2xl text-left transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                      style={{ background: style.bgGradient }}
+                      className="group relative aspect-square overflow-hidden rounded-2xl border-2 border-transparent bg-gray-100 transition-all hover:border-emerald-400 hover:ring-2 hover:ring-emerald-200"
                     >
-                      <div className="p-4 pb-5">
-                        <div className="mb-3 text-3xl leading-none">{style.emoji}</div>
-                        <p className="mb-1 text-sm font-bold leading-tight text-white">
-                          {style.label}
-                        </p>
-                        <p className="line-clamp-2 text-[11px] leading-snug text-white/70">
-                          {style.description}
-                        </p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-emerald-600/20">
+                        <div className="rounded-full bg-white p-1.5 opacity-0 shadow transition-opacity group-hover:opacity-100">
+                          <Check className="h-4 w-4 text-emerald-600" />
+                        </div>
                       </div>
-                      <div className="absolute inset-0 rounded-2xl bg-white/0 transition-colors group-hover:bg-white/10" />
+                      <div className="absolute left-1.5 top-1.5 rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-bold text-gray-700">
+                        #{i + 1}
+                      </div>
                     </button>
                   ))}
                 </div>
-                <p className="mt-4 text-center text-xs text-gray-400">
-                  10 styles · Génération IA · Portrait HD
-                </p>
-              </div>
-            )}
-
-            {/* ── Wizard step: upload ── */}
-            {aiWizardStep === "upload" && (
-              <div className="flex flex-col gap-4 border-t border-pink-100 px-4 py-4">
                 <button
                   type="button"
-                  onClick={() => {
-                    setAiWizardStep("pick-style");
-                    setAiSelfie(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-900"
+                  onClick={() => { setAiResultUrls(null); setAiSelfie(null); setAiSelfieFile(null); }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50"
                 >
-                  <ArrowLeft className="h-4 w-4" />
-                  Changer de style
+                  <RotateCcw className="h-3.5 w-3.5" /> Générer un nouveau set
                 </button>
-
-                {aiSelectedStyle && (
-                  <div
-                    className="flex items-center gap-4 rounded-2xl p-4"
-                    style={{ background: aiSelectedStyle.bgGradient }}
-                  >
-                    <div className="text-4xl leading-none">{aiSelectedStyle.emoji}</div>
-                    <div>
-                      <p className="text-base font-bold text-white">{aiSelectedStyle.label}</p>
-                      <p className="mt-0.5 text-xs text-white/70">{aiSelectedStyle.description}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAiWizardStep("pick-style")}
-                      className="ml-auto text-[11px] font-semibold text-white/80 underline underline-offset-2 transition-colors hover:text-white"
-                    >
-                      Changer
-                    </button>
-                  </div>
-                )}
-
-                {aiGenerating && (
-                  <div className="rounded-2xl border border-gray-100 bg-white p-6">
-                    <div className="flex flex-col items-center">
-                      <div className="relative mb-4">
-                        <div
-                          className="flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg"
-                          style={{ background: aiSelectedStyle?.bgGradient }}
-                        >
-                          <span className="text-3xl">{aiSelectedStyle?.emoji}</span>
-                        </div>
-                        <div
-                          className="absolute -inset-3 animate-spin rounded-3xl border-2 border-indigo-300/40"
-                          style={{ borderStyle: "dashed", animationDuration: "3s" }}
-                        />
-                      </div>
-                      <div className="mb-2 flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
-                        <p className="text-sm font-semibold text-gray-800">
-                          {GENERATING_STEPS[aiGenStepIndex]}
-                        </p>
-                      </div>
-                      <p className="text-xs text-gray-400">Cela prend en général 1 à 3 minutes</p>
-                      <div className="mt-3 flex gap-1.5">
-                        {GENERATING_STEPS.map((_, i) => (
-                          <div
-                            key={i}
-                            className={`h-1.5 rounded-full transition-all duration-500 ${
-                              i <= aiGenStepIndex ? "w-6 bg-indigo-500" : "w-1.5 bg-gray-200"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {!aiGenerating && (
-                  <div className="rounded-2xl border border-gray-100 bg-white p-5">
-                    {aiSelfie ? (
-                      <div className="flex flex-col items-center gap-4">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={aiSelfie}
-                          alt="Ta photo"
-                          className="h-32 w-32 rounded-full object-cover shadow-xl ring-4 ring-indigo-100"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setAiSelfie(null)}
-                          className="text-xs font-semibold text-gray-500 underline underline-offset-2 transition-colors hover:text-gray-900"
-                        >
-                          Changer de photo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleAiGenerate}
-                          disabled={aiGenerating}
-                          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3.5 text-sm font-bold text-white shadow-md transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Sparkles className="h-4 w-4" />
-                          Générer ma photo pro
-                        </button>
-                        <p className="text-[11px] text-gray-400">
-                          Génération IA haute qualité · portrait 1:1
-                        </p>
-                      </div>
-                    ) : (
-                      <div
-                        {...getAiRootProps()}
-                        className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-10 transition-colors ${
-                          isAiDragActive
-                            ? "border-indigo-500 bg-indigo-50/60"
-                            : "border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/30"
-                        }`}
-                      >
-                        <input {...getAiInputProps()} />
-                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100">
-                          <Upload className="h-5 w-5 text-indigo-600" />
-                        </div>
-                        <p className="mb-1 text-base font-bold text-gray-900">
-                          {isAiDragActive ? "Lâche ton selfie ici" : "Glisse ton selfie ici"}
-                        </p>
-                        <p className="mb-4 text-xs text-gray-500">
-                          JPG, PNG, WEBP ou HEIC · Max 5 Mo
-                        </p>
-                        <div className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-shadow hover:shadow-lg">
-                          Parcourir mes fichiers
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!aiGenerating && (
-                  <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                    <p className="mb-2 flex items-center gap-2 text-xs font-bold text-gray-900">
-                      <CheckCircle2 className="h-4 w-4 text-indigo-500" />
-                      Conseils pour un meilleur résultat
-                    </p>
-                    <ul className="space-y-1.5 text-xs text-gray-600">
-                      <li className="flex items-start gap-2">
-                        <span className="mt-0.5 font-bold text-indigo-500">1.</span>
-                        Prends ta photo avec un bon éclairage naturel ou face à une lampe
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="mt-0.5 font-bold text-indigo-500">2.</span>
-                        Opte pour un fond neutre (mur blanc, porte…) derrière toi
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="mt-0.5 font-bold text-indigo-500">3.</span>
-                        Ton visage doit être bien dégagé, cadré de face
-                      </li>
-                    </ul>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* ── Wizard step: result ── */}
-            {aiWizardStep === "result" && (
-              <div className="flex flex-col gap-4 border-t border-pink-100 px-4 py-4">
-                <div className="text-center">
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-1.5">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-bold text-green-700">
-                      Photo générée avec succès !
-                    </span>
+            {/* ── Selfie dropzone (no selfie yet) ── */}
+            {!aiGenerating && !aiResultUrls && !aiSelfie && (
+              <div className="border-t border-pink-100 px-4 py-4">
+                <input
+                  ref={aiSelfieRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAiSelfieFile(f); }}
+                />
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setAiDragOver(true); }}
+                  onDragLeave={() => setAiDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setAiDragOver(false);
+                    const f = e.dataTransfer.files[0];
+                    if (f) handleAiSelfieFile(f);
+                  }}
+                  onClick={() => aiSelfieRef.current?.click()}
+                  className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-10 transition-colors ${
+                    aiDragOver
+                      ? "border-pink-500 bg-pink-50/60"
+                      : "border-pink-200 hover:border-pink-400 hover:bg-pink-50/30"
+                  }`}
+                >
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-100">
+                    <Upload className="h-5 w-5 text-pink-600" />
+                  </div>
+                  <p className="mb-1 text-base font-bold text-gray-900">
+                    {aiDragOver ? "Lâche ton selfie ici" : "Glisse ton selfie ici"}
+                  </p>
+                  <p className="mb-4 text-xs text-gray-500">JPG, PNG, HEIC ou WEBP · Max 10 Mo</p>
+                  <div className="rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md">
+                    Parcourir mes fichiers
                   </div>
                 </div>
-                {aiResultUrl && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={aiResultUrl}
-                    alt="Photo pro générée"
-                    className="mx-auto h-40 w-40 rounded-full object-cover shadow-xl ring-4 ring-indigo-100"
-                  />
-                )}
-                <div className="space-y-2.5">
+              </div>
+            )}
+
+            {/* ── Criteria pickers (selfie uploaded) ── */}
+            {!aiGenerating && !aiResultUrls && aiSelfie && (
+              <div className="flex flex-col gap-3 border-t border-pink-100 px-4 py-4">
+                <input
+                  ref={aiSelfieRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAiSelfieFile(f); }}
+                />
+
+                {/* Selfie preview */}
+                <div className="flex items-center gap-3 rounded-xl border border-pink-200 bg-pink-50 p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={aiSelfie} alt="Selfie" className="h-14 w-14 rounded-lg object-cover shadow" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-gray-900">Selfie prêt</p>
+                    <p className="text-xs text-gray-500">Configure ton style ci-dessous</p>
+                  </div>
                   <button
                     type="button"
-                    onClick={async () => {
-                      const url = aiResultUrl;
-                      setAiOpen(false);
-                      resetAiWizard();
-                      if (url) await startCropping(url);
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg"
+                    onClick={() => aiSelfieRef.current?.click()}
+                    className="text-xs font-semibold text-gray-500 underline transition-colors hover:text-gray-900"
                   >
-                    <Check className="h-4 w-4" />
-                    Importer dans mon CV
+                    Changer
                   </button>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAiWizardStep("pick-style");
-                        setAiResultUrl(null);
-                      }}
-                      className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      Autre style
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAiWizardStep("upload");
-                        setAiResultUrl(null);
-                      }}
-                      className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Réessayer
-                    </button>
+                </div>
+
+                {/* Fond */}
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">Fond</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {FOND_OPTIONS.map((s) => {
+                      const active = photoFond === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setPhotoFond(s.id)}
+                          className={`rounded-lg border px-2 py-1.5 text-left transition-all ${
+                            active ? "border-pink-500 bg-pink-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <p className={`text-[10px] font-bold leading-tight ${active ? "text-pink-900" : "text-gray-800"}`}>{s.label}</p>
+                          <p className={`text-[8px] leading-tight ${active ? "text-pink-400" : "text-gray-400"}`}>{s.desc}</p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
+
+                {/* Tenue */}
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">Tenue</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {TENUE_OPTIONS.map((s) => {
+                      const active = photoTenue === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setPhotoTenue(s.id)}
+                          className={`rounded-lg border px-2 py-1.5 text-left transition-all ${
+                            active ? "border-pink-500 bg-pink-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <p className={`text-[10px] font-bold leading-tight ${active ? "text-pink-900" : "text-gray-800"}`}>{s.label}</p>
+                          <p className={`text-[8px] leading-tight ${active ? "text-pink-400" : "text-gray-400"}`}>{s.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Tonalité */}
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">Tonalité</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {TONALITE_OPTIONS.map((s) => {
+                      const active = photoTonalite === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setPhotoTonalite(s.id)}
+                          className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
+                            active ? "border-pink-500 bg-pink-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <p className={`text-[10px] font-bold leading-tight ${active ? "text-pink-900" : "text-gray-800"}`}>{s.label}</p>
+                          <p className={`text-[8px] leading-tight ${active ? "text-pink-400" : "text-gray-400"}`}>{s.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Pose */}
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">Pose</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {POSE_OPTIONS.map((s) => {
+                      const active = photoPose === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setPhotoPose(s.id)}
+                          className={`rounded-lg border px-2 py-1.5 text-left transition-all ${
+                            active ? "border-pink-500 bg-pink-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <p className={`text-[10px] font-bold leading-tight ${active ? "text-pink-900" : "text-gray-800"}`}>{s.label}</p>
+                          <p className={`text-[8px] leading-tight ${active ? "text-pink-400" : "text-gray-400"}`}>{s.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Expression */}
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">Expression</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {EXPRESSION_OPTIONS.map((s) => {
+                      const active = photoExpression === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setPhotoExpression(s.id)}
+                          className={`rounded-lg border px-2.5 py-1.5 text-left transition-all ${
+                            active ? "border-pink-500 bg-pink-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <p className={`text-[10px] font-bold leading-tight ${active ? "text-pink-900" : "text-gray-800"}`}>{s.label}</p>
+                          <p className={`text-[8px] leading-tight ${active ? "text-pink-400" : "text-gray-400"}`}>{s.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                    Précisions <span className="font-normal normal-case text-gray-400">(optionnel)</span>
+                  </p>
+                  <textarea
+                    value={photoNotes}
+                    onChange={(e) => setPhotoNotes(e.target.value)}
+                    placeholder="Ex : lunettes, badge entreprise, couleur cravate..."
+                    rows={2}
+                    className="w-full resize-none rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs placeholder-gray-300 focus:border-pink-400 focus:outline-none"
+                  />
+                </div>
+
+                {/* Generate */}
+                <button
+                  type="button"
+                  onClick={handleAiGenerate}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-pink-500/25 transition-shadow hover:shadow-xl"
+                >
+                  <Sparkles className="h-4 w-4" /> Générer ma photo pro
+                </button>
+                <p className="text-center text-[11px] text-gray-400">2 tokens · 4 photos HD · ~45 secondes</p>
               </div>
             )}
           </>
@@ -730,10 +796,7 @@ export function PhotoStep({ photoUrl, onPhotoChange }: Props) {
           {galleryLoading ? (
             <div className="flex gap-2">
               {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-20 w-20 shrink-0 animate-pulse rounded-xl bg-gray-100"
-                />
+                <div key={i} className="h-20 w-20 shrink-0 animate-pulse rounded-xl bg-gray-100" />
               ))}
             </div>
           ) : (
