@@ -28,6 +28,7 @@ import {
   Linkedin,
   ChevronDown,
   ChevronUp,
+  Zap,
 } from "lucide-react";
 import type { LinkedInExtract } from "@/app/api/cv-build/linkedin-import/route";
 import { CV_SECTOR_LIST, CvSectorKey } from "@/lib/cv-criteria";
@@ -815,6 +816,7 @@ export default function CvBuilderPage() {
               interests={draft.interests}
               setInterests={(i) => updateDraft("interests", i)}
               offerKeywords={draft.offerKeywords}
+              offerText={draft.offerText}
               sector={draft.sector}
               targetRole={draft.targetRole}
             />
@@ -1372,7 +1374,7 @@ function OfferAnalyzer({
 // ─── Skills + Languages ───────────────────────────────────────────────────────
 
 function SkillsLanguagesEditor({
-  skills, setSkills, skillLevels = {}, setSkillLevels, languages, setLanguages, interests, setInterests, offerKeywords = [], sector = "", targetRole = "",
+  skills, setSkills, skillLevels = {}, setSkillLevels, languages, setLanguages, interests, setInterests, offerKeywords = [], offerText = "", sector = "", targetRole = "",
 }: {
   skills: string[];
   setSkills: (s: string[]) => void;
@@ -1383,6 +1385,7 @@ function SkillsLanguagesEditor({
   interests: string[];
   setInterests: (i: string[]) => void;
   offerKeywords?: string[];
+  offerText?: string;
   sector?: string;
   targetRole?: string;
 }) {
@@ -1392,6 +1395,25 @@ function SkillsLanguagesEditor({
   const [suggestedSkills, setSuggestedSkills] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
+  const [skillGap, setSkillGap] = useState<{ matches: string[]; missing: string[]; bonus: string[] } | null>(null);
+  const [loadingGap, setLoadingGap] = useState(false);
+
+  const runSkillGap = async () => {
+    if (!offerText?.trim() || !skills.length) return;
+    setLoadingGap(true);
+    try {
+      const r = await fetch("/api/cv-build/skill-gap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skills, offerText, role: targetRole, sector }),
+      });
+      const data = await r.json() as { matches: string[]; missing: string[]; bonus: string[] };
+      setSkillGap(data);
+    } catch {
+    } finally {
+      setLoadingGap(false);
+    }
+  };
 
   useEffect(() => {
     if (!sector || suggestionsLoaded) return;
@@ -1452,6 +1474,66 @@ function SkillsLanguagesEditor({
                         + {s}
                       </button>
                     ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {offerText?.trim() && skills.length > 0 && (
+          <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs font-bold text-blue-900 uppercase tracking-widest">Analyse d'adéquation</p>
+                <p className="text-[11px] text-blue-600 mt-0.5">Tes compétences vs les exigences du poste</p>
+              </div>
+              <button
+                type="button"
+                onClick={runSkillGap}
+                disabled={loadingGap}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 text-white px-3 py-1.5 text-xs font-bold shadow hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {loadingGap ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                {skillGap ? "Relancer" : "Analyser"}
+              </button>
+            </div>
+            {skillGap && (
+              <div className="space-y-3">
+                {skillGap.matches.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 mb-1.5">✓ Tu as ces compétences clés ({skillGap.matches.length})</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {skillGap.matches.map((s) => (
+                        <span key={s} className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-200">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {skillGap.missing.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-red-600 mb-1.5">⚠ Manquants — à ajouter si tu les as ({skillGap.missing.length})</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {skillGap.missing.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setSkills([...skills, s])}
+                          className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[11px] font-semibold text-red-700 hover:bg-red-100 transition-colors"
+                        >
+                          + {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {skillGap.bonus.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1.5">⭐ Atouts différenciants ({skillGap.bonus.length})</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {skillGap.bonus.map((s) => (
+                        <span key={s} className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 border border-amber-200">{s}</span>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
