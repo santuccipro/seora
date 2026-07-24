@@ -11,6 +11,9 @@ import {
   Coins,
   TrendingUp,
   Loader2,
+  FileEdit,
+  Globe,
+  Eye,
 } from "lucide-react";
 
 interface Stats {
@@ -24,20 +27,18 @@ interface Stats {
     id: string; amount: number; price: number; createdAt: string;
     user: { name: string | null; email: string };
   }[];
+  cvBuilder?: {
+    drafts: number;
+    published: number;
+    totalViews: number;
+    sectorStats: { sector: string; count: number }[];
+  };
 }
 
 function StatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  color,
+  icon: Icon, label, value, sub, color,
 }: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  sub?: string;
-  color: string;
+  icon: React.ElementType; label: string; value: string | number; sub?: string; color: string;
 }) {
   return (
     <div className="rounded-2xl bg-white border border-gray-200 p-6 shadow-sm">
@@ -52,6 +53,27 @@ function StatCard({
     </div>
   );
 }
+
+const SECTOR_LABELS: Record<string, string> = {
+  finance: "Finance",
+  tech: "Tech / IT",
+  marketing: "Marketing",
+  rh: "RH",
+  juridique: "Juridique",
+  sante: "Santé",
+  enseignement: "Enseignement",
+  commerce: "Commerce B2B",
+  communication: "Communication",
+  pharmacie: "Pharmacie",
+  design: "Design UX",
+  conseil: "Conseil Strat",
+  retail: "Retail",
+  direction: "Direction",
+  hotellerie: "Hôtellerie",
+  logistique: "Logistique",
+  it_cloud: "IT Cloud",
+  business_dev: "Business Dev",
+};
 
 export default function AdminPage() {
   const { status } = useSession();
@@ -72,38 +94,32 @@ export default function AdminPage() {
           }
           return r.json();
         })
-        .then((d) => {
-          if (d) setStats(d);
-          setLoading(false);
-        })
+        .then((d) => { if (d) setStats(d); setLoading(false); })
         .catch(() => setLoading(false));
     }
   }, [status, router]);
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-        </div>
-      </DashboardLayout>
-    );
-  }
+  if (loading) return (
+    <DashboardLayout>
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+      </div>
+    </DashboardLayout>
+  );
 
-  if (error) {
-    return (
-      <DashboardLayout>
-        <div className="rounded-2xl bg-red-50 border border-red-200 p-8 text-center">
-          <p className="text-red-700 font-medium">{error}</p>
-          <p className="text-sm text-red-500 mt-2">
-            Pour activer l&apos;accès admin, passez votre compte en isAdmin=true dans la base de données.
-          </p>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  if (error) return (
+    <DashboardLayout>
+      <div className="rounded-2xl bg-red-50 border border-red-200 p-8 text-center">
+        <p className="text-red-700 font-medium">{error}</p>
+        <p className="text-sm text-red-500 mt-2">Pour activer l&apos;accès admin, passez votre compte en isAdmin=true dans la base de données.</p>
+      </div>
+    </DashboardLayout>
+  );
 
   if (!stats) return null;
+
+  const cv = stats.cvBuilder;
+  const maxSector = cv?.sectorStats[0]?.count || 1;
 
   return (
     <DashboardLayout>
@@ -120,9 +136,65 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard icon={Users} label="Utilisateurs" value={stats.users.total} sub={`+${stats.users.thisWeek} cette semaine`} color="bg-indigo-500" />
           <StatCard icon={FileText} label="Analyses CV" value={stats.analyses.total} sub={`+${stats.analyses.thisMonth} ce mois`} color="bg-cyan-500" />
-          <StatCard icon={Coins} label="Revenus total" value={`${stats.revenue.total.toFixed(2)} \u20ac`} sub={`+${stats.revenue.thisMonth.toFixed(2)} \u20ac ce mois`} color="bg-green-500" />
+          <StatCard icon={Coins} label="Revenus total" value={`${stats.revenue.total.toFixed(2)} €`} sub={`+${stats.revenue.thisMonth.toFixed(2)} € ce mois`} color="bg-green-500" />
           <StatCard icon={TrendingUp} label="Score moyen" value={`${stats.analyses.avgScore}/100`} color="bg-purple-500" />
         </div>
+
+        {/* CV Builder block */}
+        {cv && (
+          <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-emerald-100">
+              <h3 className="text-lg font-semibold text-emerald-900 flex items-center gap-2">
+                <FileEdit className="h-5 w-5" /> CV Builder Analytics
+              </h3>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="rounded-2xl bg-white border border-emerald-100 p-5 text-center shadow-sm">
+                  <FileEdit className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
+                  <p className="text-3xl font-bold text-gray-900">{cv.drafts}</p>
+                  <p className="text-xs text-gray-500 mt-1">Brouillons créés</p>
+                </div>
+                <div className="rounded-2xl bg-white border border-emerald-100 p-5 text-center shadow-sm">
+                  <Globe className="h-6 w-6 text-teal-500 mx-auto mb-2" />
+                  <p className="text-3xl font-bold text-gray-900">{cv.published}</p>
+                  <p className="text-xs text-gray-500 mt-1">CVs publiés</p>
+                </div>
+                <div className="rounded-2xl bg-white border border-emerald-100 p-5 text-center shadow-sm">
+                  <Eye className="h-6 w-6 text-blue-500 mx-auto mb-2" />
+                  <p className="text-3xl font-bold text-gray-900">{cv.totalViews}</p>
+                  <p className="text-xs text-gray-500 mt-1">Vues publiques</p>
+                </div>
+              </div>
+
+              {cv.sectorStats.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-700 mb-3">Secteurs les plus populaires</p>
+                  <div className="space-y-2">
+                    {cv.sectorStats.map((s) => {
+                      const pct = Math.round((s.count / maxSector) * 100);
+                      const label = SECTOR_LABELS[s.sector] ?? s.sector;
+                      return (
+                        <div key={s.sector} className="flex items-center gap-3">
+                          <span className="w-36 text-sm font-medium text-gray-700 shrink-0 truncate">{label}</span>
+                          <div className="flex-1 bg-emerald-100 rounded-full h-2">
+                            <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-sm font-bold text-gray-900 w-8 text-right">{s.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {cv.drafts > 0 && (
+                    <p className="text-xs text-gray-400 mt-3">
+                      Taux publication : {cv.published > 0 ? Math.round((cv.published / cv.drafts) * 100) : 0}% des drafts publiés
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Additional metrics */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -144,7 +216,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Feature usage top 5 */}
+        {/* Feature usage */}
         <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-100">
             <h3 className="text-lg font-semibold text-gray-900">Top features utilisées</h3>
@@ -156,7 +228,7 @@ export default function AdminPage() {
               return (
                 <div key={f.name} className="flex items-center gap-4">
                   <span className="w-5 text-xs font-bold text-gray-400">#{i + 1}</span>
-                  <span className="w-40 text-sm font-medium text-gray-700 shrink-0">{f.name}</span>
+                  <span className="w-44 text-sm font-medium text-gray-700 shrink-0">{f.name}</span>
                   <div className="flex-1 bg-gray-100 rounded-full h-2">
                     <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
                   </div>
@@ -188,9 +260,7 @@ export default function AdminPage() {
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{u.name || "-"}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{u.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{u.tokens}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {new Date(u.createdAt).toLocaleDateString("fr-FR")}
-                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{new Date(u.createdAt).toLocaleDateString("fr-FR")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -219,9 +289,7 @@ export default function AdminPage() {
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{p.user.name || p.user.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{p.amount}</td>
                     <td className="px-6 py-4 text-sm text-green-600 font-medium">{(p.price / 100).toFixed(2)} €</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {new Date(p.createdAt).toLocaleDateString("fr-FR")}
-                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{new Date(p.createdAt).toLocaleDateString("fr-FR")}</td>
                   </tr>
                 ))}
               </tbody>

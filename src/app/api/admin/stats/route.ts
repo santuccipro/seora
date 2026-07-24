@@ -41,6 +41,10 @@ export async function GET() {
       totalInterviewPrep,
       totalLinkedInAnalysis,
       dormantUsers,
+      totalCvDrafts,
+      totalPublicCvs,
+      publicCvViews,
+      cvBySector,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
@@ -78,9 +82,14 @@ export async function GET() {
       prisma.interviewPrepSession.count().catch(() => 0),
       prisma.linkedInAnalysis.count().catch(() => 0),
       prisma.user.count({ where: { tokens: 150, createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } } }),
+      prisma.cvDraft.count().catch(() => 0),
+      prisma.publicCv.count({ where: { isActive: true } }).catch(() => 0),
+      prisma.publicCv.aggregate({ _sum: { viewCount: true } }).catch(() => ({ _sum: { viewCount: 0 } })),
+      prisma.publicCv.groupBy({ by: ["sector"], _count: { id: true }, orderBy: { _count: { id: "desc" } }, take: 8 }).catch(() => []),
     ]);
 
     const featureUsage = [
+      { name: "CV Builder", count: totalCvDrafts as number },
       { name: "Analyse CV", count: totalAnalyses },
       { name: "Lettre de motivation", count: totalCoverLetters },
       { name: "Job Matching", count: totalJobMatches },
@@ -88,7 +97,11 @@ export async function GET() {
       { name: "Photo Pro", count: totalPhotoGenerations as number },
       { name: "Prep Entretien", count: totalInterviewPrep as number },
       { name: "LinkedIn Analyzer", count: totalLinkedInAnalysis as number },
-    ].sort((a, b) => b.count - a.count).slice(0, 5);
+    ].sort((a, b) => b.count - a.count).slice(0, 6);
+
+    const sectorStats = (cvBySector as Array<{ sector: string; _count: { id: number } }>).map(
+      (r) => ({ sector: r.sector, count: r._count.id })
+    );
 
     return NextResponse.json({
       users: {
@@ -112,6 +125,12 @@ export async function GET() {
       featureUsage,
       recentUsers,
       recentPurchases,
+      cvBuilder: {
+        drafts: totalCvDrafts as number,
+        published: totalPublicCvs as number,
+        totalViews: (publicCvViews as { _sum: { viewCount: number | null } })._sum.viewCount ?? 0,
+        sectorStats,
+      },
     });
   } catch (error) {
     console.error("Admin stats error:", error);
