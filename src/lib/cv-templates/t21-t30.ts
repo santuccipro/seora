@@ -5,6 +5,7 @@ export function tplCommunication(d: TplData): string {
   // T21 Relations Publiques / Community Manager — Inter, rose/violet tendance
   const {firstName,lastName,role,email,phone,city,linkedin,photo,summary,experiences,educations,skills,languages,interests} = d;
   const ac='#9333EA';
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 <style>
@@ -37,6 +38,8 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
 .sk-pill{display:inline-block;font-size:7.5pt;background:#F3E8FF;color:${ac};border-radius:20px;padding:2px 8px;margin:0 3px 4px 0;font-weight:600}
 .ede{font-weight:700;font-size:9pt;color:#1F1035}
 .edes{font-size:8pt;color:#6B7280;margin-top:1px;margin-bottom:6px}
+.qr-wrap{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex-shrink:0;padding-left:14px}
+.qr-lbl{font-size:6pt;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div><div class="hn">${firstName} ${lastName}</div><div class="hr">${role}</div><div class="hc">${[email,phone,city,linkedin].filter(Boolean).map(t=>`<span>${t}</span>`).join('')}</div></div>
@@ -52,6 +55,7 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
       <div class="bt">Langues</div>${languages.map(l=>`<div class="bi"><strong>${l.name}</strong> — ${l.level}</div>`).join('')}
       <div class="bt" style="margin-top:8px">Intérêts</div>${interests.map(i=>`<div class="bi">· ${i}</div>`).join('')}
     </div>
+    ${qrSvg?`<div class="qr-wrap"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#F5F5F5;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
@@ -62,6 +66,7 @@ export function tplPharmacieRecherche(d: TplData): string {
   const {firstName,lastName,role,email,phone,city,linkedin,photo,summary,experiences,educations,skills,languages,interests} = d;
   const certifications: string[] = (d as any).certifications || [];
   const ac='#166534';
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -75,7 +80,7 @@ body{font-family:'Inter',sans-serif;font-size:9pt;color:#1F2937;background:#fff}
 .hp{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid ${ac};flex-shrink:0}
 .b{flex:1;padding:12px 38px 14px;display:flex;gap:22px}
 .main{flex:1;display:flex;flex-direction:column;justify-content:space-between}
-.aside{width:170px;flex-shrink:0;border-left:1.5px solid #BBF7D0;padding-left:18px}
+.aside{width:170px;flex-shrink:0;border-left:1.5px solid #BBF7D0;padding-left:18px;display:flex;flex-direction:column}
 .sm{font-family:'Merriweather',serif;font-size:9.5pt;line-height:1.7;font-style:italic;color:#374151}
 .stt{font-size:7pt;letter-spacing:2px;text-transform:uppercase;font-weight:700;color:${ac};border-bottom:1px solid #BBF7D0;padding-bottom:3px;margin-bottom:8px}
 .xl{display:flex;flex-direction:column;gap:10px}
@@ -95,6 +100,7 @@ ul{margin:4px 0 0 0;list-style:none}li{font-size:8.3pt;line-height:1.6;margin-bo
 .sln{font-size:8.5pt;font-weight:600;color:#1F2937}
 .sll{font-size:7pt;color:#9CA3AF;margin-bottom:6px}
 .sin{font-size:7.5pt;color:#6B7280;margin-bottom:4px}
+.qr-lbl{font-size:6pt;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div><div class="hn">${firstName} ${lastName}</div><div class="hr">${role}</div><div class="hc">${[email,phone,city,linkedin].filter(Boolean).map(t=>`<span>${t}</span>`).join('')}</div></div>
@@ -114,6 +120,7 @@ ul{margin:4px 0 0 0;list-style:none}li{font-size:8.3pt;line-height:1.6;margin-bo
     ${languages.map(l=>`<div><div class="sln">${l.name}</div><div class="sll">${l.level}</div></div>`).join('')}
     <div class="stt" style="margin-top:12px">Intérêts</div>
     ${interests.map(i=>`<div class="sin">· ${i}</div>`).join('')}
+    ${qrSvg?`<div style="margin-top:auto;display:flex;flex-direction:column;align-items:center;padding-top:12px"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#F0FDF4;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
@@ -124,6 +131,7 @@ export function tplCreativeDesign(d: TplData): string {
   const {firstName,lastName,role,email,phone,city,linkedin,photo,summary,experiences,educations,skills,languages,interests} = d;
   const portfolio = (d as any).portfolio || '';
   const ac='#0F172A';
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -165,6 +173,7 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
 .lr{display:flex;justify-content:space-between;margin-bottom:5px}
 .ln{font-size:8.5pt;font-weight:600;color:${ac}}
 .ll{font-size:7pt;color:#9CA3AF;font-family:'DM Mono',monospace}
+.qr-lbl{font-size:6pt;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="sb">
   <div class="sv">portfolio</div>
@@ -192,6 +201,7 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
       <div class="fc" style="flex:1.2"><div class="ftl">Formations</div>${educations.map(e=>`<div><div class="ede">${e.degree}</div><div class="edes">${e.school} · ${e.location}${e.mention?` — ${e.mention}`:''} · ${e.dates}</div></div>`).join('')}</div>
       <div class="fc"><div class="ftl">Outils</div><div style="line-height:1.8">${skills.map(s=>`<span class="sk-pill">${s}</span>`).join('')}</div></div>
       <div class="fc" style="flex:.7"><div class="ftl">Langues</div>${languages.map(l=>`<div class="lr"><span class="ln">${l.name}</span><span class="ll">${l.level}</span></div>`).join('')}</div>
+      ${qrSvg?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex-shrink:0;padding-left:10px"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#F3F4F6;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
     </div>
   </div>
 </div>
@@ -201,6 +211,7 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
 export function tplConseilStrat(d: TplData): string {
   // T24 Conseil Stratégie / McKinsey style — Garamond, noir / blanc, rigueur
   const {firstName,lastName,role,email,phone,city,linkedin,photo,summary,experiences,educations,skills,languages,interests} = d;
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -233,6 +244,7 @@ ul{margin:4px 0 0 0;list-style:none}li{font-size:9.5pt;line-height:1.7;margin-bo
 .bt{font-family:'Inter',sans-serif;font-size:7pt;letter-spacing:2px;text-transform:uppercase;font-weight:600;color:#111;margin-bottom:6px}
 .bi{font-size:9.5pt;color:#333;margin-bottom:3px}
 .bi em{font-style:italic;color:#666;font-size:9pt}
+.qr-lbl{font-family:'Inter',sans-serif;font-size:6pt;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div><div class="hn">${firstName} ${lastName}</div><div class="hr">${role}</div><div class="hc">${[email,phone,city,linkedin].filter(Boolean).map(t=>`<span>${t}</span>`).join('')}</div></div>
@@ -248,6 +260,7 @@ ul{margin:4px 0 0 0;list-style:none}li{font-size:9.5pt;line-height:1.7;margin-bo
     <div class="bc"><div class="bt">Compétences</div>${skills.map(s=>`<div class="bi">· ${s}</div>`).join('')}</div>
     <div class="bc"><div class="bt">Langues</div>${languages.map(l=>`<div class="bi">${l.name} <em>— ${l.level}</em></div>`).join('')}</div>
     <div class="bc"><div class="bt">Intérêts</div>${interests.map(i=>`<div class="bi">· ${i}</div>`).join('')}</div>
+    ${qrSvg?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex-shrink:0;padding-left:16px"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#F5F5F5;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
@@ -258,6 +271,7 @@ export function tplRetail(d: TplData): string {
   const {firstName,lastName,role,email,phone,city,linkedin,photo,summary,experiences,educations,skills,languages,interests} = d;
   const kpis: Array<{val: string; label: string}> = (d as any).kpis || [];
   const ac='#B91C1C';
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -292,6 +306,7 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
 .bi{font-size:8.3pt;color:#374151;margin-bottom:4px;line-height:1.4}
 .ede{font-weight:600;font-size:9pt;color:#1F2937}
 .edes{font-size:8pt;color:#6B7280;margin-top:1px;margin-bottom:5px}
+.qr-lbl{font-size:6pt;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div><div class="hn">${firstName} ${lastName}</div><div class="hr">${role}</div><div class="hc">${[email,phone,city,linkedin].filter(Boolean).map(t=>`<span>${t}</span>`).join('')}</div></div>
@@ -305,6 +320,7 @@ ${kpis.length?`<div class="kpis">${kpis.map(k=>`<div class="kp"><div class="kv">
     <div class="bc" style="flex:1.4"><div class="bt">Formations</div>${educations.map(e=>`<div><div class="ede">${e.degree}</div><div class="edes">${e.school} · ${e.location}${e.mention?` — ${e.mention}`:''} · ${e.dates}</div></div>`).join('')}</div>
     <div class="bc"><div class="bt">Compétences</div>${skills.map(s=>`<div class="bi">· ${s}</div>`).join('')}</div>
     <div class="bc" style="flex:.8"><div class="bt">Langues</div>${languages.map(l=>`<div class="bi"><strong>${l.name}</strong> — ${l.level}</div>`).join('')}<div class="bt" style="margin-top:9px">Intérêts</div>${interests.map(i=>`<div class="bi">${i}</div>`).join('')}</div>
+    ${qrSvg?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex-shrink:0;padding-left:12px"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#FEF2F2;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
@@ -313,6 +329,7 @@ ${kpis.length?`<div class="kpis">${kpis.map(k=>`<div class="kp"><div class="kv">
 export function tplDirection(d: TplData): string {
   // T26 Direction générale / C-level — Playfair, premium, marine/or
   const {firstName,lastName,role,email,phone,city,linkedin,photo,summary,experiences,educations,skills,languages,interests} = d;
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -344,6 +361,7 @@ ul{margin:4px 0 0 0;list-style:none}li{font-size:9pt;line-height:1.7;margin-bott
 .bt{font-size:7pt;letter-spacing:2px;text-transform:uppercase;font-weight:500;color:#1A1A2E;margin-bottom:7px}
 .bi{font-size:9pt;color:#333;margin-bottom:3px}
 .bi em{font-style:italic;color:#777;font-size:8.5pt}
+.qr-lbl{font-size:6pt;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div><div class="hn">${firstName} ${lastName}</div><div class="hr">${role}</div><div class="hc">${[email,phone,city,linkedin].filter(Boolean).map(t=>`<span>${t}</span>`).join('')}</div></div>
@@ -357,6 +375,7 @@ ul{margin:4px 0 0 0;list-style:none}li{font-size:9pt;line-height:1.7;margin-bott
     <div class="bc"><div class="bt">Domaines d'expertise</div>${skills.map(s=>`<div class="bi">· ${s}</div>`).join('')}</div>
     <div class="bc"><div class="bt">Langues</div>${languages.map(l=>`<div class="bi">${l.name} <em>— ${l.level}</em></div>`).join('')}</div>
     <div class="bc"><div class="bt">Intérêts</div>${interests.map(i=>`<div class="bi">· ${i}</div>`).join('')}</div>
+    ${qrSvg?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex-shrink:0;padding-left:16px"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#FFFBEB;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
@@ -366,6 +385,7 @@ export function tplRestauHotel(d: TplData): string {
   // T27 Restauration / Hôtellerie — Cormorant, sobre culinaire, brun chaud
   const {firstName,lastName,role,email,phone,city,linkedin,photo,summary,experiences,educations,skills,languages,interests} = d;
   const ac='#78350F';
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -380,7 +400,7 @@ body{font-family:'Cormorant Garamond',serif;font-size:10pt;color:#1C0D02;backgro
 .orn{text-align:center;font-size:12pt;color:#C9A84C;letter-spacing:8px;padding:5px 0;flex-shrink:0;background:#FDFAF6}
 .b{flex:1;padding:12px 40px 14px;display:flex;gap:22px}
 .main{flex:1;display:flex;flex-direction:column;justify-content:space-between}
-.aside{width:168px;flex-shrink:0;border-left:1px solid #D4AE8A;padding-left:18px}
+.aside{width:168px;flex-shrink:0;border-left:1px solid #D4AE8A;padding-left:18px;display:flex;flex-direction:column}
 .sm{font-size:10pt;line-height:1.7;font-style:italic;font-weight:400;color:#4A3728}
 .st{font-family:'Inter',sans-serif;font-size:6.5pt;letter-spacing:2.5px;text-transform:uppercase;color:${ac};margin-bottom:9px;font-weight:600}
 .xl{display:flex;flex-direction:column;gap:11px}
@@ -400,6 +420,7 @@ ul{margin:4px 0 0 0;list-style:none}li{font-size:9.5pt;line-height:1.7;margin-bo
 .sin{font-size:9pt;color:#6B5D4E;margin-bottom:4px;font-style:italic;font-weight:300}
 .stt{font-family:'Inter',sans-serif;font-size:6.5pt;letter-spacing:2.5px;text-transform:uppercase;color:${ac};margin-bottom:8px;margin-top:12px;font-weight:600}
 .stt:first-child{margin-top:0}
+.qr-lbl{font-family:'Inter',sans-serif;font-size:6pt;color:#A09080;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div><div class="hn">${firstName} ${lastName}</div><div class="hr">${role}</div><div class="hc">${[email,phone,city,linkedin].filter(Boolean).map(t=>`<span>${t}</span>`).join('')}</div></div>
@@ -419,6 +440,7 @@ ul{margin:4px 0 0 0;list-style:none}li{font-size:9.5pt;line-height:1.7;margin-bo
     ${languages.map(l=>`<div><div class="sln">${l.name}</div><div class="sll">${l.level}</div></div>`).join('')}
     <div class="stt">Intérêts</div>
     ${interests.map(i=>`<div class="sin">${i}</div>`).join('')}
+    ${qrSvg?`<div style="margin-top:auto;display:flex;flex-direction:column;align-items:center;padding-top:12px"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#FDF6EE;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
@@ -428,6 +450,7 @@ export function tplLogistique(d: TplData): string {
   // T28 Logistique / Supply Chain / Transport — Inter, gris technique, efficace
   const {firstName,lastName,role,email,phone,city,linkedin,photo,summary,experiences,educations,skills,languages,interests} = d;
   const ac='#374151';
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -462,6 +485,7 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
 .bi{font-size:8.3pt;color:#374151;margin-bottom:4px}
 .ede{font-weight:600;font-size:9pt;color:#1F2937}
 .edes{font-size:8pt;color:#6B7280;margin-top:1px;margin-bottom:5px}
+.qr-lbl{font-size:6pt;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div class="h-l">
@@ -480,6 +504,7 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
     <div class="bc" style="flex:1.4"><div class="bt">Formations</div>${educations.map(e=>`<div><div class="ede">${e.degree}</div><div class="edes">${e.school} · ${e.location}${e.mention?` — ${e.mention}`:''} · ${e.dates}</div></div>`).join('')}</div>
     <div class="bc"><div class="bt">Langues</div>${languages.map(l=>`<div class="bi"><strong>${l.name}</strong> — ${l.level}</div>`).join('')}</div>
     <div class="bc"><div class="bt">Intérêts</div>${interests.map(i=>`<div class="bi">· ${i}</div>`).join('')}</div>
+    ${qrSvg?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex-shrink:0;padding-left:12px"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#F9FAFB;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
@@ -490,6 +515,7 @@ export function tplITCloud(d: TplData): string {
   const {firstName,lastName,role,email,phone,city,linkedin,photo,experiences,educations,skills,languages,interests} = d;
   const portfolio = (d as any).portfolio || '';
   const ac='#0EA5E9';
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -529,7 +555,8 @@ li::before{content:'$ ';color:${ac};font-weight:700;font-family:'Fira Code',mono
 .lr{display:flex;justify-content:space-between;margin-bottom:5px}
 .ln{font-size:8.5pt;font-weight:500;color:#F8FAFC}
 .ll{font-size:7pt;color:#64748B;font-family:'Fira Code',monospace}
-.ii{font-size:7.8pt;color:#94A3B8;margin-bottom:4px;font-family:'Fira Code',monospace;font-size:7.5pt}
+.ii{font-size:7.5pt;color:#94A3B8;margin-bottom:4px;font-family:'Fira Code',monospace}
+.qr-lbl{font-family:'Fira Code',monospace;font-size:6pt;color:#475569;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div><div class="hn">${firstName} ${lastName}</div><div class="hr">${role}</div><div class="hc">${[email,phone,city,linkedin,portfolio].filter(Boolean).map(t=>`<span>${t}</span>`).join('')}</div></div>
@@ -545,6 +572,7 @@ li::before{content:'$ ';color:${ac};font-weight:700;font-family:'Fira Code',mono
     <div class="fc" style="flex:1.4"><div class="ftl">// formations</div>${educations.map(e=>`<div><div class="ede">${e.degree}</div><div class="edes">${e.school} · ${e.location}${e.mention?` — ${e.mention}`:''}</div><div class="edt">${e.dates}</div></div>`).join('')}</div>
     <div class="fc"><div class="ftl">// langues</div>${languages.map(l=>`<div class="lr"><span class="ln">${l.name}</span><span class="ll">${l.level}</span></div>`).join('')}</div>
     <div class="fc"><div class="ftl">// intérêts</div>${interests.map(i=>`<div class="ii">&gt; ${i}</div>`).join('')}</div>
+    ${qrSvg?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex-shrink:0;padding-left:10px"><div class="qr-lbl">// qr</div><div style="width:48px;height:48px;background:#1E293B;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
@@ -556,6 +584,7 @@ export function tplBusinessDev(d: TplData): string {
   const portfolio = (d as any).portfolio || '';
   const kpis: Array<{val: string; label: string}> = (d as any).kpis || [];
   const ac='#0F766E';
+  const qrSvg = (d as Record<string,unknown>).qrSvg as string|undefined;
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -588,6 +617,7 @@ li::before{content:'';position:absolute;left:0;top:6px;width:5px;height:5px;bord
 .bi{font-size:8.3pt;color:#374151;margin-bottom:4px;line-height:1.4}
 .ede{font-weight:600;font-size:9pt;color:#134E4A}
 .edes{font-size:8pt;color:#6B7280;margin-top:1px;margin-bottom:5px}
+.qr-lbl{font-size:6pt;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
 </style></head><body>
 <div class="h">
   <div><div class="hn">${firstName} ${lastName}</div><div class="hr">${role}</div><div class="hc">${[email,phone,city,linkedin,portfolio].filter(Boolean).map(t=>`<span>${t}</span>`).join('')}</div></div>
@@ -599,8 +629,9 @@ ${kpis.length?`<div class="kpis">${kpis.map(k=>`<div class="kp"><div class="kv">
   <div><div class="stt">Expériences professionnelles</div><div class="xl">${experiences.map(e=>`<div><div class="er"><div><div class="et">${e.title}</div><div class="ec">${e.company} · ${e.location}</div></div><div class="xd">${e.dates}</div></div><ul>${e.bullets.map(b=>`<li>${b}</li>`).join('')}</ul></div>`).join('')}</div></div>
   <div class="bot">
     <div class="bc" style="flex:1.4"><div class="bt">Formations</div>${educations.map(e=>`<div><div class="ede">${e.degree}</div><div class="edes">${e.school} · ${e.location}${e.mention?` — ${e.mention}`:''} · ${e.dates}</div></div>`).join('')}</div>
-    <div class="bc"><div class="bt">Compétences</div>${skills.map(s=>`<div class="bi">↗ ${s}</div>`).join('')}</div>
+    <div class="bc"><div class="bt">Compétences</div>${skills.map(s=>`<div class="bi">· ${s}</div>`).join('')}</div>
     <div class="bc" style="flex:.8"><div class="bt">Langues</div>${languages.map(l=>`<div class="bi"><strong>${l.name}</strong> — ${l.level}</div>`).join('')}<div class="bt" style="margin-top:8px">Intérêts</div>${interests.map(i=>`<div class="bi">${i}</div>`).join('')}</div>
+    ${qrSvg?`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;flex-shrink:0;padding-left:12px"><div class="qr-lbl">LinkedIn</div><div style="width:48px;height:48px;background:#F0FDF9;padding:3px;border-radius:3px">${qrSvg}</div></div>`:''}
   </div>
 </div>
 </body></html>`;
