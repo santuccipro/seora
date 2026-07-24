@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { AnalyticsProvider } from "@/components/analytics-provider";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -18,26 +19,19 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Seora CV - Analyse et Correction de CV par IA",
-  description:
-    "Optimisez votre CV en quelques minutes grâce à l'intelligence artificielle. Score, analyse détaillée et corrections personnalisées pour décrocher le job de vos rêves.",
-  keywords: ["CV", "correction CV", "analyse CV", "IA", "recrutement", "emploi", "France"],
+  metadataBase: new URL("https://tryseora.com"),
+  title: {
+    template: "%s | Seora",
+    default: "Seora — L'IA pour étudiants : CV, lettre, détection IA",
+  },
+  description: "Seora aide les étudiants et alternants français avec l'IA : analyse CV, lettre de motivation, détection IA de texte, humanisateur, préparation entretien.",
+  keywords: ["humanisateur de texte IA", "détection IA texte", "CV étudiant IA", "lettre de motivation IA", "Turnitin", "Compilatio", "alternance", "stage", "étudiant"],
   openGraph: {
-    title: "Seora CV - Analyse et Correction de CV par IA",
-    description:
-      "Optimisez votre CV en quelques minutes grâce à l'intelligence artificielle. Score détaillé, corrections et lettre de motivation personnalisée.",
-    url: "https://seora-cv.com",
-    siteName: "Seora CV",
-    locale: "fr_FR",
     type: "website",
+    locale: "fr_FR",
+    url: "https://tryseora.com",
+    siteName: "Seora",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Seora CV - Analyse de CV par IA",
-    description:
-      "Score détaillé, corrections personnalisées et lettre de motivation IA pour décrocher le job de vos rêves.",
-  },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://seora-cv.com"),
 };
 
 export default function RootLayout({
@@ -52,6 +46,7 @@ export default function RootLayout({
           <AnalyticsProvider />
           {children}
           <Toaster position="top-center" richColors />
+          <Analytics />
         </Providers>
       </body>
     </html>

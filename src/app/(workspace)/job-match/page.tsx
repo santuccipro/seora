@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useAuthModal } from "@/components/auth/auth-context";
 import { toast } from "sonner";
-import { DashboardLayout } from "@/components/dashboard/layout";
 import { ScoreRing } from "@/components/charts/score-ring";
 import {
   Target,
@@ -35,6 +35,7 @@ interface MatchResult {
 
 export default function JobMatchPage() {
   const { status } = useSession();
+  const { openAuthModal } = useAuthModal();
   const router = useRouter();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [selectedCV, setSelectedCV] = useState("");
@@ -45,7 +46,6 @@ export default function JobMatchPage() {
   const [showAdaptedCV, setShowAdaptedCV] = useState(false);
 
   useEffect(() => {
-    if (status === "unauthenticated") router.push("/auth/signin");
     if (status === "authenticated") {
       fetch("/api/analyses")
         .then((r) => r.json())
@@ -53,7 +53,7 @@ export default function JobMatchPage() {
           if (Array.isArray(d)) setAnalyses(d);
         });
     }
-  }, [status, router]);
+  }, [status]);
 
   async function handleMatch() {
     if (!selectedCV || !jobDescription.trim()) {
@@ -88,8 +88,7 @@ export default function JobMatchPage() {
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-8">
+    <div className="space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
             <Target className="h-7 w-7 text-indigo-500" />
@@ -159,8 +158,8 @@ export default function JobMatchPage() {
             </div>
 
             <button
-              onClick={handleMatch}
-              disabled={loading || !selectedCV || !jobDescription.trim()}
+              onClick={() => { if (status !== "authenticated") { openAuthModal(() => handleMatch()); return; } handleMatch(); }}
+              disabled={loading || !jobDescription.trim()}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 active:scale-[0.98]"
             >
               {loading ? (
@@ -291,6 +290,5 @@ export default function JobMatchPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

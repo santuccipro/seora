@@ -7,11 +7,15 @@ import { useEffect, useState } from "react";
 import {
   BarChart3,
   Bot,
+  Briefcase,
   Camera,
   FileText,
+  Gift,
   History,
   LayoutDashboard,
+  Linkedin,
   LogOut,
+  MessageSquare,
   PenTool,
   Plus,
   Search,
@@ -19,6 +23,7 @@ import {
   Coins,
   X,
   Menu,
+  Zap,
 } from "lucide-react";
 
 /**
@@ -29,12 +34,17 @@ import {
 
 const NAV = [
   { key: "dashboard", href: "/app", label: "Dashboard", icon: LayoutDashboard, group: "home" },
+  { key: "express-apply", href: "/express-apply", label: "Candidature Express", icon: Zap, cost: "3 tokens", group: "features" },
   { key: "ai-detector", href: "/ai-detector", label: "Détection IA texte", icon: Search, cost: "1 token", group: "features" },
   { key: "humanizer", href: "/humanizer", label: "Analyse doc / DPP", icon: Bot, cost: "1 token", group: "features" },
   { key: "cv-analyze", href: "/app?tab=analyze", label: "Analyser mon CV", icon: BarChart3, cost: "1 token", group: "cv" },
   { key: "cv-builder", href: "/cv-builder", label: "Créer mon CV", icon: Plus, cost: "gratuit", group: "cv" },
   { key: "photo-pro", href: "/photo-pro", label: "Photo pro IA", icon: Camera, cost: "1 token", group: "features" },
+  { key: "photo-studio", href: "/photo-studio", label: "Photo Pro", icon: Camera, cost: "1 token", group: "features" },
   { key: "cover-letter", href: "/app?tab=cover-letter", label: "Lettre de motivation", icon: PenTool, cost: "3 tokens", group: "features" },
+  { key: "applications", href: "/applications", label: "Candidatures", icon: Briefcase, group: "features" },
+  { key: "interview-prep", href: "/interview-prep", label: "Prep entretien", icon: MessageSquare, group: "features" },
+  { key: "linkedin-analyzer", href: "/linkedin-analyzer", icon: Linkedin, label: "LinkedIn Pro", group: "features" },
 ] as const;
 
 export function WorkspaceSidebar() {
@@ -194,6 +204,20 @@ export function WorkspaceSidebar() {
             >
               <History className="h-4 w-4 shrink-0" />
               <span className="flex-1">Historique</span>
+            </Link>
+          </div>
+
+          <div>
+            <p className="px-2 pb-1 text-[9px] uppercase tracking-widest text-gray-400 font-black">Programme</p>
+            <Link
+              href="/referral"
+              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                pathname === "/referral" ? "bg-purple-50 text-purple-700" : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <Gift className="h-4 w-4 shrink-0" />
+              <span className="flex-1">Parrainage</span>
+              <span className="text-[9px] uppercase tracking-widest font-bold text-purple-500">+2 tkn</span>
             </Link>
           </div>
         </nav>

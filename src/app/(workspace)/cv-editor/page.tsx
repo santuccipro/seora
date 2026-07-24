@@ -991,7 +991,7 @@ function PreviewEditor({
           className="w-full flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all"
         >
           <ArrowLeft className="h-4 w-4" />
-          Modifier dans le wizard
+          Modifier étape par étape
         </button>
       </div>
     </div>
@@ -1006,6 +1006,7 @@ export default function CVEditorPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const analysisId = searchParams.get("id");
+  const fromBuilder = searchParams.get("from") === "builder";
 
   const [cv, setCv] = useState<StructuredCV | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1049,6 +1050,62 @@ export default function CVEditorPage() {
 
   /* ── Load structured CV ── */
   useEffect(() => {
+    // From builder mode: load draft and convert
+    if (fromBuilder) {
+      fetch("/api/cv-drafts")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.draft) {
+            const d = data.draft;
+            setCv({
+              header: {
+                firstName: d.firstName || "",
+                lastName: d.lastName || "",
+                title: d.targetRole || "",
+                email: d.email || "",
+                phone: d.phone || "",
+                location: d.city || "",
+                linkedin: d.linkedIn || "",
+                website: d.portfolio || "",
+                photoUrl: d.photoUrl ?? undefined,
+              },
+              summary: d.summary || "",
+              experiences: (d.experiences || []).map((e: { id: string; title: string; company: string; location: string; startDate: string; endDate: string; current: boolean; bullets: string[] }) => ({
+                id: e.id,
+                company: e.company,
+                position: e.title,
+                startDate: e.startDate,
+                endDate: e.endDate || (e.current ? "En cours" : ""),
+                location: e.location,
+                bullets: (e.bullets || []).filter(Boolean),
+              })),
+              education: (d.educations || []).map((e: { id: string; degree: string; school: string; location: string; startDate: string; endDate: string; mention?: string }) => ({
+                id: e.id,
+                school: e.school,
+                degree: e.degree,
+                startDate: e.startDate,
+                endDate: e.endDate,
+                description: e.mention || "",
+              })),
+              skills: (d.skills || []).length
+                ? [{ category: "Compétences", items: d.skills }]
+                : [{ category: "Compétences", items: [] }],
+              languages: (d.languages || []).map((l: { name: string; level: string }) => ({ name: l.name, level: l.level })),
+              interests: d.interests || [],
+              detectedTheme: d.sector || "generique",
+            });
+            const detected = getThemeForSector(d.sector);
+            setSelectedTheme(detected);
+          } else {
+            const userName = session?.user?.name?.split(" ") || [];
+            setCv({ header: { firstName: userName[0] || "", lastName: userName.slice(1).join(" ") || "", title: "", email: session?.user?.email || "", phone: "", location: "" }, summary: "", experiences: [], education: [], skills: [{ category: "Compétences", items: [] }], languages: [], interests: [] });
+          }
+        })
+        .catch(() => toast.error("Erreur chargement du brouillon"))
+        .finally(() => setLoading(false));
+      return;
+    }
+
     // Create mode: no analysisId → start with blank template
     if (!analysisId) {
       const userName = session?.user?.name?.split(" ") || [];
@@ -1097,7 +1154,7 @@ export default function CVEditorPage() {
       })
       .catch(() => toast.error("Erreur réseau"))
       .finally(() => setLoading(false));
-  }, [analysisId, router, session]);
+  }, [analysisId, fromBuilder, router, session]);
 
   /* ── Update helpers ── */
   const updateHeader = useCallback(

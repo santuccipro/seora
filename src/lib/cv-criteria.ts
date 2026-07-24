@@ -168,7 +168,7 @@ export const CV_SECTOR_CRITERIA: Record<CvSectorKey, CvSectorCriteria> = {
     ],
     visual: {
       templateKey: "modern",
-      palette: ["#0EA5E9", "#0F172A", "#22D3EE"],
+      palette: ["#1E293B", "#3B82F6", "#10B981"],
       typography: "Sans-serif moderne (Inter, JetBrains Mono pour la stack)",
       density: "balanced",
     },
@@ -208,7 +208,7 @@ export const CV_SECTOR_CRITERIA: Record<CvSectorKey, CvSectorCriteria> = {
     ],
     visual: {
       templateKey: "creative",
-      palette: ["#EC4899", "#8B5CF6", "#F97316"],
+      palette: ["#FF6B2B", "#1A1A2E", "#FFB800"],
       typography: "Sans moderne (DM Sans, Poppins), touches d'accent visuel",
       density: "balanced",
     },

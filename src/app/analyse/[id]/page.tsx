@@ -221,7 +221,7 @@ export default function AnalysisPage() {
                 {Object.entries(analysis.scoreBreakdown).map(([key, val]) => {
                   const labels: Record<string, string> = {
                     structure: "Structure", contenu: "Contenu", experiences: "Expériences",
-                    competences: "Compétences", orthographe: "Orthographe", impact: "Impact ATS",
+                    competences: "Compétences", orthographe: "Orthographe", impact: "Impact recruteur",
                   };
                   let color = "text-red-600 bg-red-50";
                   if (val >= 70) color = "text-green-600 bg-green-50";

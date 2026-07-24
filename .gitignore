@@ -44,3 +44,9 @@ next-env.d.ts
 
 # local backups (humanizer refactor 11/07)
 .backups/
+.env*.local
+
+# playwright
+e2e/.auth/
+test-results/
+playwright-report/

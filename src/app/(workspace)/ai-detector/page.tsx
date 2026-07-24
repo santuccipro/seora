@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useAuthModal } from "@/components/auth/auth-context";
 import Link from "next/link";
 import { toast } from "sonner";
 import AiReport from "@/components/ai-report/ai-report";
@@ -87,6 +88,7 @@ type HumanizedZone = {
 
 export default function AiDetectorPage() {
   const { status } = useSession();
+  const { openAuthModal } = useAuthModal();
   const router = useRouter();
   const [text, setText] = useState("");
   const [language, setLanguage] = useState<Language>("fr");
@@ -96,11 +98,7 @@ export default function AiDetectorPage() {
   const [humanizedZones, setHumanizedZones] = useState<Record<number, HumanizedZone>>({});
   const [humanizingAll, setHumanizingAll] = useState(false);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/signin?callbackUrl=/ai-detector");
-    }
-  }, [status, router]);
+  // No redirect — auth gate at action time via openAuthModal
 
   useEffect(() => {
     const saved = sessionStorage.getItem("seora_ai_text");
@@ -213,6 +211,34 @@ export default function AiDetectorPage() {
           Retour au dashboard
         </Link>
 
+        {/* SEO Hero Section */}
+        <section className="max-w-3xl mx-auto px-4 pt-8 pb-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">
+            Détecteur IA de texte — Teste avant Turnitin &amp; Compilatio
+          </h1>
+          <p className="text-gray-600 text-lg mb-6">
+            Vérifie si ton texte sera détecté comme généré par une IA avant de le rendre. Score de probabilité + zones surlignées + comparaison multi-détecteurs en 10 secondes.
+          </p>
+
+          <div className="space-y-4 text-gray-600 text-sm mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Comment fonctionne la détection IA ?</h2>
+            <p>
+              Les logiciels comme Turnitin, Compilatio et GPTZero analysent des caractéristiques statistiques du texte : perplexité, burstiness, distribution des probabilités de tokens. Un texte généré par IA présente une perplexité basse et une burstiness uniforme — le contraire d&apos;un texte humain.
+            </p>
+            <p>
+              Seora simule l&apos;analyse de 4 détecteurs majeurs et te donne un score consolidé sur 100, avec les zones à risque surlignées directement dans ton texte.
+            </p>
+            <h2 className="text-xl font-semibold text-gray-900">Quand utiliser ce détecteur ?</h2>
+            <p>
+              Avant de rendre un mémoire, une dissertation ou un rapport de stage. Si tu as utilisé ChatGPT ou un autre outil IA pour t&apos;aider à rédiger, teste ton texte ici avant soumission. Si le score dépasse 40%, utilise l&apos;humanisateur Seora pour réécrire les passages détectés.
+            </p>
+            <h2 className="text-xl font-semibold text-gray-900">Quels détecteurs sont simulés ?</h2>
+            <p>
+              Turnitin AI Detection, Compilatio, GPTZero et Copyleaks. Ces 4 outils sont les plus utilisés dans les universités françaises et les grandes écoles.
+            </p>
+          </div>
+        </section>
+
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-lg shadow-violet-500/25 mb-4">
             <Search className="h-7 w-7 text-white" />
@@ -297,7 +323,7 @@ export default function AiDetectorPage() {
             </div>
 
             <button
-              onClick={runAnalysis}
+              onClick={() => { if (status !== "authenticated") { openAuthModal(() => runAnalysis()); return; } runAnalysis(); }}
               disabled={text.trim().length < 100}
               className="w-full mt-5 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-violet-500/25 hover:shadow-xl transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             >

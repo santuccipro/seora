@@ -35,6 +35,12 @@ export async function GET() {
       avgScore,
       recentUsers,
       recentPurchases,
+      tokensDistributed,
+      totalHumanizer,
+      totalPhotoGenerations,
+      totalInterviewPrep,
+      totalLinkedInAnalysis,
+      dormantUsers,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
@@ -66,13 +72,30 @@ export async function GET() {
         take: 10,
         include: { user: { select: { name: true, email: true } } },
       }),
+      prisma.user.aggregate({ _sum: { tokens: true } }),
+      prisma.humanizerAnalysis.count().catch(() => 0),
+      prisma.photoGeneration.count().catch(() => 0),
+      prisma.interviewPrepSession.count().catch(() => 0),
+      prisma.linkedInAnalysis.count().catch(() => 0),
+      prisma.user.count({ where: { tokens: 150, createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } } }),
     ]);
+
+    const featureUsage = [
+      { name: "Analyse CV", count: totalAnalyses },
+      { name: "Lettre de motivation", count: totalCoverLetters },
+      { name: "Job Matching", count: totalJobMatches },
+      { name: "Humaniseur", count: totalHumanizer as number },
+      { name: "Photo Pro", count: totalPhotoGenerations as number },
+      { name: "Prep Entretien", count: totalInterviewPrep as number },
+      { name: "LinkedIn Analyzer", count: totalLinkedInAnalysis as number },
+    ].sort((a, b) => b.count - a.count).slice(0, 5);
 
     return NextResponse.json({
       users: {
         total: totalUsers,
         thisMonth: usersThisMonth,
         thisWeek: usersThisWeek,
+        dormant7d: dormantUsers,
       },
       analyses: {
         total: totalAnalyses,
@@ -85,6 +108,8 @@ export async function GET() {
         total: (totalRevenue._sum.price ?? 0) / 100,
         thisMonth: (revenueThisMonth._sum.price ?? 0) / 100,
       },
+      tokensDistributed: tokensDistributed._sum.tokens ?? 0,
+      featureUsage,
       recentUsers,
       recentPurchases,
     });

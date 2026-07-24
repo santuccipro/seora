@@ -39,6 +39,8 @@ import { CvReport } from "@/components/cv-report/cv-report";
 import { CoverLetterReport } from "@/components/cv-report/cover-letter-report";
 import { NotEnoughTokensModal } from "@/components/not-enough-tokens-modal";
 import { CV_SECTOR_LIST, type CvSectorKey } from "@/lib/cv-criteria";
+import { DashboardEnhancements } from "@/components/dashboard/enhancements";
+import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
 import type { CvDeepReport } from "@/lib/cv-deep-analysis";
 import type { ClDeepReport } from "@/lib/cover-letter-deep-analysis";
 import { track, EVT } from "@/lib/analytics";
@@ -139,6 +141,7 @@ export default function Home() {
 
   // UI state
   const [showTokens, setShowTokens] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeTab, setActiveTab] = useState<"results" | "corrections" | "cover-letter" | "job-match">("results");
   const [theatricalStep, setTheatricalStep] = useState(-1);
   const [activeSection, setActiveSection] = useState<"dashboard" | "analysis">("dashboard");
@@ -235,6 +238,14 @@ export default function Home() {
       }).catch(() => {}).finally(() => setLoadingDashboard(false));
     }
   }, [session]);
+
+  // Onboarding modal — show once to new users
+  useEffect(() => {
+    const done = localStorage.getItem("seora_onboarding_done");
+    if (!done) {
+      setTimeout(() => setShowOnboarding(true), 800);
+    }
+  }, []);
 
   /* ─── Upload CV ─── */
   const handleUpload = useCallback(
@@ -548,6 +559,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-mesh">
+      {/* Onboarding modal */}
+      {showOnboarding && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
+
       {/* Deep report overlay */}
       {showReport && deepReport && (
         <CvReport report={deepReport} onClose={() => setShowReport(false)} onUpsell={handleDeepUpsell} />
@@ -679,11 +693,11 @@ export default function Home() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">
-                  Salut {firstName}
+                  Bonjour {firstName} 👋
                 </h1>
                 <p className="text-sm text-gray-400 mt-0.5">
                   {(dashboard?.stats.totalAnalyses ?? 0) === 0
-                    ? "Prêt à optimiser ta candidature ?"
+                    ? "Ton espace candidature — CV, lettres, LinkedIn, entretien."
                     : `${dashboard?.stats.totalAnalyses} analyse${(dashboard?.stats.totalAnalyses ?? 0) > 1 ? "s" : ""} — score moyen de ${dashboard?.stats.avgScore || "—"}/100`}
                 </p>
               </div>
@@ -700,6 +714,9 @@ export default function Home() {
                 </div>
               </button>
             </div>
+
+            {/* ─── Dashboard enhancements (stats, tips, quick actions) ─── */}
+            <DashboardEnhancements />
 
             {/* ─── Bento grid — 4 tools ─── */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-3.5" style={{ gridTemplateRows: "1fr 1fr" }}>
@@ -1031,7 +1048,7 @@ export default function Home() {
                         </div>
                         <div>
                           <p className="text-sm font-black leading-tight">Rapport complet par secteur</p>
-                          <p className="text-[11px] text-white/70 mt-0.5">Verdict honnête, ATS, red flags, quick wins</p>
+                          <p className="text-[11px] text-white/70 mt-0.5">Verdict honnête, points bloquants, conseils actionnables</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

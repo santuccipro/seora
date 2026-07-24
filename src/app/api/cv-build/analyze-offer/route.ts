@@ -41,7 +41,7 @@ Offre d'emploi :
 ${body.offerText.slice(0, 8000)}`;
 
   try {
-    const raw = (await callClaude(prompt, { system, model: "claude-haiku-4-5", timeoutMs: 30_000 })).trim();
+    const raw = (await callClaude(prompt, { system, model: "claude-sonnet-4-6", timeoutMs: 30_000 })).trim();
     const jsonStr = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
     const parsed = JSON.parse(jsonStr) as { sector: string; jobTitle: string; keywords: string[] };
     if (!parsed.sector || !parsed.jobTitle || !Array.isArray(parsed.keywords)) {

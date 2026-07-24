@@ -35,7 +35,7 @@ Règles :
   try {
     const raw = (await callClaude(prompt, {
       system: "Tu es expert RH et rédaction de CV français. Réponds en français.",
-      model: "claude-haiku-4-5",
+      model: "claude-sonnet-4-6",
       timeoutMs: 55_000,
     })).trim();
 

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuthModal } from "@/components/auth/auth-context";
 import Link from "next/link";
 import { toast } from "sonner";
 import AiReport from "@/components/ai-report/ai-report";
@@ -218,6 +219,7 @@ const LANG_META: Record<Language, { label: string; flag: string }> = {
 
 export default function HumanizerPage() {
   const { data: session, status } = useSession();
+  const { openAuthModal } = useAuthModal();
   const router = useRouter();
   const searchParams = useSearchParams();
   const existingId = searchParams.get("id");
@@ -327,12 +329,7 @@ export default function HumanizerPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [onboardingSeen, setOnboardingSeen] = useState(true);
 
-  // Redirect if unauth
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/signin?callbackUrl=/humanizer");
-    }
-  }, [status, router]);
+  // No redirect — auth gate at action time via openAuthModal
 
   // Check onboarding flag
   useEffect(() => {
@@ -1052,6 +1049,48 @@ export default function HumanizerPage() {
           </div>
         </div>
 
+        {/* SEO Hero Section — visible avant l'outil */}
+        <section className="max-w-3xl mx-auto px-4 pt-8 pb-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">
+            Humanisateur de texte IA — Indétectable Turnitin &amp; Compilatio
+          </h1>
+          <p className="text-gray-600 text-lg mb-6">
+            Transforme ton texte généré par IA en contenu 100% humain, indétectable par Turnitin, Compilatio, GPTZero et Copyleaks. Résultat en 30 secondes.
+          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            {[
+              { label: "Turnitin", icon: "✓" },
+              { label: "Compilatio", icon: "✓" },
+              { label: "GPTZero", icon: "✓" },
+              { label: "Copyleaks", icon: "✓" },
+            ].map((d) => (
+              <div key={d.label} className="bg-green-50 border border-green-100 rounded-xl px-3 py-2 text-center">
+                <span className="text-green-500 font-bold">{d.icon}</span>
+                <span className="text-xs text-gray-700 ml-1 font-medium">{d.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-4 text-gray-600 text-sm mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Comment humaniser un texte IA ?</h2>
+            <p>
+              Colle ton texte généré par ChatGPT, Claude ou Gemini dans la zone ci-dessous. Seora analyse la structure, le vocabulaire et les patterns linguistiques pour réécrire ton contenu avec un style naturellement humain — sans en changer le sens.
+            </p>
+            <p>
+              Notre algorithme applique plusieurs niveaux de reformulation : basic (léger), balanced (recommandé), aggressive (maximum) et compilatio-proof (spécial académique). Chaque mode adapte l&apos;intensité de la transformation à ton besoin.
+            </p>
+            <h2 className="text-xl font-semibold text-gray-900">Pourquoi les détecteurs IA signalent ton texte ?</h2>
+            <p>
+              Les outils comme Turnitin et Compilatio analysent des patterns statistiques : longueur de phrase uniforme, vocabulaire &quot;plat&quot;, absence de fautes naturelles, structure trop régulière. Seora introduit une variabilité linguistique qui rend ton texte statistiquement indiscernable d&apos;un texte humain.
+            </p>
+            <h2 className="text-xl font-semibold text-gray-900">Pour quel type de documents ?</h2>
+            <p>
+              Mémoires, rapports de stage, dissertations, articles, emails professionnels. Le mode &quot;compilatio-proof&quot; est optimisé pour les documents académiques soumis aux logiciels de détection universitaires français.
+            </p>
+          </div>
+        </section>
+
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/25 mb-4">
             <Bot className="h-7 w-7 text-white" />
@@ -1634,7 +1673,7 @@ export default function HumanizerPage() {
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
-                  onClick={startAnalysis}
+                  onClick={() => { if (status !== "authenticated") { openAuthModal(() => startAnalysis()); return; } startAnalysis(); }}
                   className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-white text-orange-700 px-5 py-3.5 text-sm font-black shadow-lg hover:shadow-xl transition-all"
                 >
                   <Sparkles className="h-4 w-4" />
@@ -1701,7 +1740,7 @@ export default function HumanizerPage() {
 
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
-                  onClick={startAnalysis}
+                  onClick={() => { if (status !== "authenticated") { openAuthModal(() => startAnalysis()); return; } startAnalysis(); }}
                   className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-white text-orange-700 px-5 py-3.5 text-sm font-black shadow-lg hover:shadow-xl transition-all"
                 >
                   <Sparkles className="h-4 w-4" />
@@ -1834,7 +1873,7 @@ export default function HumanizerPage() {
 
             {/* Big single-CTA — étape 1 : analyse seule (1 token) */}
             <button
-              onClick={startAnalyzeOnly}
+              onClick={() => { if (status !== "authenticated") { openAuthModal(() => startAnalyzeOnly()); return; } startAnalyzeOnly(); }}
               disabled={!uploaded}
               className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed mb-4"
             >

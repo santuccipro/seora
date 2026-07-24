@@ -37,7 +37,7 @@ Règles strictes :
 - Réponds UNIQUEMENT avec 3 lignes, une par bullet, sans numérotation ni tirets ni guillemets`;
 
   try {
-    const raw = (await callClaude(prompt, { system: "Tu es un expert en rédaction de CV français.", model: "claude-haiku-4-5", timeoutMs: 30_000 })).trim();
+    const raw = (await callClaude(prompt, { system: "Tu es un expert en rédaction de CV français.", model: "claude-sonnet-4-6", timeoutMs: 30_000 })).trim();
     const bullets = raw.split("\n").map((l: string) => l.replace(/^[-•·*\d.)\s]+/, "").trim()).filter(Boolean).slice(0, 4);
     if (!bullets.length) throw new Error("Réponse vide");
     return NextResponse.json({ bullets });

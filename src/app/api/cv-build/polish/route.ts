@@ -58,7 +58,7 @@ Secteur cible : ${body.sector ?? "généraliste"}`;
   }
 
   try {
-    const out = (await callClaude(prompt, { system, model: "claude-haiku-4-5", timeoutMs: 40_000 })).trim();
+    const out = (await callClaude(prompt, { system, model: "claude-sonnet-4-6", timeoutMs: 40_000 })).trim();
     return NextResponse.json({ text: out });
   } catch (err) {
     return NextResponse.json(

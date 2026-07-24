@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { generateCoverLetter } from "@/lib/analyze-cv";
 import { researchCompany } from "@/lib/scrape-company";
 import { rateLimit } from "@/lib/rate-limit";
+import { captureError } from "@/lib/sentry";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -117,6 +118,7 @@ Taille: ${companyInfo.size}
         where: { id: user.id },
         data: { tokens: { increment: 3 } },
       });
+      captureError(error, { route: "cover-letter/generate", userId: user.id });
       console.error("Cover letter generation error:", error);
       return NextResponse.json(
         { error: "Erreur lors de la génération" },
@@ -124,6 +126,7 @@ Taille: ${companyInfo.size}
       );
     }
   } catch (error) {
+    captureError(error, { route: "cover-letter/generate" });
     console.error("Cover letter generation error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la génération" },

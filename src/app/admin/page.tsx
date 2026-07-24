@@ -14,9 +14,11 @@ import {
 } from "lucide-react";
 
 interface Stats {
-  users: { total: number; thisMonth: number; thisWeek: number };
+  users: { total: number; thisMonth: number; thisWeek: number; dormant7d: number };
   analyses: { total: number; thisMonth: number; coverLetters: number; jobMatches: number; avgScore: number };
   revenue: { total: number; thisMonth: number };
+  tokensDistributed: number;
+  featureUsage: { name: string; count: number }[];
   recentUsers: { id: string; name: string | null; email: string; tokens: number; createdAt: string }[];
   recentPurchases: {
     id: string; amount: number; price: number; createdAt: string;
@@ -123,18 +125,45 @@ export default function AdminPage() {
         </div>
 
         {/* Additional metrics */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="rounded-2xl bg-white border border-gray-200 p-6 shadow-sm text-center">
             <p className="text-3xl font-bold text-gray-900">{stats.analyses.coverLetters}</p>
-            <p className="text-sm text-gray-500">Lettres de motivation</p>
+            <p className="text-sm text-gray-500">Lettres générées</p>
           </div>
           <div className="rounded-2xl bg-white border border-gray-200 p-6 shadow-sm text-center">
             <p className="text-3xl font-bold text-gray-900">{stats.analyses.jobMatches}</p>
             <p className="text-sm text-gray-500">Matchings offre/CV</p>
           </div>
           <div className="rounded-2xl bg-white border border-gray-200 p-6 shadow-sm text-center">
-            <p className="text-3xl font-bold text-gray-900">{stats.users.thisMonth}</p>
-            <p className="text-sm text-gray-500">Nouveaux users ce mois</p>
+            <p className="text-3xl font-bold text-gray-900">{stats.tokensDistributed.toLocaleString("fr-FR")}</p>
+            <p className="text-sm text-gray-500">Tokens en circulation</p>
+          </div>
+          <div className="rounded-2xl bg-white border border-gray-200 p-6 shadow-sm text-center">
+            <p className="text-3xl font-bold text-amber-500">{stats.users.dormant7d}</p>
+            <p className="text-sm text-gray-500">Users dormants 7j</p>
+          </div>
+        </div>
+
+        {/* Feature usage top 5 */}
+        <div className="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-900">Top features utilisées</h3>
+          </div>
+          <div className="p-6 space-y-3">
+            {stats.featureUsage.map((f, i) => {
+              const max = stats.featureUsage[0]?.count || 1;
+              const pct = Math.round((f.count / max) * 100);
+              return (
+                <div key={f.name} className="flex items-center gap-4">
+                  <span className="w-5 text-xs font-bold text-gray-400">#{i + 1}</span>
+                  <span className="w-40 text-sm font-medium text-gray-700 shrink-0">{f.name}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2">
+                    <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-sm font-bold text-gray-900 w-10 text-right">{f.count}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 

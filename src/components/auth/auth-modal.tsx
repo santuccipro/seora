@@ -14,16 +14,20 @@ import {
   Sparkles,
   FileText,
   Bot,
+  Camera,
+  ScanText,
 } from "lucide-react";
 import Link from "next/link";
+import type { AuthModalContext } from "./auth-context";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  context?: AuthModalContext;
 }
 
-export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
+export function AuthModal({ isOpen, onClose, onSuccess, context = "default" }: AuthModalProps) {
   useEffect(() => {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
@@ -55,6 +59,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           <X className="h-5 w-5" />
         </button>
         <OTPAuthForm
+          context={context}
           onSuccess={() => {
             onClose();
             if (onSuccess) onSuccess();
@@ -66,14 +71,43 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   );
 }
 
-const benefits = [
-  { icon: FileText, text: "Corrections détaillées de ton CV" },
-  { icon: Sparkles, text: "CV réécrit et optimisé par l'IA" },
-  { icon: Bot, text: "Score de 42 → 90+ en 30 secondes" },
-  { icon: CheckCircle2, text: "Passe les filtres ATS des recruteurs" },
-];
+const BENEFITS: Record<string, { text: string }[]> = {
+  photo: [
+    { text: "Photo pro LinkedIn en HD" },
+    { text: "Fond neutre · retouche IA" },
+    { text: "Résultat en ~15 secondes" },
+    { text: "Téléchargement immédiat" },
+  ],
+  detect: [
+    { text: "Score IA détaillé 0-100%" },
+    { text: "Analyse passage par passage" },
+    { text: "Rapport PDF exportable" },
+    { text: "Compatible Compilatio, Turnitin" },
+  ],
+  humanize: [
+    { text: "Texte réécrit façon humain" },
+    { text: "Score IA → 0% en 30 sec" },
+    { text: "Passe tous les détecteurs" },
+    { text: "PDF + Word téléchargeables" },
+  ],
+  default: [
+    { text: "Corrections détaillées de ton CV" },
+    { text: "CV réécrit et optimisé par l'IA" },
+    { text: "Score de 42 → 90+ en 30 secondes" },
+    { text: "Passe les filtres ATS des recruteurs" },
+  ],
+};
+BENEFITS.cv = BENEFITS.default;
 
-function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
+const MODAL_COPY: Record<string, { title: string; subtitle: string }> = {
+  photo: { title: "Ta photo pro est prête !", subtitle: "Entre ton email pour télécharger en HD" },
+  detect: { title: "Débloque ton rapport IA", subtitle: "Entre ton email pour voir le score complet" },
+  humanize: { title: "Débloque le texte humanisé", subtitle: "Entre ton email pour voir et télécharger" },
+  default: { title: "Débloque ton résultat complet", subtitle: "Entre ton email pour voir les corrections" },
+};
+MODAL_COPY.cv = MODAL_COPY.default;
+
+function OTPAuthForm({ onSuccess, context = "default" }: { onSuccess: () => void; context?: string }) {
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState(["", "", "", "", "", ""]);
@@ -173,16 +207,16 @@ function OTPAuthForm({ onSuccess }: { onSuccess: () => void }) {
               <Mail className="h-6 w-6 text-indigo-600" />
             </div>
             <h3 className="mt-4 text-xl font-bold text-gray-900">
-              Débloque ton résultat complet
+              {(MODAL_COPY[context] ?? MODAL_COPY.default).title}
             </h3>
             <p className="mt-2 text-sm text-gray-500">
-              Entre ton email pour voir les corrections
+              {(MODAL_COPY[context] ?? MODAL_COPY.default).subtitle}
             </p>
           </div>
 
           {/* Benefits list */}
           <div className="mt-5 grid grid-cols-2 gap-2">
-            {benefits.map((b) => (
+            {(BENEFITS[context] ?? BENEFITS.default).map((b) => (
               <div
                 key={b.text}
                 className="flex items-center gap-2 rounded-xl bg-gray-50/80 px-3 py-2.5"

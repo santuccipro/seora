@@ -8,37 +8,58 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  tokens        Int       @default(5)
-  referralCode  String?   @unique
-  referredBy    String?
-  totalReferrals Int      @default(0)
-  isAdmin       Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  accounts            Account[]
-  sessions            Session[]
-  cvAnalyses          CVAnalysis[]
-  coverLetters        CoverLetterAnalysis[]
-  jobMatches          JobMatch[]
-  tokenPurchases      TokenPurchase[]
-  humanizerAnalyses   HumanizerAnalysis[]
-  cvDraft             CvDraft?
+  id                String                @id @default(cuid())
+  name              String?
+  email             String                @unique
+  emailVerified     DateTime?
+  image             String?
+  password          String?
+  tokens            Int                   @default(150)
+  referralCode      String?               @unique
+  referredBy        String?
+  totalReferrals    Int                   @default(0)
+  isAdmin           Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  accounts              Account[]
+  cvAnalyses            CVAnalysis[]
+  coverLetters          CoverLetterAnalysis[]
+  cvDraft               CvDraft?
+  humanizerAnalyses     HumanizerAnalysis[]
+  jobMatches            JobMatch[]
+  jobApplications       JobApplication[]
+  publicCvs             PublicCv[]
+  sessions              Session[]
+  tokenPurchases        TokenPurchase[]
+  linkedInAnalyses      LinkedInAnalysis[]
+  interviewPrepSessions InterviewPrepSession[]
+  photoGenerations      PhotoGeneration[]
 }
 
 model CvDraft {
   id        String   @id @default(cuid())
   userId    String   @unique
-  payload   String   // JSON serialised CvDraft (see /cv-builder)
+  payload   String
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PublicCv {
+  id        String   @id @default(cuid())
+  userId    String
+  slug      String   @unique
+  payload   String   @db.Text
+  sector    String
+  firstName String
+  lastName  String
+  isActive  Boolean  @default(true)
+  viewCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
@@ -54,8 +75,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -65,8 +85,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -78,66 +97,63 @@ model VerificationToken {
 }
 
 model CVAnalysis {
-  id              String   @id @default(cuid())
-  userId          String
-  fileName        String
-  fileContent     String
-  score           Int?
-  scoreBreakdown  String?
-  summary         String?
-  strengths       String?
-  weaknesses      String?
-  corrections     String?
-  correctedCV     String?
-  structuredCV    String?
-  originalImage   String?
-  status          String   @default("pending")
-  tokensUsed      Int      @default(0)
-  shareToken      String?  @unique
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobMatches JobMatch[]
+  id             String     @id @default(cuid())
+  userId         String
+  fileName       String
+  fileContent    String
+  score          Int?
+  scoreBreakdown String?
+  summary        String?
+  strengths      String?
+  weaknesses     String?
+  corrections    String?
+  correctedCV    String?
+  structuredCV   String?
+  originalImage  String?
+  status         String     @default("pending")
+  tokensUsed     Int        @default(0)
+  shareToken     String?    @unique
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobMatches     JobMatch[]
 }
 
 model CoverLetterAnalysis {
-  id              String   @id @default(cuid())
-  userId          String
-  fileName        String
-  fileContent     String
-  score           Int?
-  scoreBreakdown  String?
-  summary         String?
-  strengths       String?
-  weaknesses      String?
-  corrections     String?
-  correctedText   String?
-  status          String   @default("pending")
-  tokensUsed      Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  userId         String
+  fileName       String
+  fileContent    String
+  score          Int?
+  scoreBreakdown String?
+  summary        String?
+  strengths      String?
+  weaknesses     String?
+  corrections    String?
+  correctedText  String?
+  status         String   @default("pending")
+  tokensUsed     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model JobMatch {
-  id              String   @id @default(cuid())
-  userId          String
-  cvAnalysisId    String
-  jobTitle        String
-  jobDescription  String
-  matchScore      Int?
-  adaptedCV       String?
-  suggestions     String?
-  keywords        String?
-  status          String   @default("pending")
-  tokensUsed      Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cvAnalysis CVAnalysis @relation(fields: [cvAnalysisId], references: [id], onDelete: Cascade)
+  id             String     @id @default(cuid())
+  userId         String
+  cvAnalysisId   String
+  jobTitle       String
+  jobDescription String
+  matchScore     Int?
+  adaptedCV      String?
+  suggestions    String?
+  keywords       String?
+  status         String     @default("pending")
+  tokensUsed     Int        @default(0)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  cvAnalysis     CVAnalysis @relation(fields: [cvAnalysisId], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model TokenPurchase {
@@ -148,30 +164,111 @@ model TokenPurchase {
   stripeSessionId String?  @unique
   status          String   @default("pending")
   createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+model JobApplication {
+  id            String    @id @default(cuid())
+  userId        String
+  companyName   String
+  position      String
+  sector        String?
+  status        String    @default("planned")
+  appliedAt     DateTime?
+  interviewDate DateTime?
+  jobUrl        String?
+  salary        String?
+  location      String?
+  contactName   String?
+  contactEmail  String?
+  notes         String?
+  cvAnalysisId  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
 }
 
 model HumanizerAnalysis {
-  id                String   @id @default(cuid())
-  userId            String
-  fileName          String
-  fileType          String   // "pdf" | "docx" | "doc" | "txt"
-  originalText      String   @db.Text  // Full extracted text
-  humanizedText     String?  @db.Text  // After humanization
-  aiScoreBefore     Int?     // 0-100 probability of AI generated content
-  aiScoreAfter      Int?     // 0-100
-  scoreDetails      String?  @db.Text  // JSON: perplexity, burstiness, homoglyphs, patterns
-  passesCount       Int      @default(0)  // Number of humanization passes applied
-  wordCount         Int?
-  status            String   @default("pending")  // pending | extracting | detecting | humanizing | done | failed
-  errorMessage      String?
-  tokensUsed        Int      @default(3)
-  shareToken        String?  @unique
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  fileName      String
+  fileType      String
+  originalText  String
+  humanizedText String?
+  aiScoreBefore Int?
+  aiScoreAfter  Int?
+  scoreDetails  String?
+  passesCount   Int      @default(0)
+  wordCount     Int?
+  status        String   @default("pending")
+  errorMessage  String?
+  tokensUsed    Int      @default(3)
+  shareToken    String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}
+
+model LinkedInAnalysis {
+  id                   String   @id @default(cuid())
+  userId               String
+  targetSector         String
+  targetRole           String
+  targetLevel          String
+  globalScore          Int
+  scoreBreakdown       String   // JSON stringified
+  verdict              String
+  strengths            String   // JSON stringified
+  weaknesses           String   // JSON stringified
+  rewrittenTitle       String
+  rewrittenSummary     String   @db.Text
+  missingKeywords      String   // JSON stringified
+  recommendedSkills    String   // JSON stringified
+  quickWins            String   // JSON stringified
+  recruiterInsight     String   @db.Text
+  competitorComparison String   @db.Text
+  tokensUsed           Int      @default(1)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model InterviewPrepSession {
+  id              String   @id @default(cuid())
+  userId          String
+  sector          String
+  position        String
+  companyName     String?
+  experienceLevel String?
+  questions       String   @db.Text  // JSON stringified
+  globalTips      String             // JSON stringified
+  redFlags        String             // JSON stringified
+  tokensUsed      Int      @default(1)
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model PhotoGeneration {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageUrls   String[]
+  fond        String   @default("neutre")
+  tonalite    String   @default("classique")
+  pose        String   @default("face")
+  expression  String   @default("neutre")
+  notes       String   @default("")
+  tokensUsed  Int      @default(2)
+  createdAt   DateTime @default(now())
 
   @@index([userId, createdAt])
 }

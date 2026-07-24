@@ -97,13 +97,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="border-t border-gray-100 p-4">
-            <div className="mb-3 px-4">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {session?.user?.name}
-              </p>
-              <p className="text-xs text-gray-400 truncate">
-                {session?.user?.email}
-              </p>
+            <div className="mb-3 flex items-center gap-3 px-2">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 text-white text-sm font-bold">
+                {(session?.user?.name?.[0] ?? session?.user?.email?.[0] ?? "?").toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                  {session?.user?.name ?? "Mon compte"}
+                </p>
+                <p className="text-xs text-gray-400 truncate">
+                  {session?.user?.email}
+                </p>
+              </div>
             </div>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
@@ -126,7 +131,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <span className="font-bold text-gray-900">Seora <span className="gradient-text">CV</span></span>
           </Link>
           <div className="flex items-center gap-1">
-            {navItems.slice(0, 4).map((item) => (
+            {navItems.slice(0, 3).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -137,6 +142,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <item.icon className="h-5 w-5" />
               </Link>
             ))}
+            {session?.user?.email && (
+              <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 text-white text-xs font-bold flex-shrink-0">
+                {(session.user.name?.[0] ?? session.user.email[0]).toUpperCase()}
+              </div>
+            )}
           </div>
         </div>
       </div>

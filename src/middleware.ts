@@ -20,9 +20,9 @@ export const config = {
     "/tokens/:path*",
     "/referral/:path*",
     "/analyse/:path*",
-    "/job-match/:path*",
-    "/cover-letter/:path*",
     "/cv-editor/:path*",
+    "/cv-builder/:path*",
     "/profile/:path*",
+    "/applications/:path*",
   ],
 };

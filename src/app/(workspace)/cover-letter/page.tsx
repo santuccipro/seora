@@ -3,8 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { DashboardLayout } from "@/components/dashboard/layout";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 import {
   PenTool,
   Loader2,
@@ -21,6 +21,7 @@ import {
   ArrowRight,
   X,
   Check,
+  FileDown,
 } from "lucide-react";
 import { ScoreRing } from "@/components/charts/score-ring";
 import { useDropzone } from "react-dropzone";
@@ -59,6 +60,7 @@ export default function CoverLetterPage() {
   const [generatedLetter, setGeneratedLetter] = useState<string | null>(null);
   const [tips, setTips] = useState<string[]>([]);
   const [companyInsights, setCompanyInsights] = useState<string[]>([]);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Theatrical loading
   const [theatricalStep, setTheatricalStep] = useState(-1);
@@ -228,8 +230,39 @@ export default function CoverLetterPage() {
     }
   }
 
+  async function handleDownloadPdf() {
+    if (!generatedLetter) return;
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch("/api/cover-letter/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coverLetter: generatedLetter,
+          companyName,
+          tone: letterTone,
+        }),
+      });
+      if (!res.ok) { toast.error("Erreur génération PDF"); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `LM_${companyName.replace(/\s+/g, "_") || "lettre"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Lettre PDF téléchargée ✨");
+    } catch {
+      toast.error("Erreur de connexion");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
@@ -239,6 +272,20 @@ export default function CoverLetterPage() {
           <p className="mt-1 text-gray-600">
             Générez une lettre personnalisée ou analysez une lettre existante
           </p>
+        </div>
+
+        {/* Cross-link CV builder */}
+        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-600">
+            <span className="font-semibold text-gray-800">Conseil :</span> Lie ton CV pour une lettre ultra-personnalisée
+          </p>
+          <Link
+            href="/cv-builder"
+            className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-gray-900 text-white px-3 py-1.5 text-xs font-semibold hover:bg-gray-700 transition-colors"
+          >
+            Créer mon CV
+            <ArrowRight className="h-3 w-3" />
+          </Link>
         </div>
 
         {/* Tabs */}
@@ -262,6 +309,22 @@ export default function CoverLetterPage() {
             Analyser une lettre
           </button>
         </div>
+
+        {/* Wizard banner */}
+        <Link
+          href="/cover-letter/wizard"
+          className="flex items-center justify-between gap-4 rounded-2xl px-5 py-4 bg-gradient-to-r from-indigo-500 to-violet-600 shadow-md hover:shadow-lg transition-shadow group"
+        >
+          <div>
+            <p className="text-sm font-bold text-white">
+              ✨ Essaie le mode guidé étape par étape
+            </p>
+            <p className="text-xs text-indigo-100 mt-0.5">
+              4 étapes simples · Personnalisation complète · Résultat immédiat
+            </p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-white shrink-0 group-hover:translate-x-1 transition-transform" />
+        </Link>
 
         {activeTab === "generate" && !generatedLetter && (
           <div className="space-y-6">
@@ -540,6 +603,31 @@ export default function CoverLetterPage() {
               </div>
             )}
 
+            {/* PDF download */}
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-6 py-4 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+            >
+              {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              {downloadingPdf ? "Génération PDF…" : "Télécharger en PDF"}
+            </button>
+
+            {/* Cross-link CV builder */}
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-indigo-900">Tu n&apos;as pas encore de CV ?</p>
+                <p className="text-xs text-indigo-600 mt-0.5">Crée ton CV professionnel en 9 étapes — templates sectoriels + personnalisation visuelle</p>
+              </div>
+              <Link
+                href="/cv-builder"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 text-white px-4 py-2 text-xs font-bold hover:bg-indigo-700 transition-colors"
+              >
+                Créer mon CV
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
             <button
               onClick={() => { setGeneratedLetter(null); setJobDescription(""); setCompanyInfo(null); }}
               className="w-full rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
@@ -656,7 +744,7 @@ export default function CoverLetterPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }
 

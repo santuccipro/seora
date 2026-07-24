@@ -115,6 +115,7 @@ async function renderPdf(html: string): Promise<Buffer> {
     const page = await browser.newPage();
     await page.setViewport({ width: 794, height: 1123 });
     await page.setContent(html, { waitUntil: "load", timeout: 30000 });
+    await page.evaluate(() => document.fonts.ready);
     const buf = Buffer.from(await page.pdf({
       format: "A4",
       printBackground: true,

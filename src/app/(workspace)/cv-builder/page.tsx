@@ -262,9 +262,10 @@ export default function CvBuilderPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
 
   // LinkedIn import
-  const [linkedinPanelOpen, setLinkedinPanelOpen] = useState(false);
+  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [linkedinText, setLinkedinText] = useState("");
   const [linkedinImporting, setLinkedinImporting] = useState(false);
+  const [linkedinSummary, setLinkedinSummary] = useState<string | null>(null);
 
   // Auth gate
   useEffect(() => {
@@ -442,6 +443,7 @@ export default function CvBuilderPage() {
       return;
     }
     setLinkedinImporting(true);
+    setLinkedinSummary(null);
     try {
       const res = await fetch("/api/cv-build/linkedin-import", {
         method: "POST",
@@ -461,6 +463,7 @@ export default function CvBuilderPage() {
         if (extract.lastName) merged.lastName = extract.lastName;
         if (extract.city) merged.city = extract.city;
         if (extract.linkedin) merged.linkedIn = extract.linkedin;
+        else if (linkedinUrl.trim()) merged.linkedIn = linkedinUrl.trim();
         if (extract.role) merged.targetRole = extract.role;
         if (extract.summary) merged.summary = extract.summary;
         if (extract.skills?.length) merged.skills = [...new Set([...d.skills, ...extract.skills])];
@@ -497,8 +500,14 @@ export default function CvBuilderPage() {
         }
         return merged;
       });
-      toast.success("LinkedIn importé ! Vérifie les informations.");
-      setLinkedinPanelOpen(false);
+
+      const name = [extract.firstName, extract.lastName].filter(Boolean).join(" ");
+      const parts = [
+        name && `${name}`,
+        extract.experiences?.length && `${extract.experiences.length} exp.`,
+        extract.skills?.length && `${extract.skills.length} compétences`,
+      ].filter(Boolean);
+      setLinkedinSummary(`✓ ${parts.join(" · ")} importés`);
       setLinkedinText("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur import LinkedIn");
@@ -613,29 +622,53 @@ export default function CvBuilderPage() {
         <div className="rounded-3xl bg-white shadow-xl border border-emerald-100 p-6 sm:p-8">
           {step === 1 && (
             <div className="space-y-5">
-              {/* LinkedIn import panel */}
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setLinkedinPanelOpen((v) => !v)}
-                  className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <Linkedin className="h-4 w-4" />
-                    Importer depuis LinkedIn
-                  </span>
-                  {linkedinPanelOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-                {linkedinPanelOpen && (
-                  <div className="px-4 pb-4 space-y-3 border-t border-indigo-100 pt-3">
-                    <p className="text-xs text-indigo-600">
-                      Ouvre ton profil LinkedIn, sélectionne tout le texte de la page (Ctrl+A) et colle-le ici.
-                    </p>
+              {/* LinkedIn import panel — always visible */}
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#0A66C2] flex-shrink-0">
+                    <Linkedin className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <span className="text-sm font-bold text-indigo-800">Importer depuis LinkedIn</span>
+                  <span className="ml-auto text-[10px] font-semibold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full uppercase tracking-wide">Gain de temps</span>
+                </div>
+
+                {linkedinSummary ? (
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3.5 py-2.5">
+                    <Check className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                    <span className="text-sm font-medium text-emerald-700">{linkedinSummary}</span>
+                    <button
+                      type="button"
+                      onClick={() => setLinkedinSummary(null)}
+                      className="ml-auto text-xs text-emerald-500 hover:text-emerald-700 underline"
+                    >
+                      Réimporter
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-indigo-700">Méthode 1 :</p>
+                      <p className="text-xs text-indigo-600">Sur ton profil LinkedIn → <kbd className="bg-indigo-100 px-1 py-0.5 rounded text-[10px] font-mono">Ctrl+A</kbd> → <kbd className="bg-indigo-100 px-1 py-0.5 rounded text-[10px] font-mono">Ctrl+C</kbd> → colle ici</p>
+                      <p className="text-xs font-semibold text-indigo-700 mt-1.5">Méthode 2 :</p>
+                      <p className="text-xs text-indigo-600">LinkedIn → <strong>Plus</strong> → <strong>Enregistrer en PDF</strong> → colle le texte ici</p>
+                    </div>
+                    <input
+                      type="url"
+                      value={linkedinUrl}
+                      onChange={(e) => {
+                        setLinkedinUrl(e.target.value);
+                        if (e.target.value.includes("linkedin.com/in/")) {
+                          updateDraft("linkedIn", e.target.value.trim());
+                        }
+                      }}
+                      placeholder="https://linkedin.com/in/ton-profil (optionnel)"
+                      className="w-full rounded-xl border border-indigo-200 bg-white px-3.5 py-2 text-sm text-gray-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
+                    />
                     <textarea
                       value={linkedinText}
                       onChange={(e) => setLinkedinText(e.target.value)}
-                      rows={5}
-                      placeholder="Colle ici le texte de ton profil LinkedIn (Résumé, Expériences, Formation...)"
+                      rows={4}
+                      placeholder="Colle ici le texte copié de ton profil LinkedIn…"
                       className="w-full rounded-xl border border-indigo-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none transition-colors"
                     />
                     <button
@@ -645,9 +678,9 @@ export default function CvBuilderPage() {
                       className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {linkedinImporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                      {linkedinImporting ? "Import en cours…" : "Importer"}
+                      {linkedinImporting ? "Import en cours…" : "Remplir automatiquement"}
                     </button>
-                  </div>
+                  </>
                 )}
               </div>
 
@@ -758,6 +791,7 @@ export default function CvBuilderPage() {
               onPolish={polishBullet}
               sector={draft.sector}
               targetRole={draft.targetRole}
+              offerText={draft.offerText}
             />
           )}
 
@@ -910,7 +944,7 @@ function bulletQuality(text: string): "good" | "warn" | null {
 }
 
 function ExperiencesEditor({
-  experiences, setExperiences, polishing, onPolish, sector, targetRole,
+  experiences, setExperiences, polishing, onPolish, sector, targetRole, offerText,
 }: {
   experiences: Experience[];
   setExperiences: (e: Experience[]) => void;
@@ -918,8 +952,10 @@ function ExperiencesEditor({
   onPolish: (expIdx: number, bulletIdx: number) => void;
   sector: string;
   targetRole: string;
+  offerText?: string;
 }) {
   const [generating, setGenerating] = useState<string | null>(null);
+  const [rewriting, setRewriting] = useState<string | null>(null);
 
   const add = () =>
     setExperiences([
@@ -949,6 +985,27 @@ function ExperiencesEditor({
     }
   };
 
+  const rewriteBulletsFromOffer = async (exp: Experience) => {
+    const validBullets = exp.bullets.filter((b) => b.trim());
+    if (!offerText?.trim() || !validBullets.length) return;
+    setRewriting(exp.id);
+    try {
+      const res = await fetch("/api/cv-build/rewrite-bullets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bullets: validBullets, offerText, role: exp.title, sector }),
+      });
+      const data = await res.json() as { bullets?: string[]; error?: string };
+      if (!res.ok) throw new Error(data.error || "Erreur");
+      update(exp.id, { bullets: data.bullets ?? validBullets });
+      toast.success("Bullets adaptés à l'offre ✓");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur réécriture");
+    } finally {
+      setRewriting(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {experiences.map((exp, i) => (
@@ -969,19 +1026,33 @@ function ExperiencesEditor({
             </div>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-xs uppercase tracking-widest text-gray-500 font-semibold">Missions (bullets)</p>
-              {exp.title && (
-                <button
-                  type="button"
-                  onClick={() => generateBullets(exp.id, exp.title, exp.company)}
-                  disabled={generating === exp.id}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow hover:shadow-md transition-shadow disabled:opacity-50"
-                >
-                  {generating === exp.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-                  {generating === exp.id ? "Génération…" : "Générer avec l'IA"}
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {offerText && exp.bullets.some((b) => b.trim()) && (
+                  <button
+                    type="button"
+                    onClick={() => rewriteBulletsFromOffer(exp)}
+                    disabled={rewriting === exp.id}
+                    title="Réécrire les bullets pour matcher l'offre d'emploi"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-3 py-1.5 text-[11px] font-bold text-white shadow hover:shadow-md transition-shadow disabled:opacity-50"
+                  >
+                    {rewriting === exp.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    {rewriting === exp.id ? "Adaptation…" : "Adapter à l'offre"}
+                  </button>
+                )}
+                {exp.title && (
+                  <button
+                    type="button"
+                    onClick={() => generateBullets(exp.id, exp.title, exp.company)}
+                    disabled={generating === exp.id}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow hover:shadow-md transition-shadow disabled:opacity-50"
+                  >
+                    {generating === exp.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                    {generating === exp.id ? "Génération…" : "Générer avec l'IA"}
+                  </button>
+                )}
+              </div>
             </div>
             {exp.bullets.map((b, bi) => {
               const quality = bulletQuality(b);
@@ -1793,6 +1864,8 @@ function CvPreview({
   onChoiceChange: (id: string, value: string | boolean) => void;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publicUrl, setPublicUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (previewHtml && iframeRef.current) {
@@ -1874,6 +1947,74 @@ function CvPreview({
         <Check className="h-3 w-3 text-emerald-500" />
         Template adapté à ton secteur · L'IA a retravaillé chaque ligne · Prêt à envoyer
       </div>
+
+      {/* Publish & share */}
+      {publicUrl ? (
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 space-y-2">
+          <p className="text-xs font-bold text-indigo-700 uppercase tracking-widest">✓ CV publié</p>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={publicUrl}
+              className="flex-1 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs text-gray-700 outline-none truncate"
+            />
+            <button
+              onClick={() => { navigator.clipboard.writeText(publicUrl); toast.success("Lien copié !"); }}
+              className="shrink-0 rounded-xl bg-indigo-600 text-white px-3 py-2 text-xs font-bold hover:bg-indigo-700 transition-colors"
+            >
+              Copier
+            </button>
+          </div>
+          <button
+            onClick={() => setPublicUrl(null)}
+            className="text-xs text-indigo-400 hover:text-indigo-600 underline"
+          >
+            Republier avec les dernières modifications
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={async () => {
+            setPublishing(true);
+            try {
+              const res = await fetch("/api/cv-build/publish", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ cvPayload: {
+                  firstName: draft.firstName, lastName: draft.lastName,
+                  email: draft.email, phone: draft.phone, city: draft.city,
+                  linkedIn: draft.linkedIn, portfolio: draft.portfolio, photoUrl: draft.photoUrl ?? null,
+                  sector: draft.sector, targetRole: draft.targetRole, summary: draft.summary,
+                  experiences: draft.experiences, educations: draft.educations,
+                  skills: draft.skills, languages: draft.languages, interests: draft.interests,
+                }}),
+              });
+              if (!res.ok) throw new Error(await res.text());
+              const { url } = await res.json() as { slug: string; url: string };
+              setPublicUrl(url);
+              toast.success("CV publié !");
+            } catch {
+              toast.error("Erreur lors de la publication");
+            } finally {
+              setPublishing(false);
+            }
+          }}
+          disabled={publishing}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-indigo-400 text-indigo-700 px-5 py-3 text-sm font-bold hover:bg-indigo-50 transition-colors disabled:opacity-50"
+        >
+          {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🔗</span>}
+          {publishing ? "Publication..." : "Publier & partager le lien"}
+        </button>
+      )}
+
+      {/* Open in visual editor */}
+      <Link
+        href="/cv-editor?from=builder"
+        className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-emerald-500 text-emerald-700 px-5 py-3 text-sm font-bold hover:bg-emerald-50 transition-colors"
+      >
+        <PenTool className="h-4 w-4" />
+        Retoucher dans l&apos;éditeur visuel
+      </Link>
 
       {/* Cross-link cover letter */}
       <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 flex items-center justify-between gap-4">

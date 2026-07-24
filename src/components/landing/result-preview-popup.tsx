@@ -169,7 +169,7 @@ function AnalyzingAnimation({
   };
 
   const currentSteps = steps[type];
-  const TOTAL_MS = 40000; // exactly 40 seconds
+  const TOTAL_MS = 12000; // 12 seconds — feels fast and credible
 
   // Store onDone in a ref so the effect never restarts when onDone changes
   const onDoneRef = useRef(onDone);
